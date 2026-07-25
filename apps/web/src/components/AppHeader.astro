@@ -6,9 +6,10 @@ import Brand from './Brand.astro'
 interface Props {
   apiUrl: string
   lastSync: string
+  syncStatus: 'failed' | 'idle' | 'running' | 'succeeded'
 }
 
-const { apiUrl, lastSync } = Astro.props
+const { apiUrl, lastSync, syncStatus } = Astro.props
 ---
 
 <header class="app-header" data-api-url={apiUrl}>
@@ -17,6 +18,11 @@ const { apiUrl, lastSync } = Astro.props
     <Badge variant="outline"
       ><span class="status-dot"></span> Private workspace</Badge
     >
+    {
+      syncStatus === 'failed' && (
+        <Badge variant="warning">Last sync failed</Badge>
+      )
+    }
     <span class="sync-meta">Updated {lastSync}</span>
     <Button data-sync-button size="sm" variant="outline">
       <Icon aria-hidden="true" name="refresh-cw" />
@@ -34,8 +40,9 @@ const { apiUrl, lastSync } = Astro.props
 </header>
 
 <script>
-  const syncButton =
-    document.querySelector<HTMLButtonElement>('[data-sync-button]')
+  const syncButtons = document.querySelectorAll<HTMLButtonElement>(
+    '[data-sync-button]',
+  )
 
   const logoutButton = document.querySelector<HTMLButtonElement>(
     '[data-logout-button]',
@@ -44,36 +51,44 @@ const { apiUrl, lastSync } = Astro.props
   const header = document.querySelector<HTMLElement>('.app-header')
   const apiUrl = header?.dataset.apiUrl ?? '/api'
 
-  syncButton?.addEventListener('click', async () => {
-    syncButton.disabled = true
+  for (const syncButton of syncButtons) {
+    syncButton.addEventListener('click', async () => {
+      const originalLabels = new Map(
+        [...syncButtons].map((button) => [button, button.innerHTML]),
+      )
 
-    syncButton.setAttribute('aria-busy', 'true')
+      for (const button of syncButtons) {
+        button.disabled = true
 
-    const original = syncButton.innerHTML
+        button.setAttribute('aria-busy', 'true')
+      }
 
-    syncButton.textContent = 'Syncing…'
+      syncButton.textContent = 'Syncing…'
 
-    try {
-      const response = await fetch(`${apiUrl}/sync`, {
-        credentials: 'include',
-        method: 'POST',
-      })
+      try {
+        const response = await fetch(`${apiUrl}/sync`, {
+          credentials: 'include',
+          method: 'POST',
+        })
 
-      if (!response.ok) throw new Error('Sync failed')
+        if (!response.ok) throw new Error('Sync failed')
 
-      window.location.reload()
-    } catch {
-      syncButton.textContent = 'Try again'
+        window.location.reload()
+      } catch {
+        syncButton.textContent = 'Try again'
 
-      syncButton.disabled = false
+        window.setTimeout(() => {
+          for (const button of syncButtons) {
+            button.innerHTML = originalLabels.get(button) ?? 'Sync now'
 
-      syncButton.removeAttribute('aria-busy')
+            button.disabled = false
 
-      window.setTimeout(() => {
-        syncButton.innerHTML = original
-      }, 2_000)
-    }
-  })
+            button.removeAttribute('aria-busy')
+          }
+        }, 2_000)
+      }
+    })
+  }
 
   logoutButton?.addEventListener('click', async () => {
     await fetch(`${apiUrl}/auth/logout`, {

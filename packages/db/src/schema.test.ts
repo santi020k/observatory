@@ -19,4 +19,8 @@ describe('observatory database schema', () => {
 
     expect(projectSnapshots.visibility.notNull).toBe(true)
   })
+
+  it('associates snapshots with the sync run that produced them', () => {
+    expect(projectSnapshots.syncRunId.name).toBe('sync_run_id')
+  })
 })

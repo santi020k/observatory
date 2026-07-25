@@ -5,8 +5,9 @@ import {
 } from '@santi020k/observatory-api-types'
 import {
   createDb,
-  getLatestSnapshots,
+  getLatestSuccessfulSyncRun,
   getLatestSyncRun,
+  getSnapshotsForSyncRun,
 } from '@santi020k/observatory-db'
 
 import type { Bindings } from '../env'
@@ -35,10 +36,14 @@ const sumNullable = (values: readonly (number | null)[]): number | null => {
 export const buildDashboard = async (env: Bindings): Promise<Dashboard> => {
   const database = createDb(env.DB)
 
-  const [rows, sync] = await Promise.all([
-    getLatestSnapshots(database),
+  const [sync, latestSuccessfulSync] = await Promise.all([
     getLatestSyncRun(database),
+    getLatestSuccessfulSyncRun(database),
   ])
+
+  const rows = latestSuccessfulSync
+    ? await getSnapshotsForSyncRun(database, latestSuccessfulSync.id)
+    : []
 
   const projects: ProjectMetric[] = rows.map((row) => ({
     archived: row.archived,
@@ -91,8 +96,8 @@ export const buildDashboard = async (env: Bindings): Promise<Dashboard> => {
       ).length,
     },
     sync: {
-      completedAt: sync?.completedAt
-        ? new Date(sync.completedAt).toISOString()
+      completedAt: latestSuccessfulSync?.completedAt
+        ? new Date(latestSuccessfulSync.completedAt).toISOString()
         : null,
       status: sync?.status ?? 'idle',
     },

@@ -49,13 +49,15 @@ const githubHeaders = (token?: string): HeadersInit => ({
 const fetchJson = async <Result>(
   url: string,
   headers?: HeadersInit,
-): Promise<Result | null> => {
+): Promise<Result> => {
   const response = await fetch(url, {
     ...(headers ? { headers } : {}),
     signal: AbortSignal.timeout(8_000),
   })
 
-  if (!response.ok) return null
+  if (!response.ok) {
+    throw new Error(`Provider request failed with ${response.status}: ${url}`)
+  }
 
   return response.json<Result>()
 }
@@ -63,12 +65,22 @@ const fetchJson = async <Result>(
 const collectGithubRepositories = async (
   token?: string,
 ): Promise<GithubRepository[]> => {
-  const repositories = await fetchJson<GithubRepository[]>(
-    `https://api.github.com/users/${githubOwner}/repos?per_page=100&sort=updated`,
-    githubHeaders(token),
-  )
+  const repositories: GithubRepository[] = []
+  let page = 1
+  let pageRepositories: GithubRepository[]
 
-  return (repositories ?? []).filter((repository) => !repository.fork)
+  do {
+    pageRepositories = await fetchJson<GithubRepository[]>(
+      `https://api.github.com/users/${githubOwner}/repos?per_page=100&sort=updated&page=${page}`,
+      githubHeaders(token),
+    )
+
+    repositories.push(...pageRepositories)
+
+    page += 1
+  } while (pageRepositories.length === 100)
+
+  return repositories.filter((repository) => !repository.fork)
 }
 
 const collectTraffic = async (
@@ -78,12 +90,18 @@ const collectTraffic = async (
 ): Promise<number | null> => {
   if (!token) return null
 
-  const traffic = await fetchJson<GithubTraffic>(
-    `https://api.github.com/repos/${githubOwner}/${repository}/traffic/${metric}`,
-    githubHeaders(token),
-  )
+  try {
+    const traffic = await fetchJson<GithubTraffic>(
+      `https://api.github.com/repos/${githubOwner}/${repository}/traffic/${metric}`,
+      githubHeaders(token),
+    )
 
-  return traffic?.count ?? null
+    return traffic.count
+  } catch {
+    // Traffic requires additional GitHub permissions. Keep it unavailable
+    // without invalidating otherwise healthy public metadata snapshots.
+    return null
+  }
 }
 
 const collectPackageMetrics = async (
@@ -103,8 +121,8 @@ const collectPackageMetrics = async (
       ])
 
       return {
-        downloads: downloads?.downloads ?? 0,
-        latestVersion: registry?.['dist-tags']?.latest ?? null,
+        downloads: downloads.downloads,
+        latestVersion: registry['dist-tags']?.latest ?? null,
       }
     }),
   )
@@ -127,11 +145,19 @@ const checkWebsite = async (
   const startedAt = Date.now()
 
   try {
-    const response = await fetch(website, {
+    let response = await fetch(website, {
       method: 'HEAD',
       redirect: 'follow',
       signal: AbortSignal.timeout(6_000),
     })
+
+    if (response.status === 405 || response.status === 501) {
+      response = await fetch(website, {
+        headers: { Range: 'bytes=0-0' },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(6_000),
+      })
+    }
 
     return {
       responseTimeMs: Date.now() - startedAt,
@@ -167,6 +193,7 @@ const collectRepository = async (
   repository: GithubRepository,
   env: Bindings,
   collectedAt: number,
+  syncRunId: string,
 ): Promise<SnapshotWrite> => {
   const override = getCatalogOverride(repository.name)
   const packages = override?.npmPackages ?? []
@@ -199,6 +226,7 @@ const collectRepository = async (
     slug: repository.name,
     stars: repository.stargazers_count,
     status: override?.status ?? inferStatus(repository),
+    syncRunId,
     topics: repository.topics,
     visibility: repository.private ? 'private' : 'public',
     websiteUrl: repository.homepage || null,
@@ -217,7 +245,7 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
 
     const snapshots = await Promise.all(
       repositories.map((repository) =>
-        collectRepository(repository, env, startedAt),
+        collectRepository(repository, env, startedAt, runId),
       ),
     )
 
@@ -241,4 +269,10 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
 
     throw error
   }
+}
+
+export const collectorInternals = {
+  checkWebsite,
+  collectGithubRepositories,
+  collectPackageMetrics,
 }

@@ -9,11 +9,38 @@ import { buildDashboard } from './lib/dashboard'
 import { authRoutes } from './routes/auth'
 import type { Bindings, WorkerEnv } from './env'
 
-const app = new Hono<WorkerEnv>()
+export const app = new Hono<WorkerEnv>()
 
 app.use(logger())
 
 app.use(secureHeaders())
+
+app.use('*', async (context, next) => {
+  const method = context.req.method
+  const origin = context.req.header('Origin')
+
+  const allowedOrigins = context.env.CORS_ORIGIN.split(',').map((value) =>
+    value.trim(),
+  )
+
+  if (
+    !['GET', 'HEAD', 'OPTIONS'].includes(method) &&
+    origin &&
+    !allowedOrigins.includes(origin)
+  ) {
+    return context.json(
+      {
+        error: {
+          code: 'INVALID_ORIGIN',
+          message: 'Request origin is not allowed.',
+        },
+      },
+      403,
+    )
+  }
+
+  await next()
+})
 
 app.use('*', async (context, next) =>
   cors({

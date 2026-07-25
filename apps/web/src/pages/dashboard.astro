@@ -90,7 +90,11 @@ const lastSync = dashboard.sync.completedAt
   title="Overview · Observatory"
 >
   <div class="app-shell">
-    <AppHeader apiUrl={apiUrl} lastSync={lastSync} />
+    <AppHeader
+      apiUrl={apiUrl}
+      lastSync={lastSync}
+      syncStatus={dashboard.sync.status}
+    />
 
     <main class="dashboard" id="main-content">
       <section class="hero-row" aria-labelledby="overview-title">

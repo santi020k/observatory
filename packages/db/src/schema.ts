@@ -19,6 +19,15 @@ export const sessions = sqliteTable('sessions', {
   tokenHash: text('token_hash').notNull().unique(),
 })
 
+export const syncRuns = sqliteTable('sync_runs', {
+  completedAt: integer('completed_at'),
+  errorMessage: text('error_message'),
+  id: text('id').primaryKey(),
+  projectCount: integer('project_count').notNull().default(0),
+  startedAt: integer('started_at').notNull(),
+  status: text('status').notNull(),
+})
+
 export const projectSnapshots = sqliteTable('project_snapshots', {
   archived: integer('archived', { mode: 'boolean' }).notNull(),
   category: text('category').notNull(),
@@ -40,16 +49,8 @@ export const projectSnapshots = sqliteTable('project_snapshots', {
   slug: text('slug').notNull(),
   stars: integer('stars').notNull().default(0),
   status: text('status').notNull(),
+  syncRunId: text('sync_run_id').references(() => syncRuns.id),
   topics: text('topics').notNull().default('[]'),
   visibility: text('visibility').notNull().default('public'),
   websiteUrl: text('website_url'),
-})
-
-export const syncRuns = sqliteTable('sync_runs', {
-  completedAt: integer('completed_at'),
-  errorMessage: text('error_message'),
-  id: text('id').primaryKey(),
-  projectCount: integer('project_count').notNull().default(0),
-  startedAt: integer('started_at').notNull(),
-  status: text('status').notNull(),
 })

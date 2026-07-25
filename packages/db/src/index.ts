@@ -28,6 +28,7 @@ export interface SnapshotWrite {
   slug: string
   stars: number
   status: string
+  syncRunId: string
   topics: readonly string[]
   visibility: string
   websiteUrl: string | null
@@ -173,16 +174,18 @@ export const insertSnapshots = async (
   }
 }
 
-export const getLatestSnapshots = async (db: ObservatoryDb) =>
+export const getSnapshotsForSyncRun = async (
+  db: ObservatoryDb,
+  syncRunId: string,
+) =>
   db
     .select()
     .from(projectSnapshots)
     .where(
-      sql`${projectSnapshots.collectedAt} = (
-        select max(p2.collected_at)
-        from project_snapshots p2
-        where p2.slug = ${projectSnapshots.slug}
-      )`,
+      and(
+        eq(projectSnapshots.visibility, 'public'),
+        eq(projectSnapshots.syncRunId, syncRunId),
+      ),
     )
     .orderBy(desc(projectSnapshots.pushedAt))
 
@@ -190,6 +193,15 @@ export const getLatestSyncRun = async (db: ObservatoryDb) =>
   db
     .select()
     .from(syncRuns)
+    .orderBy(desc(syncRuns.startedAt))
+    .limit(1)
+    .then((rows) => rows[0] ?? null)
+
+export const getLatestSuccessfulSyncRun = async (db: ObservatoryDb) =>
+  db
+    .select()
+    .from(syncRuns)
+    .where(eq(syncRuns.status, 'succeeded'))
     .orderBy(desc(syncRuns.startedAt))
     .limit(1)
     .then((rows) => rows[0] ?? null)
