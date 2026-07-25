@@ -53,9 +53,11 @@ if (
 
 const dashboard = response.parsed
 const project = dashboard.project
+
 const sidebarProjects = settingsResponse.parsed.projects.filter(
   (candidate) => candidate.enabled,
 )
+
 const apiUrl = getBrowserApiUrl()
 
 const maxDownloads = Math.max(

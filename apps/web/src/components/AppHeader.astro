@@ -60,16 +60,20 @@ const { apiUrl, lastSync, syncStatus } = Astro.props
   const header = document.querySelector<HTMLElement>('.app-header')
   const apiUrl = header?.dataset.apiUrl ?? '/api'
   const sidebar = document.querySelector<HTMLElement>('[data-app-sidebar]')
+
   const sidebarTrigger = document.querySelector<HTMLButtonElement>(
     '[data-sidebar-trigger]',
   )
+
   const sidebarCloseButtons = document.querySelectorAll<HTMLButtonElement>(
     '[data-sidebar-close]',
   )
 
   const closeSidebar = () => {
     sidebar?.classList.remove('is-open')
+
     document.body.classList.remove('sidebar-open')
+
     sidebarTrigger?.setAttribute('aria-expanded', 'false')
   }
 
@@ -77,7 +81,9 @@ const { apiUrl, lastSync, syncStatus } = Astro.props
     const isOpen = !sidebar?.classList.contains('is-open')
 
     sidebar?.classList.toggle('is-open', isOpen)
+
     document.body.classList.toggle('sidebar-open', isOpen)
+
     sidebarTrigger.setAttribute('aria-expanded', String(isOpen))
 
     if (isOpen)
@@ -92,6 +98,7 @@ const { apiUrl, lastSync, syncStatus } = Astro.props
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       closeSidebar()
+
       sidebarTrigger?.focus({ preventScroll: true })
     }
   })

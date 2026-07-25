@@ -1,11 +1,11 @@
 ---
+import Badge from '@santi020k/lumen-astro/components/Badge'
+import Icon from '@santi020k/lumen-astro/components/Icon'
+import Sidebar from '@santi020k/lumen-astro/components/Sidebar'
 import type {
   AnalyticsRange,
   ProjectSettings,
 } from '@santi020k/observatory-api-types'
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import Sidebar from '@santi020k/lumen-astro/components/Sidebar'
 
 import Brand from './Brand.astro'
 
@@ -21,7 +21,7 @@ interface Props {
 
 const { projects, range = '30d' } = Astro.props
 const currentPath = Astro.url.pathname
-const currentSlug = currentPath.match(/^\/projects\/([^/]+)/)?.[1]
+const currentSlug = /^\/projects\/([^/]+)/.exec(currentPath)?.[1]
 
 const getCategoryIcon = (
   category: SidebarProject['category'],

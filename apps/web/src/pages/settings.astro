@@ -23,6 +23,7 @@ const apiUrl = getBrowserApiUrl()
 const enabledCount = settings.projects.filter(
   (project) => project.enabled,
 ).length
+
 const getCategoryIcon = (
   category: (typeof settings.projects)[number]['category'],
 ): 'blocks' | 'layout-dashboard' | 'notebook-tabs' | 'wrench' => {
