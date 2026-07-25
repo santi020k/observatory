@@ -6,9 +6,13 @@ import AppLayout from '@/layouts/AppLayout.astro'
 import { getBrowserApiUrl, getProjectSettings } from '@/lib/api'
 
 import Badge from '@santi020k/lumen-astro/components/Badge'
+import Button from '@santi020k/lumen-astro/components/Button'
 import Card from '@santi020k/lumen-astro/components/Card'
 import Empty from '@santi020k/lumen-astro/components/Empty'
 import Icon from '@santi020k/lumen-astro/components/Icon'
+import NativeSelect from '@santi020k/lumen-astro/components/NativeSelect'
+import Switch from '@santi020k/lumen-astro/components/Switch'
+import Tabs from '@santi020k/lumen-astro/components/Tabs'
 
 const response = await getProjectSettings(Astro.request, Astro.url)
 
@@ -38,7 +42,7 @@ const getCategoryIcon = (
 ---
 
 <AppLayout
-  description="Control which projects Observatory includes in dashboards and analysis."
+  description="Manage Observatory workspace and interface preferences."
   title="Settings · Observatory"
 >
   <div class="app-shell">
@@ -56,89 +60,243 @@ const getCategoryIcon = (
         <section class="hero-row" aria-labelledby="settings-title">
           <div>
             <span class="eyebrow">Workspace preferences</span>
-            <h1 id="settings-title">Project visibility</h1>
+            <h1 id="settings-title">Settings</h1>
             <p>
-              Decide which projects contribute to your overview, historical
-              analysis, attention queue, and individual project dashboards.
+              Shape what Observatory tracks and how this workspace feels in
+              your browser.
             </p>
           </div>
-          <Badge variant="outline" data-enabled-count>
-            {enabledCount} of {settings.projects.length} included
-          </Badge>
         </section>
 
-        <div class="settings-callout">
-          <Icon aria-hidden="true" name="info" />
-          <p>
-            Disabled projects continue collecting snapshots so they can be
-            restored without losing history. Their data is excluded from all
-            analysis while disabled.
-          </p>
-        </div>
+        <Tabs
+          class="settings-tabs"
+          initialValue="projects"
+          storageKey="observatory.settings.active-tab"
+        >
+          <div aria-label="Settings sections" role="tablist">
+            <button aria-selected="true" data-value="projects" role="tab">
+              <Icon aria-hidden="true" name="blocks" />
+              Projects
+            </button>
+            <button aria-selected="false" data-value="display" role="tab">
+              <Icon aria-hidden="true" name="panel-top" />
+              Display
+            </button>
+            <button aria-selected="false" data-value="privacy" role="tab">
+              <Icon aria-hidden="true" name="shield-check" />
+              Privacy
+            </button>
+          </div>
 
-        {
-          settings.projects.length === 0 ? (
-            <Empty class="first-sync">
-              <Icon aria-hidden="true" name="telescope" />
-              <h2>No projects to configure yet</h2>
+          <section data-value="projects" role="tabpanel">
+            <div class="settings-section-heading">
+              <div>
+                <span class="eyebrow">Catalog</span>
+                <h2>Project visibility</h2>
+                <p>
+                  Choose which projects contribute to dashboards, historical
+                  analysis, and the attention queue.
+                </p>
+              </div>
+              <Badge variant="outline" data-enabled-count>
+                {enabledCount} of {settings.projects.length} included
+              </Badge>
+            </div>
+
+            <div class="settings-callout">
+              <Icon aria-hidden="true" name="info" />
               <p>
-                Run a sync from the overview to discover your public projects.
+                Disabled projects continue collecting snapshots so they can be
+                restored without losing history. Their data is excluded from
+                analysis while disabled.
               </p>
-            </Empty>
-          ) : (
-            <Card
-              as="section"
-              class="settings-panel"
-              aria-labelledby="project-settings-heading"
-              data-settings-panel
-              data-total={settings.projects.length}
-            >
-              <div class="settings-panel__heading">
-                <div>
-                  <h2 id="project-settings-heading">Included projects</h2>
+            </div>
+
+            {
+              settings.projects.length === 0 ? (
+                <Empty class="first-sync">
+                  <Icon aria-hidden="true" name="telescope" />
+                  <h2>No projects to configure yet</h2>
                   <p>
-                    Changes save immediately and apply on the next page load.
+                    Run a sync from the overview to discover your public
+                    projects.
+                  </p>
+                </Empty>
+              ) : (
+                <Card
+                  as="section"
+                  class="settings-panel"
+                  aria-labelledby="project-settings-heading"
+                  data-settings-panel
+                  data-total={settings.projects.length}
+                >
+                  <div class="settings-panel__heading">
+                    <div>
+                      <h3 id="project-settings-heading">
+                        Included projects
+                      </h3>
+                      <p>
+                        Changes save immediately and apply on the next page
+                        load.
+                      </p>
+                    </div>
+                    <span
+                      class="save-state"
+                      aria-live="polite"
+                      data-save-state
+                    >
+                      All changes saved
+                    </span>
+                  </div>
+                  <ul class="project-settings-list">
+                    {settings.projects.map((project) => (
+                      <li>
+                        <span class="project-icon">
+                          <Icon
+                            aria-hidden="true"
+                            name={getCategoryIcon(project.category)}
+                          />
+                        </span>
+                        <div>
+                          <strong>{project.name}</strong>
+                          <span data-project-details>
+                            {project.category} · {project.status}
+                          </span>
+                        </div>
+                        <Switch
+                          aria-label={`Include ${project.name} in analytics`}
+                          checked={project.enabled}
+                          data-project-toggle
+                          data-slug={project.slug}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              )
+            }
+          </section>
+
+          <section data-value="display" role="tabpanel">
+            <div class="settings-section-heading">
+              <div>
+                <span class="eyebrow">This browser</span>
+                <h2>Display preferences</h2>
+                <p>
+                  Tune the density and motion of Observatory on this device.
+                  Changes are applied and saved immediately.
+                </p>
+              </div>
+              <span
+                class="save-state"
+                aria-live="polite"
+                data-local-save-state
+              >
+                Saved in this browser
+              </span>
+            </div>
+
+            <Card as="section" class="settings-panel preference-panel">
+              <div class="preference-row">
+                <div>
+                  <label for="project-row-density">Project row density</label>
+                  <p>Control how much vertical space catalog rows use.</p>
+                </div>
+                <NativeSelect
+                  aria-label="Project row density"
+                  data-preference="density"
+                  id="project-row-density"
+                  options={[
+                    { label: 'Comfortable', value: 'comfortable' },
+                    { label: 'Compact', value: 'compact' },
+                  ]}
+                  size="sm"
+                />
+              </div>
+              <div class="preference-row">
+                <div>
+                  <label for="show-project-details">
+                    Show project metadata
+                  </label>
+                  <p id="show-project-details-description">
+                    Display category and health status below project names.
                   </p>
                 </div>
-                <span class="save-state" aria-live="polite" data-save-state>
-                  All changes saved
-                </span>
+                <Switch
+                  aria-describedby="show-project-details-description"
+                  aria-label="Show project metadata"
+                  data-preference="showDetails"
+                  id="show-project-details"
+                />
               </div>
-              <ul class="project-settings-list">
-                {settings.projects.map((project) => (
-                  <li>
-                    <span class="project-icon">
-                      <Icon
-                        aria-hidden="true"
-                        name={getCategoryIcon(project.category)}
-                      />
-                    </span>
-                    <div>
-                      <strong>{project.name}</strong>
-                      <span>
-                        {project.category} · {project.status}
-                      </span>
-                    </div>
-                    <label class="project-switch">
-                      <span class="sr-only">
-                        Include {project.name} in analytics
-                      </span>
-                      <input
-                        checked={project.enabled}
-                        data-project-toggle
-                        data-slug={project.slug}
-                        type="checkbox"
-                      />
-                      <span aria-hidden="true" class="project-switch__track">
-                        <span />
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
+              <div class="preference-row">
+                <div>
+                  <label for="reduce-interface-motion">
+                    Reduce interface motion
+                  </label>
+                  <p id="reduce-interface-motion-description">
+                    Minimize nonessential transitions in this workspace.
+                  </p>
+                </div>
+                <Switch
+                  aria-describedby="reduce-interface-motion-description"
+                  aria-label="Reduce interface motion"
+                  data-preference="reduceMotion"
+                  id="reduce-interface-motion"
+                />
+              </div>
             </Card>
-          )
-        }
+          </section>
+
+          <section data-value="privacy" role="tabpanel">
+            <div class="settings-section-heading">
+              <div>
+                <span class="eyebrow">Data controls</span>
+                <h2>Privacy & storage</h2>
+                <p>
+                  Review where your settings live and clear preferences stored
+                  by this browser.
+                </p>
+              </div>
+            </div>
+
+            <div class="privacy-grid">
+              <Card as="article" class="privacy-card">
+                <span class="preference-icon">
+                  <Icon aria-hidden="true" name="lock-keyhole" />
+                </span>
+                <div>
+                  <h3>Private workspace</h3>
+                  <p>
+                    Project names and private metrics are only returned to the
+                    authenticated owner of this Observatory.
+                  </p>
+                </div>
+                <Badge variant="success">Owner only</Badge>
+              </Card>
+              <Card as="article" class="privacy-card">
+                <span class="preference-icon">
+                  <Icon aria-hidden="true" name="monitor" />
+                </span>
+                <div>
+                  <h3>Browser preferences</h3>
+                  <p>
+                    Display choices and the last-opened settings tab remain on
+                    this device. Project visibility stays in Observatory.
+                  </p>
+                </div>
+                <Button
+                  data-clear-preferences
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Clear preferences
+                </Button>
+              </Card>
+            </div>
+          </section>
+        </Tabs>
       </main>
 
       <footer class="app-footer">
@@ -150,6 +308,136 @@ const getCategoryIcon = (
 </AppLayout>
 
 <script>
+  const preferenceKey = 'observatory.settings.preferences'
+
+  interface BrowserPreferences {
+    density: 'comfortable' | 'compact'
+    reduceMotion: boolean
+    showDetails: boolean
+  }
+
+  const defaultPreferences: BrowserPreferences = {
+    density: 'comfortable',
+    reduceMotion: false,
+    showDetails: true,
+  }
+
+  const readPreferences = (): BrowserPreferences => {
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem(preferenceKey) ?? '{}',
+      ) as Partial<BrowserPreferences>
+
+      return { ...defaultPreferences, ...stored }
+    } catch {
+      return defaultPreferences
+    }
+  }
+
+  const applyPreferences = (preferences: BrowserPreferences) => {
+    document.documentElement.dataset.observatoryDensity = preferences.density
+
+    document.documentElement.dataset.observatoryReduceMotion = String(
+      preferences.reduceMotion,
+    )
+
+    document.documentElement.dataset.observatoryShowDetails = String(
+      preferences.showDetails,
+    )
+
+    const densitySelect = document.querySelector<HTMLSelectElement>(
+      '[data-preference="density"]',
+    )
+
+    const showDetails = document.querySelector<HTMLInputElement>(
+      '[data-preference="showDetails"]',
+    )
+
+    const reduceMotion = document.querySelector<HTMLInputElement>(
+      '[data-preference="reduceMotion"]',
+    )
+
+    if (densitySelect) densitySelect.value = preferences.density
+
+    if (showDetails) showDetails.checked = preferences.showDetails
+
+    if (reduceMotion) reduceMotion.checked = preferences.reduceMotion
+  }
+
+  let browserPreferences = readPreferences()
+
+  applyPreferences(browserPreferences)
+
+  const localSaveState = document.querySelector<HTMLElement>(
+    '[data-local-save-state]',
+  )
+
+  for (const control of document.querySelectorAll<
+    HTMLInputElement | HTMLSelectElement
+  >('[data-preference]')) {
+    control.addEventListener('change', () => {
+      browserPreferences = {
+        density:
+          document.querySelector<HTMLSelectElement>(
+            '[data-preference="density"]',
+          )?.value === 'compact'
+            ? 'compact'
+            : 'comfortable',
+        reduceMotion:
+          document.querySelector<HTMLInputElement>(
+            '[data-preference="reduceMotion"]',
+          )?.checked ?? false,
+        showDetails:
+          document.querySelector<HTMLInputElement>(
+            '[data-preference="showDetails"]',
+          )?.checked ?? true,
+      }
+
+      try {
+        localStorage.setItem(preferenceKey, JSON.stringify(browserPreferences))
+      } catch {
+        if (localSaveState)
+          localSaveState.textContent = 'Browser storage is unavailable'
+      }
+
+      applyPreferences(browserPreferences)
+
+      if (localSaveState) {
+        if (localSaveState.textContent !== 'Browser storage is unavailable')
+          localSaveState.textContent = 'Saved just now'
+
+        window.setTimeout(() => {
+          if (localSaveState.textContent !== 'Browser storage is unavailable')
+            localSaveState.textContent = 'Saved in this browser'
+        }, 1_600)
+      }
+    })
+  }
+
+  document
+    .querySelector<HTMLButtonElement>('[data-clear-preferences]')
+    ?.addEventListener('click', (event) => {
+      try {
+        localStorage.removeItem(preferenceKey)
+
+        localStorage.removeItem('observatory.settings.active-tab')
+      } catch {
+        // Applying the defaults still works when browser storage is blocked.
+      }
+
+      browserPreferences = { ...defaultPreferences }
+
+      applyPreferences(browserPreferences)
+
+      const button = event.currentTarget as HTMLButtonElement
+
+      button.textContent = 'Preferences cleared'
+
+      window.setTimeout(() => {
+        button.textContent = 'Clear preferences'
+      }, 1_600)
+    })
+
   const panel = document.querySelector<HTMLElement>('[data-settings-panel]')
 
   const apiUrl =

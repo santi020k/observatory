@@ -75,14 +75,6 @@ export const dashboardSchema = z.object({
   }),
 })
 
-export const projectDashboardSchema = z.object({
-  generatedAt: z.string().trim(),
-  history: z.array(historyPointSchema),
-  period: periodSummarySchema,
-  project: projectMetricSchema,
-  range: analyticsRangeSchema,
-})
-
 export const projectSettingSchema = z.object({
   category: projectMetricSchema.shape.category,
   enabled: z.boolean(),
@@ -121,6 +113,15 @@ export const websiteAnalyticsSchema = z.object({
   sites: z.array(websiteAnalyticsSiteSchema),
 })
 
+export const projectDashboardSchema = z.object({
+  generatedAt: z.string().trim(),
+  history: z.array(historyPointSchema),
+  period: periodSummarySchema,
+  project: projectMetricSchema,
+  range: analyticsRangeSchema,
+  websiteAnalytics: websiteAnalyticsSiteSchema.nullable(),
+})
+
 export type Dashboard = z.infer<typeof dashboardSchema>
 export type AnalyticsRange = z.infer<typeof analyticsRangeSchema>
 export type ProjectDashboard = z.infer<typeof projectDashboardSchema>
@@ -130,6 +131,8 @@ export type UpdateProjectSettingInput = z.infer<
   typeof updateProjectSettingSchema
 >
 export type WebsiteAnalytics = z.infer<typeof websiteAnalyticsSchema>
+export type WebsiteAnalyticsPoint = z.infer<typeof websiteAnalyticsPointSchema>
+export type WebsiteAnalyticsSite = z.infer<typeof websiteAnalyticsSiteSchema>
 export type RequestCodeInput = z.infer<typeof requestCodeSchema>
 export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>
 

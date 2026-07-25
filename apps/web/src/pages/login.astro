@@ -11,6 +11,7 @@ import Field from '@santi020k/lumen-astro/components/Field'
 import Icon from '@santi020k/lumen-astro/components/Icon'
 import Input from '@santi020k/lumen-astro/components/Input'
 import Label from '@santi020k/lumen-astro/components/Label'
+import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
 
 const apiUrl = getBrowserApiUrl()
 ---
@@ -19,6 +20,7 @@ const apiUrl = getBrowserApiUrl()
   description="Private sign in for Santiago's project analytics dashboard."
   title="Sign in · Observatory"
 >
+  <ThemeToggle class="auth-theme-toggle" title="Toggle color theme" />
   <main class="auth-shell" id="main-content">
     <section class="auth-story" aria-labelledby="auth-story-title">
       <Brand />

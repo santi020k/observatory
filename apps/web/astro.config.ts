@@ -13,4 +13,12 @@ export default defineConfig({
     host: true,
     port: 4321,
   },
+  vite: {
+    ssr: {
+      optimizeDeps: {
+        ignoreOutdatedRequests: true,
+        include: ['zod'],
+      },
+    },
+  },
 })

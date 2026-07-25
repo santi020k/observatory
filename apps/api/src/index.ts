@@ -186,9 +186,11 @@ export default {
   ) => {
     executionContext.waitUntil(
       (async () => {
-        await syncProjects(env)
-
-        await Promise.all([syncCloudflareAnalytics(env), cleanupAuth(env)])
+        await Promise.all([
+          syncProjects(env),
+          syncCloudflareAnalytics(env),
+          cleanupAuth(env),
+        ])
       })(),
     )
   },

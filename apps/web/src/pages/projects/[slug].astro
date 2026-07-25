@@ -17,6 +17,7 @@ import {
   formatNumber,
   formatRelativeDate,
 } from '@/lib/format'
+import { aggregateWebsiteAnalytics } from '@/lib/website-analytics'
 
 import Badge from '@santi020k/lumen-astro/components/Badge'
 import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
@@ -53,6 +54,7 @@ if (
 
 const dashboard = response.parsed
 const project = dashboard.project
+const websiteAnalytics = dashboard.websiteAnalytics
 
 const sidebarProjects = settingsResponse.parsed.projects.filter(
   (candidate) => candidate.enabled,
@@ -65,10 +67,29 @@ const maxDownloads = Math.max(
   1,
 )
 
+const websiteHistory = websiteAnalytics
+  ? aggregateWebsiteAnalytics(websiteAnalytics.history, dashboard.range)
+  : []
+
+const maxWebsiteTraffic = Math.max(
+  ...websiteHistory.flatMap((point) => [point.pageViews, point.visits]),
+  1,
+)
+
+const websiteDataIsSampled = websiteHistory.some(
+  (point) => point.sampleInterval > 1,
+)
+
 const rangeLabels = {
   '30d': 'last 30 days',
   '1y': 'last year',
   '5y': 'last 5 years',
+} as const
+
+const websiteBucketLabels = {
+  '30d': 'Daily',
+  '1y': 'Monthly',
+  '5y': 'Monthly',
 } as const
 ---
 
@@ -179,6 +200,131 @@ const rangeLabels = {
             value={formatDuration(project.responseTimeMs)}
           />
         </section>
+
+        {
+          project.sources.website && (
+            <section
+              class="website-analytics-section"
+              aria-labelledby="website-analytics-heading"
+            >
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Cloudflare Web Analytics</span>
+                  <h2 id="website-analytics-heading">Website traffic</h2>
+                  <p>
+                    Privacy-first page activity for{' '}
+                    {websiteAnalytics?.hostname ??
+                      new URL(project.sources.website).hostname}
+                    .
+                  </p>
+                </div>
+                {websiteAnalytics && (
+                  <Badge variant="outline">
+                    {rangeLabels[dashboard.range]}
+                  </Badge>
+                )}
+              </div>
+
+              {websiteAnalytics ? (
+                <div class="website-analytics-grid">
+                  <div
+                    class="website-metric-grid"
+                    aria-label={`${project.name} website metrics`}
+                  >
+                    <MetricCard
+                      context={`Cloudflare total · ${rangeLabels[dashboard.range]}`}
+                      icon="mouse-pointer-click"
+                      label="Page views"
+                      value={formatNumber(websiteAnalytics.pageViews)}
+                    />
+                    <MetricCard
+                      context="Direct or externally referred sessions"
+                      icon="users"
+                      label="Visits"
+                      value={formatNumber(websiteAnalytics.visits)}
+                    />
+                  </div>
+
+                  <Card
+                    as="section"
+                    class="panel website-traffic-panel"
+                    aria-labelledby="website-traffic-history-heading"
+                  >
+                    <div class="panel-heading">
+                      <div>
+                        <span class="eyebrow">Traffic over time</span>
+                        <h3 id="website-traffic-history-heading">
+                          Page views and visits
+                        </h3>
+                      </div>
+                      <div class="traffic-legend" aria-label="Chart legend">
+                        <span>
+                          <i class="traffic-key traffic-key--views" />
+                          Page views
+                        </span>
+                        <span>
+                          <i class="traffic-key traffic-key--visits" />
+                          Visits
+                        </span>
+                      </div>
+                    </div>
+
+                    <Chart aria-label={`${project.name} website traffic history`}>
+                      <div class="traffic-chart">
+                        {websiteHistory.map((point) => (
+                          <div
+                            class="traffic-column"
+                            role="img"
+                            aria-label={`${formatDate(point.periodStart)}: ${formatNumber(point.pageViews)} page views and ${formatNumber(point.visits)} visits`}
+                          >
+                            <div
+                              class="traffic-column__bars"
+                              aria-hidden="true"
+                            >
+                              <span
+                                class="traffic-bar traffic-bar--views"
+                                style={`height: ${Math.max(
+                                  (point.pageViews / maxWebsiteTraffic) * 100,
+                                  3,
+                                )}%`}
+                              />
+                              <span
+                                class="traffic-bar traffic-bar--visits"
+                                style={`height: ${Math.max(
+                                  (point.visits / maxWebsiteTraffic) * 100,
+                                  3,
+                                )}%`}
+                              />
+                            </div>
+                            <small>{formatDate(point.periodStart)}</small>
+                          </div>
+                        ))}
+                      </div>
+                      <figcaption>
+                        {websiteBucketLabels[dashboard.range]} Cloudflare totals.
+                        {websiteDataIsSampled &&
+                          ' Cloudflare adaptive sampling is present in this range.'}
+                      </figcaption>
+                    </Chart>
+                  </Card>
+                </div>
+              ) : (
+                <Card class="panel website-analytics-empty">
+                  <Empty>
+                    <span class="empty-icon">
+                      <Icon aria-hidden="true" name="chart-no-axes-column" />
+                    </span>
+                    <h3>No Cloudflare traffic yet</h3>
+                    <p>
+                      Data will appear after the Web Analytics beacon reports
+                      activity and the next analytics sync completes.
+                    </p>
+                  </Empty>
+                </Card>
+              )}
+            </section>
+          )
+        }
 
         <section class="project-detail-grid">
           <Card

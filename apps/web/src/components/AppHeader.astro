@@ -2,6 +2,7 @@
 import Badge from '@santi020k/lumen-astro/components/Badge'
 import Button from '@santi020k/lumen-astro/components/Button'
 import Icon from '@santi020k/lumen-astro/components/Icon'
+import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
 
 interface Props {
   apiUrl: string
@@ -38,6 +39,7 @@ const { apiUrl, lastSync, syncStatus } = Astro.props
       <Icon aria-hidden="true" name="refresh-cw" />
       Sync now
     </Button>
+    <ThemeToggle title="Toggle color theme" />
     <Button
       data-logout-button
       size="icon"

@@ -19,6 +19,8 @@ import {
 
 import type { Bindings } from '../env'
 
+import { buildWebsiteAnalytics } from './cloudflare'
+
 type Snapshot = Awaited<ReturnType<typeof getSnapshotsForSyncRun>>[number]
 
 const getRangeMilliseconds = (range: AnalyticsRange): number => {
@@ -209,12 +211,19 @@ export const buildProjectDashboard = async (
     historyRows.filter((snapshot) => snapshot.slug === slug),
   )
 
+  const websiteAnalytics = row.websiteUrl
+    ? (await buildWebsiteAnalytics(env, range)).sites.find(
+        (site) => site.slug === slug,
+      ) ?? null
+    : null
+
   return projectDashboardSchema.parse({
     generatedAt: new Date().toISOString(),
     history,
     period: getPeriodSummary(history),
     project: toProjectMetric(row),
     range,
+    websiteAnalytics,
   })
 }
 

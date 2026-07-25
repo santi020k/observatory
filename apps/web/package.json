@@ -19,7 +19,9 @@
     "@astrojs/cloudflare": "catalog:",
     "@santi020k/lumen-astro": "catalog:",
     "@santi020k/observatory-api-types": "workspace:*",
-    "astro": "catalog:"
+    "@santi020k/theme": "catalog:",
+    "astro": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@astrojs/check": "catalog:",

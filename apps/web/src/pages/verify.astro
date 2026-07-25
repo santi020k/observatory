@@ -12,6 +12,7 @@ import Field from '@santi020k/lumen-astro/components/Field'
 import Icon from '@santi020k/lumen-astro/components/Icon'
 import InputOTP from '@santi020k/lumen-astro/components/InputOTP'
 import Label from '@santi020k/lumen-astro/components/Label'
+import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
 
 const email = Astro.url.searchParams.get('email') ?? ''
 
@@ -28,6 +29,7 @@ if (!email) return Astro.redirect('/login/')
   description="Verify your Observatory login code."
   title="Verify · Observatory"
 >
+  <ThemeToggle class="auth-theme-toggle" title="Toggle color theme" />
   <main class="verify-shell" id="main-content">
     <Brand />
     <Card class="auth-card verify-card">
