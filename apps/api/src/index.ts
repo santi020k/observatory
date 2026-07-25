@@ -2,10 +2,19 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { secureHeaders } from 'hono/secure-headers'
+import {
+  analyticsRangeSchema,
+  updateProjectSettingSchema,
+} from '@santi020k/observatory-api-types'
+import { createDb, setProjectPreference } from '@santi020k/observatory-db'
 
 import { cleanupAuth, requireAuth } from './lib/auth'
 import { syncProjects } from './lib/collector'
-import { buildDashboard } from './lib/dashboard'
+import {
+  buildDashboard,
+  buildProjectDashboard,
+  buildProjectSettings,
+} from './lib/dashboard'
 import { authRoutes } from './routes/auth'
 import type { Bindings, WorkerEnv } from './env'
 
@@ -61,9 +70,62 @@ app.get('/health', (context) =>
 
 app.route('/auth', authRoutes)
 
+const readRange = (value: string | undefined) =>
+  analyticsRangeSchema.catch('30d').parse(value)
+
 app.get('/dashboard', requireAuth, async (context) =>
-  context.json(await buildDashboard(context.env)),
+  context.json(
+    await buildDashboard(context.env, readRange(context.req.query('range'))),
+  ),
 )
+
+app.get('/projects/:slug', requireAuth, async (context) => {
+  const dashboard = await buildProjectDashboard(
+    context.env,
+    context.req.param('slug'),
+    readRange(context.req.query('range')),
+  )
+
+  return dashboard
+    ? context.json(dashboard)
+    : context.json(
+        {
+          error: {
+            code: 'PROJECT_NOT_FOUND',
+            message: 'Project not found or disabled.',
+          },
+        },
+        404,
+      )
+})
+
+app.get('/settings/projects', requireAuth, async (context) =>
+  context.json(await buildProjectSettings(context.env)),
+)
+
+app.post('/settings/projects', requireAuth, async (context) => {
+  const input = updateProjectSettingSchema.safeParse(await context.req.json())
+
+  if (!input.success)
+    return context.json(
+      {
+        error: {
+          code: 'INVALID_PROJECT_SETTING',
+          message: 'A project slug and enabled state are required.',
+        },
+      },
+      400,
+    )
+
+  await setProjectPreference(
+    createDb(context.env.DB),
+    input.data.slug,
+    input.data.enabled,
+    Date.now(),
+  )
+
+  return context.json({ updated: true })
+})
 
 app.post('/sync', requireAuth, async (context) => {
   const count = await syncProjects(context.env)

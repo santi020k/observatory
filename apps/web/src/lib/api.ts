@@ -1,5 +1,8 @@
 import type {
+  AnalyticsRange,
   Dashboard,
+  ProjectDashboard,
+  ProjectSettings,
   SessionResponse,
 } from '@santi020k/observatory-api-types'
 
@@ -50,7 +53,29 @@ export const getDashboard = async (
   requestUrl: URL,
 ): Promise<ApiResponse<Dashboard>> =>
   (await requestFromApi(
-    '/dashboard',
+    `/dashboard?range=${encodeURIComponent(requestUrl.searchParams.get('range') ?? '30d')}`,
     request,
     requestUrl,
   )) as ApiResponse<Dashboard>
+
+export const getProjectDashboard = async (
+  slug: string,
+  range: AnalyticsRange,
+  request: Request,
+  requestUrl: URL,
+): Promise<ApiResponse<ProjectDashboard>> =>
+  (await requestFromApi(
+    `/projects/${encodeURIComponent(slug)}?range=${range}`,
+    request,
+    requestUrl,
+  )) as ApiResponse<ProjectDashboard>
+
+export const getProjectSettings = async (
+  request: Request,
+  requestUrl: URL,
+): Promise<ApiResponse<ProjectSettings>> =>
+  (await requestFromApi(
+    '/settings/projects',
+    request,
+    requestUrl,
+  )) as ApiResponse<ProjectSettings>

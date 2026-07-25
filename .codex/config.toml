@@ -1,0 +1,6 @@
+[mcp_servers.lumen]
+enabled = true
+command = "npx"
+args = ["-y", "@santi020k/lumen-mcp"]
+startup_timeout_sec = 10.0
+tool_timeout_sec = 30.0

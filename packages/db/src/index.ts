@@ -1,7 +1,13 @@
 import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 
-import { authCodes, projectSnapshots, sessions, syncRuns } from './schema'
+import {
+  authCodes,
+  projectPreferences,
+  projectSnapshots,
+  sessions,
+  syncRuns,
+} from './schema'
 
 export * from './schema'
 
@@ -188,6 +194,39 @@ export const getSnapshotsForSyncRun = async (
       ),
     )
     .orderBy(desc(projectSnapshots.pushedAt))
+
+export const getPublicSnapshotsSince = async (
+  db: ObservatoryDb,
+  since: number,
+) =>
+  db
+    .select()
+    .from(projectSnapshots)
+    .where(
+      and(
+        eq(projectSnapshots.visibility, 'public'),
+        gt(projectSnapshots.collectedAt, since),
+      ),
+    )
+    .orderBy(projectSnapshots.collectedAt)
+
+export const getProjectPreferences = async (db: ObservatoryDb) =>
+  db.select().from(projectPreferences)
+
+export const setProjectPreference = async (
+  db: ObservatoryDb,
+  slug: string,
+  enabled: boolean,
+  updatedAt: number,
+): Promise<void> => {
+  await db
+    .insert(projectPreferences)
+    .values({ enabled, slug, updatedAt })
+    .onConflictDoUpdate({
+      set: { enabled, updatedAt },
+      target: projectPreferences.slug,
+    })
+}
 
 export const getLatestSyncRun = async (db: ObservatoryDb) =>
   db

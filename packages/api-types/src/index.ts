@@ -39,9 +39,28 @@ export const projectMetricSchema = z.object({
   visibility: z.enum(['private', 'public']),
 })
 
+export const analyticsRangeSchema = z.enum(['30d', '1y', '5y'])
+
+export const historyPointSchema = z.object({
+  collectedAt: z.string().trim(),
+  githubViews14d: z.int().nonnegative().nullable(),
+  npmDownloads30d: z.int().nonnegative(),
+  openIssues: z.int().nonnegative(),
+  stars: z.int().nonnegative(),
+})
+
+export const periodSummarySchema = z.object({
+  issueChange: z.int(),
+  starsGained: z.int(),
+  syncs: z.int().nonnegative(),
+})
+
 export const dashboardSchema = z.object({
   generatedAt: z.string().trim(),
+  history: z.array(historyPointSchema),
+  period: periodSummarySchema,
   projects: z.array(projectMetricSchema),
+  range: analyticsRangeSchema,
   summary: z.object({
     activeProjects: z.int().nonnegative(),
     githubClones14d: z.int().nonnegative().nullable(),
@@ -56,8 +75,39 @@ export const dashboardSchema = z.object({
   }),
 })
 
+export const projectDashboardSchema = z.object({
+  generatedAt: z.string().trim(),
+  history: z.array(historyPointSchema),
+  period: periodSummarySchema,
+  project: projectMetricSchema,
+  range: analyticsRangeSchema,
+})
+
+export const projectSettingSchema = z.object({
+  category: projectMetricSchema.shape.category,
+  enabled: z.boolean(),
+  name: z.string().trim(),
+  slug: z.string().trim(),
+  status: projectMetricSchema.shape.status,
+})
+
+export const projectSettingsSchema = z.object({
+  projects: z.array(projectSettingSchema),
+})
+
+export const updateProjectSettingSchema = z.object({
+  enabled: z.boolean(),
+  slug: z.string().trim().min(1),
+})
+
 export type Dashboard = z.infer<typeof dashboardSchema>
+export type AnalyticsRange = z.infer<typeof analyticsRangeSchema>
+export type ProjectDashboard = z.infer<typeof projectDashboardSchema>
 export type ProjectMetric = z.infer<typeof projectMetricSchema>
+export type ProjectSettings = z.infer<typeof projectSettingsSchema>
+export type UpdateProjectSettingInput = z.infer<
+  typeof updateProjectSettingSchema
+>
 export type RequestCodeInput = z.infer<typeof requestCodeSchema>
 export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>
 

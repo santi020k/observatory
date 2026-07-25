@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS project_preferences (
+  slug TEXT PRIMARY KEY NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  updated_at INTEGER NOT NULL
+);

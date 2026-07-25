@@ -54,3 +54,9 @@ export const projectSnapshots = sqliteTable('project_snapshots', {
   visibility: text('visibility').notNull().default('public'),
   websiteUrl: text('website_url'),
 })
+
+export const projectPreferences = sqliteTable('project_preferences', {
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  slug: text('slug').primaryKey(),
+  updatedAt: integer('updated_at').notNull(),
+})

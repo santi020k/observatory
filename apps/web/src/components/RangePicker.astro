@@ -1,0 +1,27 @@
+---
+import type { AnalyticsRange } from '@santi020k/observatory-api-types'
+
+interface Props {
+  range: AnalyticsRange
+}
+
+const { range } = Astro.props
+const ranges: { label: string; value: AnalyticsRange }[] = [
+  { label: '30 days', value: '30d' },
+  { label: '1 year', value: '1y' },
+  { label: '5 years', value: '5y' },
+]
+---
+
+<nav aria-label="Analytics time range" class="range-picker">
+  {
+    ranges.map((item) => (
+      <a
+        aria-current={range === item.value ? 'page' : undefined}
+        href={`?range=${item.value}`}
+      >
+        {item.label}
+      </a>
+    ))
+  }
+</nav>

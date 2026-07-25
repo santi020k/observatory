@@ -2,6 +2,7 @@
 import AppHeader from '@/components/AppHeader.astro'
 import MetricCard from '@/components/MetricCard.astro'
 import PrivateProjects from '@/components/PrivateProjects.astro'
+import RangePicker from '@/components/RangePicker.astro'
 import StatusBadge from '@/components/StatusBadge.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
@@ -13,16 +14,14 @@ import {
   formatRelativeDate,
 } from '@/lib/format'
 
-import {
-  Badge,
-  ButtonLink,
-  Card,
-  Chart,
-  Empty,
-  Icon,
-  Progress,
-  Table,
-} from '@santi020k/lumen-astro'
+import Badge from '@santi020k/lumen-astro/components/Badge'
+import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
+import Card from '@santi020k/lumen-astro/components/Card'
+import Chart from '@santi020k/lumen-astro/components/Chart'
+import Empty from '@santi020k/lumen-astro/components/Empty'
+import Icon from '@santi020k/lumen-astro/components/Icon'
+import Progress from '@santi020k/lumen-astro/components/Progress'
+import Table from '@santi020k/lumen-astro/components/Table'
 
 const response = await getDashboard(Astro.request, Astro.url)
 
@@ -33,6 +32,12 @@ if (!response.ok || !response.parsed)
 
 const dashboard = response.parsed
 const apiUrl = getBrowserApiUrl()
+const rangeLabels = {
+  '30d': 'last 30 days',
+  '1y': 'last year',
+  '5y': 'last 5 years',
+} as const
+const rangeLabel = rangeLabels[dashboard.range]
 
 const projectsByDownloads = [...dashboard.projects].sort(
   (left, right) => right.npmDownloads30d - left.npmDownloads30d,
@@ -44,6 +49,18 @@ const chartProjects = projectsByDownloads
 
 const maxDownloads = Math.max(
   ...chartProjects.map((project) => project.npmDownloads30d),
+  1,
+)
+const historySamples =
+  dashboard.history.length > 12
+    ? dashboard.history.filter(
+        (_, index) =>
+          index % Math.ceil(dashboard.history.length / 12) === 0 ||
+          index === dashboard.history.length - 1,
+      )
+    : dashboard.history
+const maxHistoryDownloads = Math.max(
+  ...historySamples.map((point) => point.npmDownloads30d),
   1,
 )
 
@@ -106,16 +123,19 @@ const lastSync = dashboard.sync.completedAt
             your product energy is going.
           </p>
         </div>
-        <div class="source-legend" aria-label="Active data sources">
-          <Badge variant="outline"
-            ><Icon aria-hidden="true" name="github" /> GitHub</Badge
-          >
-          <Badge variant="outline"
-            ><Icon aria-hidden="true" name="package" /> npm</Badge
-          >
-          <Badge variant="outline"
-            ><Icon aria-hidden="true" name="activity" /> Health</Badge
-          >
+        <div class="hero-controls">
+          <RangePicker range={dashboard.range} />
+          <div class="source-legend" aria-label="Active data sources">
+            <Badge variant="outline"
+              ><Icon aria-hidden="true" name="github" /> GitHub</Badge
+            >
+            <Badge variant="outline"
+              ><Icon aria-hidden="true" name="package" /> npm</Badge
+            >
+            <Badge variant="outline"
+              ><Icon aria-hidden="true" name="activity" /> Health</Badge
+            >
+          </div>
         </div>
       </section>
 
@@ -127,13 +147,13 @@ const lastSync = dashboard.sync.completedAt
           value={formatNumber(dashboard.summary.activeProjects)}
         />
         <MetricCard
-          context="Across mapped packages · last 30 days"
+          context="Current 30-day velocity across mapped packages"
           icon="download"
           label="Package downloads"
           value={formatNumber(dashboard.summary.npmDownloads30d)}
         />
         <MetricCard
-          context="Authenticated repository traffic · last 14 days"
+          context="Current authenticated 14-day repository traffic"
           icon="eye"
           label="GitHub views"
           value={formatNumber(dashboard.summary.githubViews14d)}
@@ -143,6 +163,18 @@ const lastSync = dashboard.sync.completedAt
           icon="activity"
           label="Open issues"
           value={formatNumber(dashboard.summary.openIssues)}
+        />
+        <MetricCard
+          context={`Net portfolio change · ${rangeLabel}`}
+          icon="star"
+          label="Stars gained"
+          value={`${dashboard.period.starsGained >= 0 ? '+' : ''}${formatNumber(dashboard.period.starsGained)}`}
+        />
+        <MetricCard
+          context={`Historical samples available · ${rangeLabel}`}
+          icon="history"
+          label="Sync snapshots"
+          value={formatNumber(dashboard.period.syncs)}
         />
       </section>
 
@@ -269,9 +301,59 @@ const lastSync = dashboard.sync.completedAt
               </Card>
             </section>
 
+            <Card
+              as="section"
+              class="panel history-panel"
+              aria-labelledby="history-heading"
+            >
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">Momentum</span>
+                  <h2 id="history-heading">Portfolio history</h2>
+                </div>
+                <span>{rangeLabel}</span>
+              </div>
+              {historySamples.length > 1 ? (
+                <Chart
+                  aria-label={`Portfolio download history for ${rangeLabel}`}
+                >
+                  <div class="history-chart">
+                    {historySamples.map((point) => (
+                      <div class="history-column">
+                        <span
+                          class="history-column__bar"
+                          style={`height: ${Math.max(
+                            (point.npmDownloads30d / maxHistoryDownloads) * 100,
+                            4,
+                          )}%`}
+                          title={`${formatNumber(point.npmDownloads30d)} downloads`}
+                        />
+                        <small>{formatDate(point.collectedAt)}</small>
+                      </div>
+                    ))}
+                  </div>
+                  <figcaption>
+                    Each bar is the observed 30-day download velocity at a sync
+                    point. {dashboard.period.starsGained >= 0 ? '+' : ''}
+                    {formatNumber(dashboard.period.starsGained)} stars and{' '}
+                    {dashboard.period.issueChange >= 0 ? '+' : ''}
+                    {formatNumber(dashboard.period.issueChange)} open issues
+                    across the selected range.
+                  </figcaption>
+                </Chart>
+              ) : (
+                <Empty>
+                  <p>
+                    More history will appear after a second sync in this range.
+                  </p>
+                </Empty>
+              )}
+            </Card>
+
             <section
               class="portfolio-section"
               aria-labelledby="portfolio-heading"
+              id="portfolio"
             >
               <div class="section-heading">
                 <div>
@@ -320,7 +402,14 @@ const lastSync = dashboard.sync.completedAt
                               />
                             </span>
                             <span>
-                              <strong>{project.name}</strong>
+                              <strong>
+                                <a
+                                  class="project-link"
+                                  href={`/projects/${project.slug}/?range=${dashboard.range}`}
+                                >
+                                  {project.name}
+                                </a>
+                              </strong>
                               <small>
                                 {project.description ?? project.slug}
                               </small>
@@ -361,13 +450,12 @@ const lastSync = dashboard.sync.completedAt
                         </td>
                         <td>
                           <ButtonLink
-                            ariaLabel={`Open ${project.name} on GitHub`}
-                            href={project.sources.github}
-                            newTab
+                            ariaLabel={`View ${project.name} dashboard`}
+                            href={`/projects/${project.slug}/?range=${dashboard.range}`}
                             shape="icon"
                             variant="ghost"
                           >
-                            <Icon aria-hidden="true" name="arrow-up-right" />
+                            <Icon aria-hidden="true" name="arrow-right" />
                           </ButtonLink>
                         </td>
                       </tr>

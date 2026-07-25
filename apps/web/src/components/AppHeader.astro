@@ -1,5 +1,7 @@
 ---
-import { Badge, Button, Icon } from '@santi020k/lumen-astro'
+import Badge from '@santi020k/lumen-astro/components/Badge'
+import Button from '@santi020k/lumen-astro/components/Button'
+import Icon from '@santi020k/lumen-astro/components/Icon'
 
 import Brand from './Brand.astro'
 
@@ -10,10 +12,33 @@ interface Props {
 }
 
 const { apiUrl, lastSync, syncStatus } = Astro.props
+const currentPath = Astro.url.pathname
+const navigation = [
+  { href: '/dashboard/', label: 'Overview' },
+  { href: '/dashboard/#portfolio', label: 'Projects' },
+  { href: '/settings/', label: 'Settings' },
+]
 ---
 
 <header class="app-header" data-api-url={apiUrl}>
   <Brand compact />
+  <nav aria-label="Primary navigation" class="app-nav">
+    {
+      navigation.map((item) => (
+        <a
+          aria-current={
+            item.href !== '/dashboard/#portfolio' &&
+            currentPath.startsWith(item.href)
+              ? 'page'
+              : undefined
+          }
+          href={item.href}
+        >
+          {item.label}
+        </a>
+      ))
+    }
+  </nav>
   <div class="app-header__actions">
     <Badge variant="outline"
       ><span class="status-dot"></span> Private workspace</Badge
@@ -40,9 +65,8 @@ const { apiUrl, lastSync, syncStatus } = Astro.props
 </header>
 
 <script>
-  const syncButtons = document.querySelectorAll<HTMLButtonElement>(
-    '[data-sync-button]',
-  )
+  const syncButtons =
+    document.querySelectorAll<HTMLButtonElement>('[data-sync-button]')
 
   const logoutButton = document.querySelector<HTMLButtonElement>(
     '[data-logout-button]',

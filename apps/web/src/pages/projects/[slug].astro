@@ -1,0 +1,247 @@
+---
+import AppHeader from '@/components/AppHeader.astro'
+import MetricCard from '@/components/MetricCard.astro'
+import RangePicker from '@/components/RangePicker.astro'
+import StatusBadge from '@/components/StatusBadge.astro'
+import AppLayout from '@/layouts/AppLayout.astro'
+import { getBrowserApiUrl, getProjectDashboard } from '@/lib/api'
+import {
+  formatDate,
+  formatDuration,
+  formatNumber,
+  formatRelativeDate,
+} from '@/lib/format'
+
+import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
+import Badge from '@santi020k/lumen-astro/components/Badge'
+import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
+import Card from '@santi020k/lumen-astro/components/Card'
+import Chart from '@santi020k/lumen-astro/components/Chart'
+import Empty from '@santi020k/lumen-astro/components/Empty'
+import Icon from '@santi020k/lumen-astro/components/Icon'
+
+const slug = Astro.params.slug
+
+if (!slug) return Astro.redirect('/dashboard/')
+
+const range = analyticsRangeSchema
+  .catch('30d')
+  .parse(Astro.url.searchParams.get('range'))
+const response = await getProjectDashboard(
+  slug,
+  range,
+  Astro.request,
+  Astro.url,
+)
+
+if (response.status === 401) return Astro.redirect('/login/')
+if (response.status === 404) return Astro.redirect('/dashboard/')
+if (!response.ok || !response.parsed)
+  throw new Error('Observatory API is unavailable.')
+
+const dashboard = response.parsed
+const project = dashboard.project
+const apiUrl = getBrowserApiUrl()
+const maxDownloads = Math.max(
+  ...dashboard.history.map((point) => point.npmDownloads30d),
+  1,
+)
+const rangeLabels = {
+  '30d': 'last 30 days',
+  '1y': 'last year',
+  '5y': 'last 5 years',
+} as const
+---
+
+<AppLayout
+  description={`Analytics and operational health for ${project.name}.`}
+  title={`${project.name} · Observatory`}
+>
+  <div class="app-shell">
+    <AppHeader
+      apiUrl={apiUrl}
+      lastSync={formatRelativeDate(dashboard.generatedAt)}
+      syncStatus="succeeded"
+    />
+
+    <main class="dashboard project-dashboard" id="main-content">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <a href="/dashboard/">Overview</a>
+        <Icon aria-hidden="true" name="chevron-right" />
+        <span aria-current="page">{project.name}</span>
+      </nav>
+
+      <section class="hero-row" aria-labelledby="project-title">
+        <div>
+          <span class="eyebrow">{project.category} dashboard</span>
+          <h1 id="project-title">{project.name}</h1>
+          <p>{project.description ?? `Analytics for ${project.slug}.`}</p>
+          <div class="project-meta">
+            <StatusBadge status={project.status} />
+            <Badge variant="outline">
+              <span class={`health-dot health-dot--${project.healthStatus}`}
+              ></span>
+              {project.healthStatus}
+            </Badge>
+            {
+              project.latestVersion && (
+                <Badge variant="secondary">v{project.latestVersion}</Badge>
+              )
+            }
+          </div>
+        </div>
+        <div class="hero-controls">
+          <RangePicker range={dashboard.range} />
+          <div class="source-legend">
+            <ButtonLink href={project.sources.github} newTab variant="outline">
+              <Icon aria-hidden="true" name="github" />
+              Repository
+            </ButtonLink>
+            {
+              project.sources.website && (
+                <ButtonLink
+                  href={project.sources.website}
+                  newTab
+                  variant="outline"
+                >
+                  <Icon aria-hidden="true" name="globe" />
+                  Website
+                </ButtonLink>
+              )
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="metric-grid" aria-label={`${project.name} metrics`}>
+        <MetricCard
+          context="Current rolling 30-day package reach"
+          icon="download"
+          label="Downloads"
+          value={formatNumber(project.npmDownloads30d)}
+        />
+        <MetricCard
+          context={`Net change · ${rangeLabels[dashboard.range]}`}
+          icon="star"
+          label="Stars gained"
+          value={`${dashboard.period.starsGained >= 0 ? '+' : ''}${formatNumber(dashboard.period.starsGained)}`}
+        />
+        <MetricCard
+          context={`${project.forks} forks on GitHub`}
+          icon="git-fork"
+          label="Total stars"
+          value={formatNumber(project.stars)}
+        />
+        <MetricCard
+          context={`Change ${dashboard.period.issueChange >= 0 ? '+' : ''}${formatNumber(dashboard.period.issueChange)} in range`}
+          icon="circle-dot-dashed"
+          label="Open issues"
+          value={formatNumber(project.openIssues)}
+        />
+        <MetricCard
+          context="Current authenticated 14-day traffic"
+          icon="eye"
+          label="GitHub views"
+          value={formatNumber(project.githubViews14d)}
+        />
+        <MetricCard
+          context="Latest website health check"
+          icon="activity"
+          label="Response time"
+          value={formatDuration(project.responseTimeMs)}
+        />
+      </section>
+
+      <section class="project-detail-grid">
+        <Card
+          as="section"
+          class="panel history-panel"
+          aria-labelledby="project-history-heading"
+        >
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">Reach over time</span>
+              <h2 id="project-history-heading">Download velocity</h2>
+            </div>
+            <span>{rangeLabels[dashboard.range]}</span>
+          </div>
+          {
+            dashboard.history.length > 1 ? (
+              <Chart aria-label={`${project.name} download history`}>
+                <div class="history-chart">
+                  {dashboard.history.map((point) => (
+                    <div class="history-column">
+                      <span
+                        class="history-column__bar"
+                        style={`height: ${Math.max(
+                          (point.npmDownloads30d / maxDownloads) * 100,
+                          4,
+                        )}%`}
+                        title={`${formatNumber(point.npmDownloads30d)} downloads`}
+                      />
+                      <small>{formatDate(point.collectedAt)}</small>
+                    </div>
+                  ))}
+                </div>
+                <figcaption>
+                  Rolling 30-day npm downloads observed at each sync point.
+                </figcaption>
+              </Chart>
+            ) : (
+              <Empty>
+                <p>
+                  More history will appear after another sync in this range.
+                </p>
+              </Empty>
+            )
+          }
+        </Card>
+
+        <Card
+          as="aside"
+          class="panel project-facts"
+          aria-labelledby="project-facts-heading"
+        >
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">Details</span>
+              <h2 id="project-facts-heading">Project facts</h2>
+            </div>
+          </div>
+          <dl>
+            <div>
+              <dt>Last push</dt>
+              <dd>{formatRelativeDate(project.pushedAt)}</dd>
+            </div>
+            <div>
+              <dt>Exact date</dt>
+              <dd>{formatDate(project.pushedAt)}</dd>
+            </div>
+            <div>
+              <dt>npm packages</dt>
+              <dd>{formatNumber(project.sources.npm.length)}</dd>
+            </div>
+            <div>
+              <dt>Snapshots in range</dt>
+              <dd>{formatNumber(dashboard.period.syncs)}</dd>
+            </div>
+          </dl>
+          {
+            project.topics.length > 0 && (
+              <div class="topic-list" aria-label="Repository topics">
+                {project.topics.map((topic) => (
+                  <Badge variant="outline">{topic}</Badge>
+                ))}
+              </div>
+            )
+          }
+        </Card>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <span>{project.name} analytics</span>
+      <span>Generated {formatDate(dashboard.generatedAt)}</span>
+    </footer>
+  </div>
+</AppLayout>

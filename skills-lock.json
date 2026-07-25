@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "lumen-ui": {
+      "source": "santi020k/lumen",
+      "sourceType": "github",
+      "skillPath": "skills/lumen-ui/SKILL.md",
+      "computedHash": "d9dc666c44d33dd13a14a5b1edd001868935e48bd676798ef6a64f20cff5ed75"
+    }
+  }
+}
