@@ -1,0 +1,136 @@
+---
+import type {
+  AnalyticsRange,
+  ProjectSettings,
+} from '@santi020k/observatory-api-types'
+import Badge from '@santi020k/lumen-astro/components/Badge'
+import Icon from '@santi020k/lumen-astro/components/Icon'
+import Sidebar from '@santi020k/lumen-astro/components/Sidebar'
+
+import Brand from './Brand.astro'
+
+type SidebarProject = Pick<
+  ProjectSettings['projects'][number],
+  'category' | 'name' | 'slug'
+>
+
+interface Props {
+  projects: SidebarProject[]
+  range?: AnalyticsRange
+}
+
+const { projects, range = '30d' } = Astro.props
+const currentPath = Astro.url.pathname
+const currentSlug = currentPath.match(/^\/projects\/([^/]+)/)?.[1]
+
+const getCategoryIcon = (
+  category: SidebarProject['category'],
+): 'blocks' | 'layout-dashboard' | 'notebook-tabs' | 'wrench' => {
+  if (category === 'app') return 'layout-dashboard'
+
+  if (category === 'content') return 'notebook-tabs'
+
+  if (category === 'tool') return 'wrench'
+
+  return 'blocks'
+}
+---
+
+<Sidebar
+  aria-label="Observatory navigation"
+  class="app-sidebar"
+  data-app-sidebar
+  id="app-sidebar"
+>
+  <div class="app-sidebar__brand">
+    <Brand />
+    <button
+      aria-label="Close navigation"
+      class="sidebar-close"
+      data-sidebar-close
+      type="button"
+    >
+      <Icon aria-hidden="true" name="x" />
+    </button>
+  </div>
+
+  <nav aria-label="Primary navigation" class="sidebar-nav">
+    <a
+      aria-current={currentPath === '/dashboard/' ? 'page' : undefined}
+      class="sidebar-link sidebar-link--overview"
+      href="/dashboard/"
+    >
+      <Icon aria-hidden="true" name="layout-dashboard" />
+      <span>
+        <strong>Main dashboard</strong>
+        <small>Portfolio overview</small>
+      </span>
+    </a>
+
+    <div class="sidebar-projects">
+      <div class="sidebar-section-heading">
+        <span>Project dashboards</span>
+        <Badge variant="outline">{projects.length}</Badge>
+      </div>
+
+      {
+        projects.length > 0 ? (
+          <ul>
+            {projects.map((project) => (
+              <li>
+                <a
+                  aria-current={
+                    currentSlug === project.slug ? 'page' : undefined
+                  }
+                  class="sidebar-link"
+                  href={`/projects/${project.slug}/?range=${range}`}
+                >
+                  <span class="sidebar-link__icon">
+                    <Icon
+                      aria-hidden="true"
+                      name={getCategoryIcon(project.category)}
+                    />
+                  </span>
+                  <span>
+                    <strong>{project.name}</strong>
+                    <small>{project.category}</small>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="sidebar-empty">Sync projects to populate this list.</p>
+        )
+      }
+    </div>
+  </nav>
+
+  <div class="app-sidebar__footer">
+    <a
+      aria-current={currentPath === '/settings/' ? 'page' : undefined}
+      class="sidebar-link"
+      href="/settings/"
+    >
+      <Icon aria-hidden="true" name="settings" />
+      <span>
+        <strong>Settings</strong>
+        <small>Project visibility</small>
+      </span>
+    </a>
+    <div class="sidebar-private">
+      <span class="status-dot"></span>
+      <span>
+        <strong>Private workspace</strong>
+        <small>Owner access only</small>
+      </span>
+    </div>
+  </div>
+</Sidebar>
+
+<button
+  aria-label="Close navigation"
+  class="sidebar-backdrop"
+  data-sidebar-close
+  tabindex="-1"
+  type="button"></button>

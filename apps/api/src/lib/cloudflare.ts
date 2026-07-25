@@ -182,7 +182,6 @@ export const syncCloudflareAnalytics = async (
   const database = createDb(env.DB)
   const websites = await getAnalyticsWebsites(database)
   const end = Math.floor(Date.now() / hourMilliseconds) * hourMilliseconds
-
   const snapshots: WebsiteAnalyticsWrite[] = []
 
   for (let index = 0; index < websites.length; index += websitesPerRequest) {

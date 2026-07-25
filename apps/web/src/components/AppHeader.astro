@@ -3,8 +3,6 @@ import Badge from '@santi020k/lumen-astro/components/Badge'
 import Button from '@santi020k/lumen-astro/components/Button'
 import Icon from '@santi020k/lumen-astro/components/Icon'
 
-import Brand from './Brand.astro'
-
 interface Props {
   apiUrl: string
   lastSync: string
@@ -12,34 +10,20 @@ interface Props {
 }
 
 const { apiUrl, lastSync, syncStatus } = Astro.props
-const currentPath = Astro.url.pathname
-
-const navigation = [
-  { href: '/dashboard/', label: 'Overview' },
-  { href: '/dashboard/#portfolio', label: 'Projects' },
-  { href: '/settings/', label: 'Settings' },
-]
 ---
 
 <header class="app-header" data-api-url={apiUrl}>
-  <Brand compact />
-  <nav aria-label="Primary navigation" class="app-nav">
-    {
-      navigation.map((item) => (
-        <a
-          aria-current={
-            item.href !== '/dashboard/#portfolio' &&
-            currentPath.startsWith(item.href)
-              ? 'page'
-              : undefined
-          }
-          href={item.href}
-        >
-          {item.label}
-        </a>
-      ))
-    }
-  </nav>
+  <button
+    aria-controls="app-sidebar"
+    aria-expanded="false"
+    aria-label="Open navigation"
+    class="sidebar-trigger"
+    data-sidebar-trigger
+    type="button"
+  >
+    <Icon aria-hidden="true" name="menu" />
+  </button>
+  <span class="app-header__context">Observatory workspace</span>
   <div class="app-header__actions">
     <Badge variant="outline"
       ><span class="status-dot"></span> Private workspace</Badge
@@ -75,6 +59,42 @@ const navigation = [
 
   const header = document.querySelector<HTMLElement>('.app-header')
   const apiUrl = header?.dataset.apiUrl ?? '/api'
+  const sidebar = document.querySelector<HTMLElement>('[data-app-sidebar]')
+  const sidebarTrigger = document.querySelector<HTMLButtonElement>(
+    '[data-sidebar-trigger]',
+  )
+  const sidebarCloseButtons = document.querySelectorAll<HTMLButtonElement>(
+    '[data-sidebar-close]',
+  )
+
+  const closeSidebar = () => {
+    sidebar?.classList.remove('is-open')
+    document.body.classList.remove('sidebar-open')
+    sidebarTrigger?.setAttribute('aria-expanded', 'false')
+  }
+
+  sidebarTrigger?.addEventListener('click', () => {
+    const isOpen = !sidebar?.classList.contains('is-open')
+
+    sidebar?.classList.toggle('is-open', isOpen)
+    document.body.classList.toggle('sidebar-open', isOpen)
+    sidebarTrigger.setAttribute('aria-expanded', String(isOpen))
+
+    if (isOpen)
+      sidebar
+        ?.querySelector<HTMLAnchorElement>('a, button')
+        ?.focus({ preventScroll: true })
+  })
+
+  for (const closeButton of sidebarCloseButtons)
+    closeButton.addEventListener('click', closeSidebar)
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeSidebar()
+      sidebarTrigger?.focus({ preventScroll: true })
+    }
+  })
 
   for (const syncButton of syncButtons) {
     syncButton.addEventListener('click', async () => {

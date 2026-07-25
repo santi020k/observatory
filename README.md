@@ -80,6 +80,7 @@ Cloudflare collection is optional and activates only when both `CLOUDFLARE_ACCOU
 queries the `rumPageloadEventsAdaptiveGroups` dataset for the hostnames already associated with
 public projects, excludes bot-tagged events, and refreshes the latest 48 completed hourly buckets
 on every scheduled run. This overlap captures delayed analytics without duplicating rows.
+Cloudflare Web Analytics and its browser beacon must also be enabled for each hostname.
 
 The owner-authenticated API exposes `GET /analytics/websites?range=30d` and accepts `30d`, `1y`, or
 `5y`. `POST /sync/cloudflare` runs the collector manually. Cloudflare currently retains Web

@@ -4,6 +4,14 @@ ENVIRONMENT=development
 MAIL_FROM=Observatory <observatory@example.com>
 OWNER_EMAIL=you@example.com
 
+# Optional as a pair. Enables Cloudflare Web Analytics collection.
+# Account ID: Cloudflare Dashboard > Account home.
+CLOUDFLARE_ACCOUNT_ID=
+
+# Server-only API token. Required permission:
+# Account > Account Analytics > Read.
+CLOUDFLARE_API_TOKEN=
+
 # Optional in local development. When omitted, the API returns the code in
 # `developmentCode` so the full login flow can still be tested.
 RESEND_API_KEY=

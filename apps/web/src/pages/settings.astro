@@ -1,5 +1,6 @@
 ---
 import AppHeader from '@/components/AppHeader.astro'
+import AppSidebar from '@/components/AppSidebar.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
 import { getBrowserApiUrl, getProjectSettings } from '@/lib/api'
@@ -40,103 +41,110 @@ const getCategoryIcon = (
   title="Settings · Observatory"
 >
   <div class="app-shell">
-    <AppHeader
-      apiUrl={apiUrl}
-      lastSync="when the catalog was synced"
-      syncStatus="succeeded"
+    <AppSidebar
+      projects={settings.projects.filter((project) => project.enabled)}
     />
+    <div class="app-workspace">
+      <AppHeader
+        apiUrl={apiUrl}
+        lastSync="when the catalog was synced"
+        syncStatus="succeeded"
+      />
 
-    <main class="dashboard settings-dashboard" id="main-content">
-      <section class="hero-row" aria-labelledby="settings-title">
-        <div>
-          <span class="eyebrow">Workspace preferences</span>
-          <h1 id="settings-title">Project visibility</h1>
+      <main class="dashboard settings-dashboard" id="main-content">
+        <section class="hero-row" aria-labelledby="settings-title">
+          <div>
+            <span class="eyebrow">Workspace preferences</span>
+            <h1 id="settings-title">Project visibility</h1>
+            <p>
+              Decide which projects contribute to your overview, historical
+              analysis, attention queue, and individual project dashboards.
+            </p>
+          </div>
+          <Badge variant="outline" data-enabled-count>
+            {enabledCount} of {settings.projects.length} included
+          </Badge>
+        </section>
+
+        <div class="settings-callout">
+          <Icon aria-hidden="true" name="info" />
           <p>
-            Decide which projects contribute to your overview, historical
-            analysis, attention queue, and individual project dashboards.
+            Disabled projects continue collecting snapshots so they can be
+            restored without losing history. Their data is excluded from all
+            analysis while disabled.
           </p>
         </div>
-        <Badge variant="outline" data-enabled-count>
-          {enabledCount} of {settings.projects.length} included
-        </Badge>
-      </section>
 
-      <div class="settings-callout">
-        <Icon aria-hidden="true" name="info" />
-        <p>
-          Disabled projects continue collecting snapshots so they can be
-          restored without losing history. Their data is excluded from all
-          analysis while disabled.
-        </p>
-      </div>
-
-      {
-        settings.projects.length === 0 ? (
-          <Empty class="first-sync">
-            <Icon aria-hidden="true" name="telescope" />
-            <h2>No projects to configure yet</h2>
-            <p>
-              Run a sync from the overview to discover your public projects.
-            </p>
-          </Empty>
-        ) : (
-          <Card
-            as="section"
-            class="settings-panel"
-            aria-labelledby="project-settings-heading"
-            data-settings-panel
-            data-total={settings.projects.length}
-          >
-            <div class="settings-panel__heading">
-              <div>
-                <h2 id="project-settings-heading">Included projects</h2>
-                <p>Changes save immediately and apply on the next page load.</p>
+        {
+          settings.projects.length === 0 ? (
+            <Empty class="first-sync">
+              <Icon aria-hidden="true" name="telescope" />
+              <h2>No projects to configure yet</h2>
+              <p>
+                Run a sync from the overview to discover your public projects.
+              </p>
+            </Empty>
+          ) : (
+            <Card
+              as="section"
+              class="settings-panel"
+              aria-labelledby="project-settings-heading"
+              data-settings-panel
+              data-total={settings.projects.length}
+            >
+              <div class="settings-panel__heading">
+                <div>
+                  <h2 id="project-settings-heading">Included projects</h2>
+                  <p>
+                    Changes save immediately and apply on the next page load.
+                  </p>
+                </div>
+                <span class="save-state" aria-live="polite" data-save-state>
+                  All changes saved
+                </span>
               </div>
-              <span class="save-state" aria-live="polite" data-save-state>
-                All changes saved
-              </span>
-            </div>
-            <ul class="project-settings-list">
-              {settings.projects.map((project) => (
-                <li>
-                  <span class="project-icon">
-                    <Icon
-                      aria-hidden="true"
-                      name={getCategoryIcon(project.category)}
-                    />
-                  </span>
-                  <div>
-                    <strong>{project.name}</strong>
-                    <span>
-                      {project.category} · {project.status}
+              <ul class="project-settings-list">
+                {settings.projects.map((project) => (
+                  <li>
+                    <span class="project-icon">
+                      <Icon
+                        aria-hidden="true"
+                        name={getCategoryIcon(project.category)}
+                      />
                     </span>
-                  </div>
-                  <label class="project-switch">
-                    <span class="sr-only">
-                      Include {project.name} in analytics
-                    </span>
-                    <input
-                      checked={project.enabled}
-                      data-project-toggle
-                      data-slug={project.slug}
-                      type="checkbox"
-                    />
-                    <span aria-hidden="true" class="project-switch__track">
-                      <span />
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )
-      }
-    </main>
+                    <div>
+                      <strong>{project.name}</strong>
+                      <span>
+                        {project.category} · {project.status}
+                      </span>
+                    </div>
+                    <label class="project-switch">
+                      <span class="sr-only">
+                        Include {project.name} in analytics
+                      </span>
+                      <input
+                        checked={project.enabled}
+                        data-project-toggle
+                        data-slug={project.slug}
+                        type="checkbox"
+                      />
+                      <span aria-hidden="true" class="project-switch__track">
+                        <span />
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )
+        }
+      </main>
 
-    <footer class="app-footer">
-      <span>Preferences are private to this Observatory workspace.</span>
-      <a href="/dashboard/">Return to overview</a>
-    </footer>
+      <footer class="app-footer">
+        <span>Preferences are private to this Observatory workspace.</span>
+        <a href="/dashboard/">Return to overview</a>
+      </footer>
+    </div>
   </div>
 </AppLayout>
 
