@@ -63,9 +63,16 @@ export const projectSnapshots = sqliteTable('project_snapshots', {
 })
 
 export const projectPreferences = sqliteTable('project_preferences', {
+  attentionMode: text('attention_mode').notNull().default('all'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
   slug: text('slug').primaryKey(),
   updatedAt: integer('updated_at').notNull(),
+  websiteAnalyticsEnabled: integer('website_analytics_enabled', {
+    mode: 'boolean',
+  })
+    .notNull()
+    .default(true),
 })
 
 export const websiteAnalyticsSnapshots = sqliteTable(

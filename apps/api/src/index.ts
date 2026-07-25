@@ -115,16 +115,28 @@ app.post('/settings/projects', requireAuth, async (context) => {
       {
         error: {
           code: 'INVALID_PROJECT_SETTING',
-          message: 'A project slug and enabled state are required.',
+          message: 'A project slug and at least one setting are required.',
         },
       },
       400,
     )
 
+  const { attentionMode, enabled, pinned, slug, websiteAnalyticsEnabled } =
+    input.data
+
+  const settings = {
+    ...(attentionMode === undefined ? {} : { attentionMode }),
+    ...(enabled === undefined ? {} : { enabled }),
+    ...(pinned === undefined ? {} : { pinned }),
+    ...(websiteAnalyticsEnabled === undefined
+      ? {}
+      : { websiteAnalyticsEnabled }),
+  }
+
   await setProjectPreference(
     createDb(context.env.DB),
-    input.data.slug,
-    input.data.enabled,
+    slug,
+    settings,
     Date.now(),
   )
 

@@ -5,6 +5,7 @@ import AppLayout from '@/layouts/AppLayout.astro'
 
 import { getBrowserApiUrl, getProjectSettings } from '@/lib/api'
 
+import Accordion from '@santi020k/lumen-astro/components/Accordion'
 import Badge from '@santi020k/lumen-astro/components/Badge'
 import Button from '@santi020k/lumen-astro/components/Button'
 import Card from '@santi020k/lumen-astro/components/Card'
@@ -62,8 +63,8 @@ const getCategoryIcon = (
             <span class="eyebrow">Workspace preferences</span>
             <h1 id="settings-title">Settings</h1>
             <p>
-              Shape what Observatory tracks and how this workspace feels in
-              your browser.
+              Shape what Observatory tracks and how this workspace feels in your
+              browser.
             </p>
           </div>
         </section>
@@ -109,10 +110,10 @@ const getCategoryIcon = (
             <div class="settings-section-heading">
               <div>
                 <span class="eyebrow">Catalog</span>
-                <h2>Project visibility</h2>
+                <h2>Project controls</h2>
                 <p>
-                  Choose which projects contribute to dashboards, historical
-                  analysis, and the attention queue.
+                  Tune how every project appears, which signals matter, and what
+                  Observatory collects.
                 </p>
               </div>
               <Badge variant="outline" data-enabled-count>
@@ -149,47 +150,208 @@ const getCategoryIcon = (
                 >
                   <div class="settings-panel__heading">
                     <div>
-                      <h3 id="project-settings-heading">
-                        Included projects
-                      </h3>
+                      <h3 id="project-settings-heading">Project settings</h3>
                       <p>
-                        Changes save immediately and apply on the next page
-                        load.
+                        Open a project to adjust its workspace behavior. Changes
+                        save immediately.
                       </p>
                     </div>
-                    <span
-                      class="save-state"
-                      aria-live="polite"
-                      data-save-state
-                    >
+                    <span class="save-state" aria-live="polite" data-save-state>
                       All changes saved
                     </span>
                   </div>
-                  <ul class="project-settings-list">
-                    {settings.projects.map((project) => (
-                      <li>
-                        <span class="project-icon">
-                          <Icon
-                            aria-hidden="true"
-                            name={getCategoryIcon(project.category)}
-                          />
-                        </span>
-                        <div>
-                          <strong>{project.name}</strong>
-                          <span data-project-details>
-                            {project.category} · {project.status} · relevance{' '}
-                            {project.relevanceScore}
+                  <Accordion class="project-settings-list" variant="flush">
+                    {settings.projects.map((project, index) => (
+                      <details
+                        id={`project-${project.slug}`}
+                        open={index === 0}
+                      >
+                        <summary>
+                          <span class="project-icon">
+                            <Icon
+                              aria-hidden="true"
+                              name={getCategoryIcon(project.category)}
+                            />
                           </span>
+                          <span class="project-settings-summary">
+                            <strong>{project.name}</strong>
+                            <span data-project-details>
+                              {project.category} · {project.status} · relevance{' '}
+                              {project.relevanceScore}
+                            </span>
+                          </span>
+                          <span class="project-settings-badges">
+                            <Badge
+                              data-project-pin-state
+                              data-slug={project.slug}
+                              hidden={!project.pinned}
+                              variant="secondary"
+                            >
+                              <Icon aria-hidden="true" name="pin" />
+                              Pinned
+                            </Badge>
+                            <Badge
+                              data-enabled={String(project.enabled)}
+                              data-project-state
+                              data-slug={project.slug}
+                              variant={project.enabled ? 'success' : 'outline'}
+                            >
+                              {project.enabled ? 'Included' : 'Excluded'}
+                            </Badge>
+                          </span>
+                        </summary>
+
+                        <div class="project-settings-content">
+                          <div class="project-settings-grid">
+                            <section class="project-setting-card">
+                              <span class="project-setting-icon">
+                                <Icon
+                                  aria-hidden="true"
+                                  name="chart-no-axes-combined"
+                                />
+                              </span>
+                              <div>
+                                <h4 id={`analytics-${project.slug}`}>
+                                  Include in Observatory
+                                </h4>
+                                <p id={`analytics-help-${project.slug}`}>
+                                  Contribute to portfolio metrics, history, and
+                                  project dashboards.
+                                </p>
+                              </div>
+                              <Switch
+                                aria-describedby={`analytics-help-${project.slug}`}
+                                aria-labelledby={`analytics-${project.slug}`}
+                                checked={project.enabled}
+                                data-project-control
+                                data-project-setting="enabled"
+                                data-saved-value={String(project.enabled)}
+                                data-slug={project.slug}
+                              />
+                            </section>
+
+                            <section class="project-setting-card">
+                              <span class="project-setting-icon">
+                                <Icon aria-hidden="true" name="pin" />
+                              </span>
+                              <div>
+                                <h4 id={`pin-${project.slug}`}>
+                                  Pin in navigation
+                                </h4>
+                                <p id={`pin-help-${project.slug}`}>
+                                  Keep this project ahead of the rest in the
+                                  sidebar.
+                                </p>
+                              </div>
+                              <Switch
+                                aria-describedby={`pin-help-${project.slug}`}
+                                aria-labelledby={`pin-${project.slug}`}
+                                checked={project.pinned}
+                                data-project-control
+                                data-project-setting="pinned"
+                                data-saved-value={String(project.pinned)}
+                                data-slug={project.slug}
+                              />
+                            </section>
+
+                            <section class="project-setting-card">
+                              <span class="project-setting-icon">
+                                <Icon aria-hidden="true" name="list-filter" />
+                              </span>
+                              <div>
+                                <label for={`attention-${project.slug}`}>
+                                  Attention signals
+                                </label>
+                                <p id={`attention-help-${project.slug}`}>
+                                  Decide what can place this project in the
+                                  attention queue.
+                                </p>
+                              </div>
+                              <NativeSelect
+                                aria-describedby={`attention-help-${project.slug}`}
+                                data-project-control
+                                data-project-setting="attentionMode"
+                                data-saved-value={project.attentionMode}
+                                data-slug={project.slug}
+                                id={`attention-${project.slug}`}
+                                size="sm"
+                              >
+                                <option
+                                  selected={project.attentionMode === 'all'}
+                                  value="all"
+                                >
+                                  All signals
+                                </option>
+                                <option
+                                  selected={project.attentionMode === 'health'}
+                                  value="health"
+                                >
+                                  Health only
+                                </option>
+                                <option
+                                  selected={project.attentionMode === 'off'}
+                                  value="off"
+                                >
+                                  Muted
+                                </option>
+                              </NativeSelect>
+                            </section>
+
+                            <section
+                              class:list={[
+                                'project-setting-card',
+                                !project.hasWebsite &&
+                                  'project-setting-card--unavailable',
+                              ]}
+                            >
+                              <span class="project-setting-icon">
+                                <Icon aria-hidden="true" name="globe-2" />
+                              </span>
+                              <div>
+                                <h4 id={`website-${project.slug}`}>
+                                  Website analytics
+                                </h4>
+                                <p id={`website-help-${project.slug}`}>
+                                  {project.hasWebsite
+                                    ? 'Collect and show Cloudflare traffic for this project.'
+                                    : 'Add a website URL to the catalog to enable this source.'}
+                                </p>
+                              </div>
+                              <Switch
+                                aria-describedby={`website-help-${project.slug}`}
+                                aria-labelledby={`website-${project.slug}`}
+                                checked={
+                                  project.hasWebsite &&
+                                  project.websiteAnalyticsEnabled
+                                }
+                                data-project-control
+                                data-project-setting="websiteAnalyticsEnabled"
+                                data-saved-value={String(
+                                  project.websiteAnalyticsEnabled,
+                                )}
+                                data-slug={project.slug}
+                                disabled={!project.hasWebsite}
+                              />
+                            </section>
+                          </div>
+
+                          <div class="project-settings-footer">
+                            <span>
+                              <Icon aria-hidden="true" name="sparkles" />
+                              Relevance score {project.relevanceScore}
+                            </span>
+                            <a
+                              class="project-settings-link"
+                              href={`/projects/${project.slug}/`}
+                            >
+                              View project
+                              <Icon aria-hidden="true" name="arrow-up-right" />
+                            </a>
+                          </div>
                         </div>
-                        <Switch
-                          aria-label={`Include ${project.name} in analytics`}
-                          checked={project.enabled}
-                          data-project-toggle
-                          data-slug={project.slug}
-                        />
-                      </li>
+                      </details>
                     ))}
-                  </ul>
+                  </Accordion>
                 </Card>
               )
             }
@@ -205,11 +367,7 @@ const getCategoryIcon = (
                   Changes are applied and saved immediately.
                 </p>
               </div>
-              <span
-                class="save-state"
-                aria-live="polite"
-                data-local-save-state
-              >
+              <span class="save-state" aria-live="polite" data-local-save-state>
                 Saved in this browser
               </span>
             </div>
@@ -464,32 +622,94 @@ const getCategoryIcon = (
   const saveState = document.querySelector<HTMLElement>('[data-save-state]')
   const count = document.querySelector<HTMLElement>('[data-enabled-count]')
 
-  const toggles = document.querySelectorAll<HTMLInputElement>(
-    '[data-project-toggle]',
+  const inclusionToggles = document.querySelectorAll<HTMLInputElement>(
+    '[data-project-setting="enabled"]',
   )
 
+  const projectControls = document.querySelectorAll<
+    HTMLInputElement | HTMLSelectElement
+  >('[data-project-control]')
+
   const updateCount = () => {
-    const enabled = [...toggles].filter((toggle) => toggle.checked).length
-    const total = panel?.dataset.total ?? String(toggles.length)
+    const enabled = [...inclusionToggles].filter(
+      (toggle) => toggle.checked,
+    ).length
+
+    const total = panel?.dataset.total ?? String(inclusionToggles.length)
 
     if (count) count.textContent = `${enabled} of ${total} included`
   }
 
-  for (const toggle of toggles) {
-    toggle.addEventListener('change', async () => {
-      const enabled = toggle.checked
+  const updateProjectState = (slug: string | undefined, enabled: boolean) => {
+    if (!slug) return
 
-      toggle.disabled = true
+    const state = document.querySelector<HTMLElement>(
+      `[data-project-state][data-slug="${CSS.escape(slug)}"]`,
+    )
+
+    if (!state) return
+
+    state.textContent = enabled ? 'Included' : 'Excluded'
+
+    state.dataset.enabled = String(enabled)
+  }
+
+  const updatePinnedState = (slug: string | undefined, pinned: boolean) => {
+    if (!slug) return
+
+    const state = document.querySelector<HTMLElement>(
+      `[data-project-pin-state][data-slug="${CSS.escape(slug)}"]`,
+    )
+
+    if (state) state.hidden = !pinned
+  }
+
+  const setControlValue = (
+    control: HTMLInputElement | HTMLSelectElement,
+    value: string,
+  ) => {
+    if (control instanceof HTMLInputElement) {
+      control.checked = value === 'true'
+
+      return
+    }
+
+    control.value = value
+  }
+
+  for (const control of projectControls) {
+    control.addEventListener('change', async () => {
+      const field = control.dataset.projectSetting
+      const slug = control.dataset.slug
+
+      if (!field || !slug) return
+
+      const savedValue =
+        control.dataset.savedValue ??
+        (control instanceof HTMLInputElement
+          ? String(!control.checked)
+          : control.value)
+
+      const value =
+        control instanceof HTMLInputElement ? control.checked : control.value
+
+      control.disabled = true
 
       if (saveState) saveState.textContent = 'Saving…'
 
-      updateCount()
+      if (field === 'enabled') {
+        updateCount()
+
+        updateProjectState(slug, Boolean(value))
+      }
+
+      if (field === 'pinned') updatePinnedState(slug, Boolean(value))
 
       try {
         const response = await fetch(`${apiUrl}/settings/projects`, {
           body: JSON.stringify({
-            enabled,
-            slug: toggle.dataset.slug,
+            [field]: value,
+            slug,
           }),
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -498,15 +718,23 @@ const getCategoryIcon = (
 
         if (!response.ok) throw new Error('Save failed')
 
+        control.dataset.savedValue = String(value)
+
         if (saveState) saveState.textContent = 'All changes saved'
       } catch {
-        toggle.checked = !enabled
+        setControlValue(control, savedValue)
 
-        updateCount()
+        if (field === 'enabled') {
+          updateCount()
+
+          updateProjectState(slug, savedValue === 'true')
+        }
+
+        if (field === 'pinned') updatePinnedState(slug, savedValue === 'true')
 
         if (saveState) saveState.textContent = 'Could not save — try again'
       } finally {
-        toggle.disabled = false
+        control.disabled = false
       }
     })
   }

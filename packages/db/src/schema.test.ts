@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   authCodes,
+  projectPreferences,
   projectSnapshots,
   sessions,
   syncRuns,
@@ -38,5 +39,15 @@ describe('observatory database schema', () => {
     expect(projectSnapshots.relevanceScore.name).toBe('relevance_score')
 
     expect(projectSnapshots.relevanceScore.notNull).toBe(true)
+  })
+
+  it('stores project-specific navigation and collection preferences', () => {
+    expect(projectPreferences.attentionMode.name).toBe('attention_mode')
+
+    expect(projectPreferences.pinned.name).toBe('pinned')
+
+    expect(projectPreferences.websiteAnalyticsEnabled.name).toBe(
+      'website_analytics_enabled',
+    )
   })
 })

@@ -11,7 +11,7 @@ import Brand from './Brand.astro'
 
 type SidebarProject = Pick<
   ProjectSettings['projects'][number],
-  'category' | 'name' | 'slug'
+  'category' | 'name' | 'pinned' | 'slug'
 >
 
 interface Props {
@@ -20,6 +20,13 @@ interface Props {
 }
 
 const { projects, range = '30d' } = Astro.props
+
+const orderedProjects = [...projects].sort(
+  (left, right) =>
+    Number(right.pinned) - Number(left.pinned) ||
+    left.name.localeCompare(right.name),
+)
+
 const currentPath = Astro.url.pathname
 const currentSlug = /^\/projects\/([^/]+)/.exec(currentPath)?.[1]
 
@@ -70,13 +77,13 @@ const getCategoryIcon = (
     <div class="sidebar-projects">
       <div class="sidebar-section-heading">
         <span>Project dashboards</span>
-        <Badge variant="outline">{projects.length}</Badge>
+        <Badge variant="outline">{orderedProjects.length}</Badge>
       </div>
 
       {
-        projects.length > 0 ? (
+        orderedProjects.length > 0 ? (
           <ul>
-            {projects.map((project) => (
+            {orderedProjects.map((project) => (
               <li>
                 <a
                   aria-current={
@@ -92,7 +99,12 @@ const getCategoryIcon = (
                     />
                   </span>
                   <span>
-                    <strong>{project.name}</strong>
+                    <strong>
+                      {project.name}
+                      {project.pinned && (
+                        <Icon aria-label="Pinned project" name="pin" />
+                      )}
+                    </strong>
                     <small>{project.category}</small>
                   </span>
                 </a>

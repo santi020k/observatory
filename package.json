@@ -21,6 +21,7 @@
     "lint:fix": "pnpm run lint:repo:fix && turbo run lint:fix",
     "lint:repo": "eslint eslint.config.ts scripts --cache --no-warn-ignored",
     "lint:repo:fix": "eslint eslint.config.ts scripts --cache --fix --no-warn-ignored",
+    "setup:github": "node scripts/setup-github-token.mjs",
     "setup:local": "node scripts/setup-local.mjs",
     "test": "turbo run test",
     "type-check": "turbo run type-check",

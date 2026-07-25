@@ -89,6 +89,7 @@ const scoreSnapshotsByRelevance = (
 
   return snapshots.map((snapshot) => {
     const websitePageViews = websitePageViewsBySlug.get(snapshot.slug) ?? 0
+
     const score =
       normalizeSignal(snapshot.npmDownloads30d, maxima.npmDownloads) *
         relevanceWeights.npmDownloads +

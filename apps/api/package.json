@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "wrangler deploy --dry-run",
+    "build": "wrangler deploy --dry-run --install-skills=false",
     "check": "tsc --noEmit",
     "clean": "rm -rf .wrangler dist",
     "db:migrate:local": "wrangler d1 migrations apply observatory --local",

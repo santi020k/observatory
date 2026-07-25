@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   requestCodeSchema,
+  updateProjectSettingSchema,
   verifyCodeSchema,
   websiteAnalyticsSchema,
 } from './index'
@@ -22,6 +23,37 @@ describe('authentication contracts', () => {
     expect(
       verifyCodeSchema.safeParse({ code: '12345a', email: 'santi@example.com' })
         .success,
+    ).toBe(false)
+  })
+})
+
+describe('project setting contracts', () => {
+  it('accepts each supported project preference independently', () => {
+    expect(
+      updateProjectSettingSchema.safeParse({
+        pinned: true,
+        slug: 'observatory',
+      }).success,
+    ).toBe(true)
+
+    expect(
+      updateProjectSettingSchema.safeParse({
+        attentionMode: 'health',
+        slug: 'observatory',
+      }).success,
+    ).toBe(true)
+  })
+
+  it('rejects empty updates and unsupported attention modes', () => {
+    expect(
+      updateProjectSettingSchema.safeParse({ slug: 'observatory' }).success,
+    ).toBe(false)
+
+    expect(
+      updateProjectSettingSchema.safeParse({
+        attentionMode: 'urgent',
+        slug: 'observatory',
+      }).success,
     ).toBe(false)
   })
 })

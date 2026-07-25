@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SnapshotWrite } from '@santi020k/observatory-db'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { collectorInternals } from './collector'
 
@@ -187,6 +187,7 @@ describe('public project collection', () => {
       snapshot('package', { npmDownloads30d: 1_000 }),
       snapshot('website'),
     ]
+
     const pageViews = new Map([['website', 10_000]])
 
     const scored = collectorInternals.scoreSnapshotsByRelevance(

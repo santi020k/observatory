@@ -26,7 +26,8 @@ vi.mock('@santi020k/observatory-db', async (importOriginal) => ({
   getSnapshotsForSyncRun: mocks.getSnapshotsForSyncRun,
 }))
 
-const { buildDashboard, buildProjectDashboard } = await import('./dashboard')
+const { buildDashboard, buildProjectDashboard, buildProjectSettings } =
+  await import('./dashboard')
 
 const environment = {
   AUTH_SECRET: 'test-secret',
@@ -36,6 +37,41 @@ const environment = {
   MAIL_FROM: 'Observatory <observatory@example.com>',
   OWNER_EMAIL: 'owner@example.com',
 } satisfies Bindings
+
+const websiteSnapshot = {
+  archived: false,
+  category: 'content',
+  collectedAt: 1_000,
+  description: 'Personal website',
+  forks: 0,
+  githubClones14d: 2,
+  githubViews14d: 5,
+  healthStatus: 'healthy',
+  id: 'snapshot',
+  latestVersion: null,
+  name: 'Website',
+  npmDownloads30d: 0,
+  npmPackages: '[]',
+  openIssues: 0,
+  pushedAt: '2026-07-25T00:00:00Z',
+  relevanceScore: 60,
+  repositoryUrl: 'https://github.com/santi020k/website',
+  responseTimeMs: 120,
+  slug: 'website',
+  stars: 1,
+  status: 'active',
+  syncRunId: 'successful-run',
+  topics: '[]',
+  visibility: 'public',
+  websiteUrl: 'https://santi.dev',
+}
+
+const successfulSync = {
+  completedAt: 1_500,
+  id: 'successful-run',
+  startedAt: 1_000,
+  status: 'succeeded',
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -55,49 +91,11 @@ beforeEach(() => {
 
 describe('project website analytics', () => {
   it('matches Cloudflare analytics to the project slug', async () => {
-    mocks.getLatestSyncRun.mockResolvedValue({
-      completedAt: 1_500,
-      id: 'successful-run',
-      startedAt: 1_000,
-      status: 'succeeded',
-    })
+    mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
 
-    mocks.getLatestSuccessfulSyncRun.mockResolvedValue({
-      completedAt: 1_500,
-      id: 'successful-run',
-      startedAt: 1_000,
-      status: 'succeeded',
-    })
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
 
-    mocks.getSnapshotsForSyncRun.mockResolvedValue([
-      {
-        archived: false,
-        category: 'content',
-        collectedAt: 1_000,
-        description: 'Personal website',
-        forks: 0,
-        githubClones14d: 2,
-        githubViews14d: 5,
-        healthStatus: 'healthy',
-        id: 'snapshot',
-        latestVersion: null,
-        name: 'Website',
-        npmDownloads30d: 0,
-        npmPackages: '[]',
-        openIssues: 0,
-        pushedAt: '2026-07-25T00:00:00Z',
-        relevanceScore: 0,
-        repositoryUrl: 'https://github.com/santi020k/website',
-        responseTimeMs: 120,
-        slug: 'website',
-        stars: 1,
-        status: 'active',
-        syncRunId: 'successful-run',
-        topics: '[]',
-        visibility: 'public',
-        websiteUrl: 'https://santi.dev',
-      },
-    ])
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([websiteSnapshot])
 
     mocks.buildWebsiteAnalytics.mockResolvedValue({
       generatedAt: new Date(0).toISOString(),
@@ -126,6 +124,97 @@ describe('project website analytics', () => {
       hostname: 'santi.dev',
       pageViews: 14,
       visits: 9,
+    })
+  })
+
+  it('does not return website analytics when collection is disabled', async () => {
+    mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
+
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
+
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([websiteSnapshot])
+
+    mocks.getProjectPreferences.mockResolvedValue([
+      {
+        attentionMode: 'all',
+        enabled: true,
+        pinned: false,
+        slug: 'website',
+        updatedAt: 2_000,
+        websiteAnalyticsEnabled: false,
+      },
+    ])
+
+    const dashboard = await buildProjectDashboard(environment, 'website')
+
+    expect(dashboard?.websiteAnalytics).toBeNull()
+
+    expect(mocks.buildWebsiteAnalytics).not.toHaveBeenCalled()
+  })
+})
+
+describe('project preferences', () => {
+  it('pins projects and exposes attention preferences to dashboards', async () => {
+    mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
+
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
+
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([
+      websiteSnapshot,
+      {
+        ...websiteSnapshot,
+        id: 'pinned-snapshot',
+        name: 'Pinned project',
+        relevanceScore: 10,
+        slug: 'pinned',
+        websiteUrl: null,
+      },
+    ])
+
+    mocks.getProjectPreferences.mockResolvedValue([
+      {
+        attentionMode: 'off',
+        enabled: true,
+        pinned: true,
+        slug: 'pinned',
+        updatedAt: 2_000,
+        websiteAnalyticsEnabled: true,
+      },
+    ])
+
+    const dashboard = await buildDashboard(environment)
+
+    expect(dashboard.projects[0]).toMatchObject({
+      attentionMode: 'off',
+      name: 'Pinned project',
+      pinned: true,
+    })
+  })
+
+  it('returns every persisted control in project settings', async () => {
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
+
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([websiteSnapshot])
+
+    mocks.getProjectPreferences.mockResolvedValue([
+      {
+        attentionMode: 'health',
+        enabled: true,
+        pinned: true,
+        slug: 'website',
+        updatedAt: 2_000,
+        websiteAnalyticsEnabled: false,
+      },
+    ])
+
+    const settings = await buildProjectSettings(environment)
+
+    expect(settings.projects[0]).toMatchObject({
+      attentionMode: 'health',
+      enabled: true,
+      hasWebsite: true,
+      pinned: true,
+      websiteAnalyticsEnabled: false,
     })
   })
 })

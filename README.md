@@ -37,6 +37,7 @@ Requirements: Node 22.22.3 or newer and pnpm 11.
 ```bash
 pnpm install
 pnpm setup:local
+pnpm setup:github
 pnpm db:migrate:local
 pnpm dev
 ```
@@ -45,6 +46,11 @@ Open `http://localhost:4321/login/` and use `hi@santi020k.com`. Without a Resend
 verification code is shown on the verification screen. Run the first sync from the dashboard.
 
 The web app runs on `4321`; the API runs on `8787`.
+
+`pnpm setup:github` copies the active `gh` CLI credential into the git-ignored local Worker
+environment without printing it. Run `gh auth login` first if the CLI is not authenticated. GitHub
+authentication avoids the low shared limit on unauthenticated API requests and enables repository
+traffic metrics.
 
 ## Production configuration
 

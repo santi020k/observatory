@@ -8,6 +8,7 @@ import StatusBadge from '@/components/StatusBadge.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
 import { getBrowserApiUrl, getDashboard } from '@/lib/api'
+import { needsAttention } from '@/lib/attention'
 import {
   formatDate,
   formatDuration,
@@ -70,14 +71,7 @@ const maxHistoryDownloads = Math.max(
 )
 
 const attentionProjects = dashboard.projects
-  .filter((project) => {
-    const pushedAt = project.pushedAt ? Date.parse(project.pushedAt) : 0
-    const stale = Date.now() - pushedAt > 120 * 24 * 60 * 60 * 1000
-
-    return (
-      project.openIssues > 0 || project.healthStatus === 'degraded' || stale
-    )
-  })
+  .filter((project) => needsAttention(project))
   .sort((left, right) => right.openIssues - left.openIssues)
   .slice(0, 5)
 

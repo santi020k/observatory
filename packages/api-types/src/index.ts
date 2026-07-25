@@ -17,7 +17,10 @@ export const projectSourceSchema = z.object({
   website: z.url().nullable(),
 })
 
+export const projectAttentionModeSchema = z.enum(['all', 'health', 'off'])
+
 export const projectMetricSchema = z.object({
+  attentionMode: projectAttentionModeSchema,
   archived: z.boolean(),
   category: z.enum(['app', 'content', 'library', 'tool']),
   description: z.string().trim().nullable(),
@@ -29,6 +32,7 @@ export const projectMetricSchema = z.object({
   name: z.string().trim(),
   npmDownloads30d: z.int().nonnegative(),
   openIssues: z.int().nonnegative(),
+  pinned: z.boolean(),
   pushedAt: z.string().trim().nullable(),
   relevanceScore: z.int().min(0).max(100),
   responseTimeMs: z.int().nonnegative().nullable(),
@@ -38,6 +42,7 @@ export const projectMetricSchema = z.object({
   status: z.enum(['active', 'archived', 'maintained', 'paused']),
   topics: z.array(z.string().trim()),
   visibility: z.enum(['private', 'public']),
+  websiteAnalyticsEnabled: z.boolean(),
 })
 
 export const analyticsRangeSchema = z.enum(['30d', '1y', '5y'])
@@ -77,22 +82,38 @@ export const dashboardSchema = z.object({
 })
 
 export const projectSettingSchema = z.object({
+  attentionMode: projectAttentionModeSchema,
   category: projectMetricSchema.shape.category,
   enabled: z.boolean(),
+  hasWebsite: z.boolean(),
   name: z.string().trim(),
+  pinned: z.boolean(),
   relevanceScore: projectMetricSchema.shape.relevanceScore,
   slug: z.string().trim(),
   status: projectMetricSchema.shape.status,
+  websiteAnalyticsEnabled: z.boolean(),
 })
 
 export const projectSettingsSchema = z.object({
   projects: z.array(projectSettingSchema),
 })
 
-export const updateProjectSettingSchema = z.object({
-  enabled: z.boolean(),
-  slug: z.string().trim().min(1),
-})
+export const updateProjectSettingSchema = z
+  .object({
+    attentionMode: projectAttentionModeSchema.optional(),
+    enabled: z.boolean().optional(),
+    pinned: z.boolean().optional(),
+    slug: z.string().trim().min(1),
+    websiteAnalyticsEnabled: z.boolean().optional(),
+  })
+  .refine(
+    ({ attentionMode, enabled, pinned, websiteAnalyticsEnabled }) =>
+      attentionMode !== undefined ||
+      enabled !== undefined ||
+      pinned !== undefined ||
+      websiteAnalyticsEnabled !== undefined,
+    { error: 'At least one project setting is required.' },
+  )
 
 export const websiteAnalyticsPointSchema = z.object({
   pageViews: z.int().nonnegative(),

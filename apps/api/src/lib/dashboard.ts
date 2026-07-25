@@ -23,10 +23,22 @@ import { buildWebsiteAnalytics } from './cloudflare'
 
 type Snapshot = Awaited<ReturnType<typeof getSnapshotsForSyncRun>>[number]
 
+type ProjectPreference = Pick<
+  ProjectMetric,
+  'attentionMode' | 'pinned' | 'websiteAnalyticsEnabled'
+>
+
+const defaultProjectPreference: ProjectPreference = {
+  attentionMode: 'all',
+  pinned: false,
+  websiteAnalyticsEnabled: true,
+}
+
 const compareProjectRelevance = (
-  left: { name: string; relevanceScore: number },
-  right: { name: string; relevanceScore: number },
+  left: { name: string; pinned?: boolean; relevanceScore: number },
+  right: { name: string; pinned?: boolean; relevanceScore: number },
 ): number =>
+  Number(right.pinned ?? false) - Number(left.pinned ?? false) ||
   right.relevanceScore - left.relevanceScore ||
   left.name.localeCompare(right.name)
 
@@ -51,7 +63,11 @@ const parseStringArray = (value: string): string[] => {
   }
 }
 
-const toProjectMetric = (row: Snapshot): ProjectMetric => ({
+const toProjectMetric = (
+  row: Snapshot,
+  preference: ProjectPreference,
+): ProjectMetric => ({
+  attentionMode: preference.attentionMode,
   archived: row.archived,
   category: row.category as ProjectMetric['category'],
   description: row.description,
@@ -63,6 +79,7 @@ const toProjectMetric = (row: Snapshot): ProjectMetric => ({
   name: row.name,
   npmDownloads30d: row.npmDownloads30d,
   openIssues: row.openIssues,
+  pinned: preference.pinned,
   pushedAt: row.pushedAt,
   relevanceScore: row.relevanceScore,
   responseTimeMs: row.responseTimeMs,
@@ -76,6 +93,7 @@ const toProjectMetric = (row: Snapshot): ProjectMetric => ({
   status: row.status as ProjectMetric['status'],
   topics: parseStringArray(row.topics),
   visibility: row.visibility as ProjectMetric['visibility'],
+  websiteAnalyticsEnabled: preference.websiteAnalyticsEnabled,
 })
 
 const sumNullable = (values: readonly (number | null)[]): number | null => {
@@ -132,11 +150,26 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
     getProjectPreferences(database),
   ])
 
-  const enabledBySlug = new Map(
-    preferences.map((preference) => [preference.slug, preference.enabled]),
+  const preferencesBySlug = new Map(
+    preferences.map((preference) => [preference.slug, preference]),
   )
 
-  const isEnabled = (slug: string) => enabledBySlug.get(slug) !== false
+  const getPreference = (slug: string) => {
+    const preference = preferencesBySlug.get(slug)
+
+    return {
+      attentionMode:
+        preference?.attentionMode === 'health' ||
+        preference?.attentionMode === 'off'
+          ? preference.attentionMode
+          : 'all',
+      pinned: preference?.pinned ?? false,
+      websiteAnalyticsEnabled: preference?.websiteAnalyticsEnabled ?? true,
+    } satisfies ProjectPreference
+  }
+
+  const isEnabled = (slug: string) =>
+    preferencesBySlug.get(slug)?.enabled !== false
 
   const [latestRows, historyRows] = await Promise.all([
     latestSuccessfulSync
@@ -147,6 +180,7 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
 
   return {
     historyRows: historyRows.filter((row) => isEnabled(row.slug)),
+    getPreference,
     isEnabled,
     latestRows,
     latestSuccessfulSync,
@@ -158,12 +192,18 @@ export const buildDashboard = async (
   env: Bindings,
   range: AnalyticsRange = '30d',
 ): Promise<Dashboard> => {
-  const { historyRows, isEnabled, latestRows, latestSuccessfulSync, sync } =
-    await getDashboardRows(env, range)
+  const {
+    getPreference,
+    historyRows,
+    isEnabled,
+    latestRows,
+    latestSuccessfulSync,
+    sync,
+  } = await getDashboardRows(env, range)
 
   const projects = latestRows
     .filter((row) => isEnabled(row.slug))
-    .map(toProjectMetric)
+    .map((row) => toProjectMetric(row, getPreference(row.slug)))
     .sort(compareProjectRelevance)
 
   const history = buildHistory(historyRows)
@@ -207,30 +247,31 @@ export const buildProjectDashboard = async (
   slug: string,
   range: AnalyticsRange = '30d',
 ): Promise<ProjectDashboard | null> => {
-  const { historyRows, isEnabled, latestRows } = await getDashboardRows(
-    env,
-    range,
-  )
+  const { getPreference, historyRows, isEnabled, latestRows } =
+    await getDashboardRows(env, range)
 
   const row = latestRows.find((candidate) => candidate.slug === slug)
 
   if (!row || !isEnabled(slug)) return null
 
+  const preference = getPreference(slug)
+
   const history = buildHistory(
     historyRows.filter((snapshot) => snapshot.slug === slug),
   )
 
-  const websiteAnalytics = row.websiteUrl
-    ? (await buildWebsiteAnalytics(env, range)).sites.find(
-        (site) => site.slug === slug,
-      ) ?? null
-    : null
+  const websiteAnalytics =
+    row.websiteUrl && preference.websiteAnalyticsEnabled
+      ? ((await buildWebsiteAnalytics(env, range)).sites.find(
+          (site) => site.slug === slug,
+        ) ?? null)
+      : null
 
   return projectDashboardSchema.parse({
     generatedAt: new Date().toISOString(),
     history,
     period: getPeriodSummary(history),
-    project: toProjectMetric(row),
+    project: toProjectMetric(row, preference),
     range,
     websiteAnalytics,
   })
@@ -250,19 +291,28 @@ export const buildProjectSettings = async (
     ? await getSnapshotsForSyncRun(database, latestSuccessfulSync.id)
     : []
 
-  const enabledBySlug = new Map(
-    preferences.map((preference) => [preference.slug, preference.enabled]),
+  const preferencesBySlug = new Map(
+    preferences.map((preference) => [preference.slug, preference]),
   )
 
   return projectSettingsSchema.parse({
     projects: rows
       .map((row) => ({
+        attentionMode:
+          preferencesBySlug.get(row.slug)?.attentionMode === 'health' ||
+          preferencesBySlug.get(row.slug)?.attentionMode === 'off'
+            ? preferencesBySlug.get(row.slug)?.attentionMode
+            : defaultProjectPreference.attentionMode,
         category: row.category,
-        enabled: enabledBySlug.get(row.slug) !== false,
+        enabled: preferencesBySlug.get(row.slug)?.enabled !== false,
+        hasWebsite: row.websiteUrl !== null,
         name: row.name,
+        pinned: preferencesBySlug.get(row.slug)?.pinned ?? false,
         relevanceScore: row.relevanceScore,
         slug: row.slug,
         status: row.status as ProjectSettings['projects'][number]['status'],
+        websiteAnalyticsEnabled:
+          preferencesBySlug.get(row.slug)?.websiteAnalyticsEnabled ?? true,
       }))
       .sort(compareProjectRelevance),
   })

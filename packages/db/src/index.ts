@@ -54,6 +54,13 @@ export interface WebsiteAnalyticsWrite {
   visits: number
 }
 
+export interface ProjectPreferenceWrite {
+  attentionMode?: 'all' | 'health' | 'off'
+  enabled?: boolean
+  pinned?: boolean
+  websiteAnalyticsEnabled?: boolean
+}
+
 export const createDb = (client: D1Database) => drizzle(client)
 
 export const insertAuthCode = async (
@@ -230,14 +237,14 @@ export const getProjectPreferences = async (db: ObservatoryDb) =>
 export const setProjectPreference = async (
   db: ObservatoryDb,
   slug: string,
-  enabled: boolean,
+  values: ProjectPreferenceWrite,
   updatedAt: number,
 ): Promise<void> => {
   await db
     .insert(projectPreferences)
-    .values({ enabled, slug, updatedAt })
+    .values({ ...values, slug, updatedAt })
     .onConflictDoUpdate({
-      set: { enabled, updatedAt },
+      set: { ...values, updatedAt },
       target: projectPreferences.slug,
     })
 }
@@ -264,10 +271,24 @@ export const getAnalyticsWebsites = async (db: ObservatoryDb) => {
 
   if (!latestSync) return []
 
-  const rows = await getSnapshotsForSyncRun(db, latestSync.id)
+  const [rows, preferences] = await Promise.all([
+    getSnapshotsForSyncRun(db, latestSync.id),
+    getProjectPreferences(db),
+  ])
+
+  const analyticsEnabledBySlug = new Map(
+    preferences.map((preference) => [
+      preference.slug,
+      preference.websiteAnalyticsEnabled,
+    ]),
+  )
 
   return rows.flatMap((row) => {
-    if (!row.websiteUrl) return []
+    if (
+      !row.websiteUrl ||
+      analyticsEnabledBySlug.get(row.slug) === false
+    )
+      return []
 
     try {
       return [{ hostname: new URL(row.websiteUrl).hostname, slug: row.slug }]
