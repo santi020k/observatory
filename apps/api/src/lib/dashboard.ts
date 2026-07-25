@@ -23,6 +23,13 @@ import { buildWebsiteAnalytics } from './cloudflare'
 
 type Snapshot = Awaited<ReturnType<typeof getSnapshotsForSyncRun>>[number]
 
+const compareProjectRelevance = (
+  left: { name: string; relevanceScore: number },
+  right: { name: string; relevanceScore: number },
+): number =>
+  right.relevanceScore - left.relevanceScore ||
+  left.name.localeCompare(right.name)
+
 const getRangeMilliseconds = (range: AnalyticsRange): number => {
   if (range === '30d') return 30 * 24 * 60 * 60 * 1_000
 
@@ -57,6 +64,7 @@ const toProjectMetric = (row: Snapshot): ProjectMetric => ({
   npmDownloads30d: row.npmDownloads30d,
   openIssues: row.openIssues,
   pushedAt: row.pushedAt,
+  relevanceScore: row.relevanceScore,
   responseTimeMs: row.responseTimeMs,
   slug: row.slug,
   sources: {
@@ -156,6 +164,7 @@ export const buildDashboard = async (
   const projects = latestRows
     .filter((row) => isEnabled(row.slug))
     .map(toProjectMetric)
+    .sort(compareProjectRelevance)
 
   const history = buildHistory(historyRows)
 
@@ -246,12 +255,15 @@ export const buildProjectSettings = async (
   )
 
   return projectSettingsSchema.parse({
-    projects: rows.map((row) => ({
-      category: row.category,
-      enabled: enabledBySlug.get(row.slug) !== false,
-      name: row.name,
-      slug: row.slug,
-      status: row.status,
-    })),
+    projects: rows
+      .map((row) => ({
+        category: row.category,
+        enabled: enabledBySlug.get(row.slug) !== false,
+        name: row.name,
+        relevanceScore: row.relevanceScore,
+        slug: row.slug,
+        status: row.status as ProjectSettings['projects'][number]['status'],
+      }))
+      .sort(compareProjectRelevance),
   })
 }

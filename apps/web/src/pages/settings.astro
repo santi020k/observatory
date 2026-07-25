@@ -52,7 +52,7 @@ const getCategoryIcon = (
     <div class="app-workspace">
       <AppHeader
         apiUrl={apiUrl}
-        lastSync="during the latest catalog sync"
+        lastSync="after the latest sync"
         syncStatus="succeeded"
       />
 
@@ -74,15 +74,32 @@ const getCategoryIcon = (
           storageKey="observatory.settings.active-tab"
         >
           <div aria-label="Settings sections" role="tablist">
-            <button aria-selected="true" data-value="projects" role="tab">
+            <button
+              aria-selected="true"
+              data-value="projects"
+              role="tab"
+              type="button"
+            >
               <Icon aria-hidden="true" name="blocks" />
               Projects
             </button>
-            <button aria-selected="false" data-value="display" role="tab">
+            <button
+              aria-selected="false"
+              data-value="display"
+              role="tab"
+              tabindex="-1"
+              type="button"
+            >
               <Icon aria-hidden="true" name="panel-top" />
               Display
             </button>
-            <button aria-selected="false" data-value="privacy" role="tab">
+            <button
+              aria-selected="false"
+              data-value="privacy"
+              role="tab"
+              tabindex="-1"
+              type="button"
+            >
               <Icon aria-hidden="true" name="shield-check" />
               Privacy
             </button>
@@ -160,7 +177,8 @@ const getCategoryIcon = (
                         <div>
                           <strong>{project.name}</strong>
                           <span data-project-details>
-                            {project.category} · {project.status}
+                            {project.category} · {project.status} · relevance{' '}
+                            {project.relevanceScore}
                           </span>
                         </div>
                         <Switch
@@ -177,7 +195,7 @@ const getCategoryIcon = (
             }
           </section>
 
-          <section data-value="display" role="tabpanel">
+          <section data-value="display" hidden role="tabpanel">
             <div class="settings-section-heading">
               <div>
                 <span class="eyebrow">This browser</span>
@@ -248,7 +266,7 @@ const getCategoryIcon = (
             </Card>
           </section>
 
-          <section data-value="privacy" role="tabpanel">
+          <section data-value="privacy" hidden role="tabpanel">
             <div class="settings-section-heading">
               <div>
                 <span class="eyebrow">Data controls</span>

@@ -86,6 +86,7 @@ describe('project website analytics', () => {
         npmPackages: '[]',
         openIssues: 0,
         pushedAt: '2026-07-25T00:00:00Z',
+        relevanceScore: 0,
         repositoryUrl: 'https://github.com/santi020k/website',
         responseTimeMs: 120,
         slug: 'website',

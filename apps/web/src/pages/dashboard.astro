@@ -435,7 +435,9 @@ const lastSync = dashboard.sync.completedAt
                             <strong>
                               {formatNumber(project.npmDownloads30d)}
                             </strong>
-                            <small>npm / 30d</small>
+                            <small>
+                              npm / 30d · relevance {project.relevanceScore}
+                            </small>
                           </td>
                           <td>
                             <strong>{project.openIssues} issues</strong>

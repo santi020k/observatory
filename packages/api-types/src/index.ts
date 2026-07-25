@@ -30,6 +30,7 @@ export const projectMetricSchema = z.object({
   npmDownloads30d: z.int().nonnegative(),
   openIssues: z.int().nonnegative(),
   pushedAt: z.string().trim().nullable(),
+  relevanceScore: z.int().min(0).max(100),
   responseTimeMs: z.int().nonnegative().nullable(),
   slug: z.string().trim(),
   sources: projectSourceSchema,
@@ -79,6 +80,7 @@ export const projectSettingSchema = z.object({
   category: projectMetricSchema.shape.category,
   enabled: z.boolean(),
   name: z.string().trim(),
+  relevanceScore: projectMetricSchema.shape.relevanceScore,
   slug: z.string().trim(),
   status: projectMetricSchema.shape.status,
 })

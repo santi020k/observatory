@@ -30,8 +30,14 @@ const { description, title } = Astro.props
         try {
           const storedTheme = localStorage.getItem('lumen-theme')
 
-          if (storedTheme === 'light' || storedTheme === 'dark')
-            theme = storedTheme
+          if (storedTheme === 'light' || storedTheme === 'santi020k-light')
+            theme = 'light'
+
+          if (storedTheme === 'dark' || storedTheme === 'santi020k-dark')
+            theme = 'dark'
+
+          if (storedTheme !== theme)
+            localStorage.setItem('lumen-theme', theme)
 
           const preferences = JSON.parse(
             localStorage.getItem('observatory.settings.preferences') ?? '{}',

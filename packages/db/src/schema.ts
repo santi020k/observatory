@@ -50,6 +50,7 @@ export const projectSnapshots = sqliteTable('project_snapshots', {
   npmPackages: text('npm_packages').notNull().default('[]'),
   openIssues: integer('open_issues').notNull().default(0),
   pushedAt: text('pushed_at'),
+  relevanceScore: integer('relevance_score').notNull().default(0),
   repositoryUrl: text('repository_url').notNull(),
   responseTimeMs: integer('response_time_ms'),
   slug: text('slug').notNull(),

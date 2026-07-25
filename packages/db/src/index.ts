@@ -30,6 +30,7 @@ export interface SnapshotWrite {
   npmPackages: readonly string[]
   openIssues: number
   pushedAt: string | null
+  relevanceScore: number
   repositoryUrl: string
   responseTimeMs: number | null
   slug: string
@@ -182,7 +183,7 @@ export const insertSnapshots = async (
   db: ObservatoryDb,
   snapshots: readonly SnapshotWrite[],
 ): Promise<void> => {
-  // D1 enforces a low bound-variable limit per statement. One snapshot has 23
+  // D1 enforces a low bound-variable limit per statement. One snapshot has 24
   // columns, so single-row writes remain safely below the limit at any catalog size.
   for (const snapshot of snapshots) {
     await db.insert(projectSnapshots).values({

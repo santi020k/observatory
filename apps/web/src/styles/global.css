@@ -1260,7 +1260,7 @@ p {
   height: 1rem;
 }
 
-.settings-tabs > [role='tabpanel'] {
+.settings-tabs > [role='tabpanel']:not([hidden]) {
   display: grid;
   gap: 1.25rem;
 }
@@ -1539,6 +1539,7 @@ html[data-observatory-reduce-motion='true'] *::after {
     pointer-events: auto;
   }
 
+  .app-header__workspace > .ui-badge,
   .app-header__actions > .ui-badge,
   .sync-meta {
     display: none;

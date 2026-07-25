@@ -33,4 +33,10 @@ describe('observatory database schema', () => {
   it('associates snapshots with the sync run that produced them', () => {
     expect(projectSnapshots.syncRunId.name).toBe('sync_run_id')
   })
+
+  it('stores the calculated relevance score with every snapshot', () => {
+    expect(projectSnapshots.relevanceScore.name).toBe('relevance_score')
+
+    expect(projectSnapshots.relevanceScore.notNull).toBe(true)
+  })
 })

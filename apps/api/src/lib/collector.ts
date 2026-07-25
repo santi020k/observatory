@@ -8,6 +8,7 @@ import {
 import {
   completeSyncRun,
   createDb,
+  getWebsiteAnalyticsSince,
   insertSnapshots,
   type SnapshotWrite,
   startSyncRun,
@@ -39,6 +40,86 @@ interface PackageMetrics {
   latestVersion: string | null
 }
 
+const dayMilliseconds = 24 * 60 * 60 * 1_000
+const relevanceWindowMilliseconds = 30 * dayMilliseconds
+
+const relevanceWeights = {
+  forks: 0.03,
+  githubClones: 0.07,
+  githubViews: 0.1,
+  npmDownloads: 0.5,
+  recency: 0.04,
+  stars: 0.06,
+  websitePageViews: 0.2,
+} as const
+
+const normalizeSignal = (value: number, maximum: number): number =>
+  maximum > 0 ? Math.log1p(value) / Math.log1p(maximum) : 0
+
+const getRecencySignal = (pushedAt: string | null, now: number): number => {
+  if (!pushedAt) return 0
+
+  const pushedAtTime = Date.parse(pushedAt)
+
+  if (!Number.isFinite(pushedAtTime)) return 0
+
+  const ageInDays = Math.max(0, now - pushedAtTime) / dayMilliseconds
+
+  return Math.max(0, 1 - ageInDays / 365)
+}
+
+const scoreSnapshotsByRelevance = (
+  snapshots: readonly SnapshotWrite[],
+  websitePageViewsBySlug: ReadonlyMap<string, number>,
+  now: number,
+): SnapshotWrite[] => {
+  const maximum = (select: (snapshot: SnapshotWrite) => number): number =>
+    Math.max(0, ...snapshots.map(select))
+
+  const maxima = {
+    forks: maximum((snapshot) => snapshot.forks),
+    githubClones: maximum((snapshot) => snapshot.githubClones14d ?? 0),
+    githubViews: maximum((snapshot) => snapshot.githubViews14d ?? 0),
+    npmDownloads: maximum((snapshot) => snapshot.npmDownloads30d),
+    stars: maximum((snapshot) => snapshot.stars),
+    websitePageViews: maximum(
+      (snapshot) => websitePageViewsBySlug.get(snapshot.slug) ?? 0,
+    ),
+  }
+
+  return snapshots.map((snapshot) => {
+    const websitePageViews = websitePageViewsBySlug.get(snapshot.slug) ?? 0
+    const score =
+      normalizeSignal(snapshot.npmDownloads30d, maxima.npmDownloads) *
+        relevanceWeights.npmDownloads +
+      normalizeSignal(websitePageViews, maxima.websitePageViews) *
+        relevanceWeights.websitePageViews +
+      normalizeSignal(snapshot.githubViews14d ?? 0, maxima.githubViews) *
+        relevanceWeights.githubViews +
+      normalizeSignal(snapshot.githubClones14d ?? 0, maxima.githubClones) *
+        relevanceWeights.githubClones +
+      normalizeSignal(snapshot.stars, maxima.stars) * relevanceWeights.stars +
+      normalizeSignal(snapshot.forks, maxima.forks) * relevanceWeights.forks +
+      getRecencySignal(snapshot.pushedAt, now) * relevanceWeights.recency
+
+    return {
+      ...snapshot,
+      relevanceScore: Math.round(score * 100),
+    }
+  })
+}
+
+class ProviderRequestError extends Error {
+  constructor(
+    readonly status: number,
+    readonly url: string,
+  ) {
+    super(`Provider request failed with ${status}: ${url}`)
+
+    this.name = 'ProviderRequestError'
+  }
+}
+
 const githubHeaders = (token?: string): HeadersInit => ({
   Accept: 'application/vnd.github+json',
   'User-Agent': 'santi-observatory',
@@ -56,7 +137,7 @@ const fetchJson = async <Result>(
   })
 
   if (!response.ok) {
-    throw new Error(`Provider request failed with ${response.status}: ${url}`)
+    throw new ProviderRequestError(response.status, url)
   }
 
   return response.json<Result>()
@@ -114,7 +195,13 @@ const collectPackageMetrics = async (
       const [downloads, registry] = await Promise.all([
         fetchJson<{ downloads: number }>(
           `https://api.npmjs.org/downloads/point/last-month/${encoded}`,
-        ),
+        ).catch((error: unknown) => {
+          if (error instanceof ProviderRequestError && error.status === 404) {
+            return { downloads: 0 }
+          }
+
+          throw error
+        }),
         fetchJson<{ 'dist-tags'?: { latest?: string } }>(
           `https://registry.npmjs.org/${encoded}`,
         ),
@@ -221,6 +308,7 @@ const collectRepository = async (
     npmPackages: packages,
     openIssues: repository.open_issues_count,
     pushedAt: repository.pushed_at,
+    relevanceScore: 0,
     repositoryUrl: repository.html_url,
     responseTimeMs: websiteHealth.responseTimeMs,
     slug: repository.name,
@@ -241,12 +329,33 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
   await startSyncRun(database, runId, startedAt)
 
   try {
-    const repositories = await collectGithubRepositories(env.GITHUB_TOKEN)
+    const [repositories, websiteAnalytics] = await Promise.all([
+      collectGithubRepositories(env.GITHUB_TOKEN),
+      getWebsiteAnalyticsSince(
+        database,
+        startedAt - relevanceWindowMilliseconds,
+      ),
+    ])
 
-    const snapshots = await Promise.all(
+    const websitePageViewsBySlug = new Map<string, number>()
+
+    for (const row of websiteAnalytics) {
+      websitePageViewsBySlug.set(
+        row.slug,
+        (websitePageViewsBySlug.get(row.slug) ?? 0) + row.pageViews,
+      )
+    }
+
+    const collectedSnapshots = await Promise.all(
       repositories.map((repository) =>
         collectRepository(repository, env, startedAt, runId),
       ),
+    )
+
+    const snapshots = scoreSnapshotsByRelevance(
+      collectedSnapshots,
+      websitePageViewsBySlug,
+      startedAt,
     )
 
     await insertSnapshots(database, snapshots)
@@ -275,4 +384,5 @@ export const collectorInternals = {
   checkWebsite,
   collectGithubRepositories,
   collectPackageMetrics,
+  scoreSnapshotsByRelevance,
 }

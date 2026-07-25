@@ -62,7 +62,6 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
       npmPackages: [
         '@santi020k/theme',
         '@santi020k/theme-core',
-        'santi020k-theme',
       ],
       status: 'active',
     },
