@@ -24,30 +24,41 @@ const { apiUrl, lastSync, syncStatus } = Astro.props
   >
     <Icon aria-hidden="true" name="menu" />
   </button>
-  <span class="app-header__context">Observatory workspace</span>
-  <div class="app-header__actions">
+  <div class="app-header__workspace">
+    <span class="app-header__context">Observatory</span>
     <Badge variant="outline"
       ><span class="status-dot"></span> Private workspace</Badge
     >
+  </div>
+  <div class="app-header__actions">
     {
       syncStatus === 'failed' && (
         <Badge variant="warning">Last sync failed</Badge>
       )
     }
-    <span class="sync-meta">Updated {lastSync}</span>
-    <Button data-sync-button size="sm" variant="outline">
-      <Icon aria-hidden="true" name="refresh-cw" />
-      Sync now
-    </Button>
-    <ThemeToggle title="Toggle color theme" />
-    <Button
-      data-logout-button
-      size="icon"
-      variant="ghost"
-      aria-label="Sign out"
-    >
-      <Icon aria-hidden="true" name="log-out" />
-    </Button>
+    <div class="app-header__sync">
+      <span class="sync-meta">Updated {lastSync}</span>
+      <Button data-sync-button size="sm" variant="outline">
+        <Icon aria-hidden="true" name="refresh-cw" />
+        Sync now
+      </Button>
+    </div>
+    <div class="app-header__utilities">
+      <ThemeToggle
+        class="header-theme-toggle"
+        title="Toggle color theme"
+      />
+      <Button
+        class="header-icon-button"
+        data-logout-button
+        size="icon"
+        variant="ghost"
+        aria-label="Sign out"
+        title="Sign out"
+      >
+        <Icon aria-hidden="true" name="log-out" />
+      </Button>
+    </div>
   </div>
 </header>
 
