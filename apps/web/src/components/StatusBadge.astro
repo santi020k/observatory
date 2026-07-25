@@ -1,0 +1,16 @@
+---
+import { Badge } from '@santi020k/lumen-astro'
+
+interface Props {
+  status: 'active' | 'archived' | 'maintained' | 'paused'
+}
+
+const { status } = Astro.props
+let variant: 'outline' | 'success' | 'warning' = 'outline'
+
+if (status === 'active') variant = 'success'
+
+if (status === 'paused') variant = 'warning'
+---
+
+<Badge variant={variant}>{status}</Badge>

@@ -1,0 +1,393 @@
+---
+import AppHeader from '@/components/AppHeader.astro'
+import MetricCard from '@/components/MetricCard.astro'
+import PrivateProjects from '@/components/PrivateProjects.astro'
+import StatusBadge from '@/components/StatusBadge.astro'
+import AppLayout from '@/layouts/AppLayout.astro'
+
+import { getBrowserApiUrl, getDashboard } from '@/lib/api'
+import {
+  formatDate,
+  formatDuration,
+  formatNumber,
+  formatRelativeDate,
+} from '@/lib/format'
+
+import {
+  Badge,
+  ButtonLink,
+  Card,
+  Chart,
+  Empty,
+  Icon,
+  Progress,
+  Table,
+} from '@santi020k/lumen-astro'
+
+const response = await getDashboard(Astro.request, Astro.url)
+
+if (response.status === 401) return Astro.redirect('/login/')
+
+if (!response.ok || !response.parsed)
+  throw new Error('Observatory API is unavailable.')
+
+const dashboard = response.parsed
+const apiUrl = getBrowserApiUrl()
+
+const projectsByDownloads = [...dashboard.projects].sort(
+  (left, right) => right.npmDownloads30d - left.npmDownloads30d,
+)
+
+const chartProjects = projectsByDownloads
+  .filter((project) => project.npmDownloads30d > 0)
+  .slice(0, 6)
+
+const maxDownloads = Math.max(
+  ...chartProjects.map((project) => project.npmDownloads30d),
+  1,
+)
+
+const attentionProjects = dashboard.projects
+  .filter((project) => {
+    const pushedAt = project.pushedAt ? Date.parse(project.pushedAt) : 0
+    const stale = Date.now() - pushedAt > 120 * 24 * 60 * 60 * 1000
+
+    return (
+      project.openIssues > 0 || project.healthStatus === 'degraded' || stale
+    )
+  })
+  .sort((left, right) => right.openIssues - left.openIssues)
+  .slice(0, 5)
+
+const categoryCounts = dashboard.projects.reduce<Record<string, number>>(
+  (counts, project) => {
+    counts[project.category] = (counts[project.category] ?? 0) + 1
+
+    return counts
+  },
+  {},
+)
+
+const getCategoryIcon = (
+  category: (typeof dashboard.projects)[number]['category'],
+): 'blocks' | 'layout-dashboard' | 'notebook-tabs' | 'wrench' => {
+  if (category === 'app') return 'layout-dashboard'
+
+  if (category === 'content') return 'notebook-tabs'
+
+  if (category === 'tool') return 'wrench'
+
+  return 'blocks'
+}
+
+const lastSync = dashboard.sync.completedAt
+  ? formatRelativeDate(dashboard.sync.completedAt)
+  : 'awaiting first sync'
+---
+
+<AppLayout
+  description="Private project analytics and operational health dashboard."
+  title="Overview · Observatory"
+>
+  <div class="app-shell">
+    <AppHeader apiUrl={apiUrl} lastSync={lastSync} />
+
+    <main class="dashboard" id="main-content">
+      <section class="hero-row" aria-labelledby="overview-title">
+        <div>
+          <span class="eyebrow">Portfolio overview</span>
+          <h1 id="overview-title">Good evening, Santiago.</h1>
+          <p>
+            A focused read on what is growing, what needs attention, and where
+            your product energy is going.
+          </p>
+        </div>
+        <div class="source-legend" aria-label="Active data sources">
+          <Badge variant="outline"
+            ><Icon aria-hidden="true" name="github" /> GitHub</Badge
+          >
+          <Badge variant="outline"
+            ><Icon aria-hidden="true" name="package" /> npm</Badge
+          >
+          <Badge variant="outline"
+            ><Icon aria-hidden="true" name="activity" /> Health</Badge
+          >
+        </div>
+      </section>
+
+      <section class="metric-grid" aria-label="Portfolio totals">
+        <MetricCard
+          context={`${dashboard.summary.publicProjects} public repositories tracked`}
+          icon="circle-dot-dashed"
+          label="Active projects"
+          value={formatNumber(dashboard.summary.activeProjects)}
+        />
+        <MetricCard
+          context="Across mapped packages · last 30 days"
+          icon="download"
+          label="Package downloads"
+          value={formatNumber(dashboard.summary.npmDownloads30d)}
+        />
+        <MetricCard
+          context="Authenticated repository traffic · last 14 days"
+          icon="eye"
+          label="GitHub views"
+          value={formatNumber(dashboard.summary.githubViews14d)}
+        />
+        <MetricCard
+          context="Maintenance load across public repositories"
+          icon="activity"
+          label="Open issues"
+          value={formatNumber(dashboard.summary.openIssues)}
+        />
+      </section>
+
+      {
+        dashboard.projects.length === 0 ? (
+          <Empty class="first-sync">
+            <span class="empty-icon">
+              <Icon aria-hidden="true" name="telescope" />
+            </span>
+            <h2>Your catalog is ready for first light</h2>
+            <p>
+              Run the first sync to collect GitHub, npm, and website health
+              metrics.
+            </p>
+            <button
+              class="ui-button ui-button--default"
+              data-sync-button
+              type="button"
+            >
+              Sync public projects
+            </button>
+          </Empty>
+        ) : (
+          <>
+            <section class="insight-grid">
+              <Card
+                as="section"
+                class="panel reach-panel"
+                aria-labelledby="reach-heading"
+              >
+                <div class="panel-heading">
+                  <div>
+                    <span class="eyebrow">Reach</span>
+                    <h2 id="reach-heading">Package downloads</h2>
+                  </div>
+                  <span>Last 30 days</span>
+                </div>
+
+                {chartProjects.length > 0 ? (
+                  <Chart aria-label="Package downloads by project">
+                    <div class="bar-chart">
+                      {chartProjects.map((project) => (
+                        <div class="bar-row">
+                          <div class="bar-label">
+                            <span>{project.name}</span>
+                            <strong>
+                              {formatNumber(project.npmDownloads30d)}
+                            </strong>
+                          </div>
+                          <Progress
+                            max={maxDownloads}
+                            value={project.npmDownloads30d}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <figcaption>
+                      Aggregated across every npm package mapped to each
+                      product.
+                    </figcaption>
+                  </Chart>
+                ) : (
+                  <Empty>
+                    <p>No mapped npm package has download data yet.</p>
+                  </Empty>
+                )}
+              </Card>
+
+              <Card
+                as="section"
+                class="panel attention-panel"
+                aria-labelledby="attention-heading"
+              >
+                <div class="panel-heading">
+                  <div>
+                    <span class="eyebrow">Focus</span>
+                    <h2 id="attention-heading">Attention queue</h2>
+                  </div>
+                  <Badge
+                    variant={
+                      attentionProjects.length > 0 ? 'warning' : 'success'
+                    }
+                  >
+                    {attentionProjects.length} signals
+                  </Badge>
+                </div>
+
+                {attentionProjects.length > 0 ? (
+                  <ul class="attention-list">
+                    {attentionProjects.map((project) => (
+                      <li>
+                        <span
+                          class:list={[
+                            'health-dot',
+                            `health-dot--${project.healthStatus}`,
+                          ]}
+                        />
+                        <div>
+                          <strong>{project.name}</strong>
+                          <span>
+                            {project.openIssues > 0
+                              ? `${project.openIssues} open issue${project.openIssues === 1 ? '' : 's'}`
+                              : `Last push ${formatRelativeDate(project.pushedAt)}`}
+                          </span>
+                        </div>
+                        <ButtonLink
+                          ariaLabel={`Open ${project.name} on GitHub`}
+                          href={project.sources.github}
+                          newTab
+                          shape="icon"
+                          variant="ghost"
+                        >
+                          <Icon aria-hidden="true" name="arrow-up-right" />
+                        </ButtonLink>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Empty>
+                    <Icon aria-hidden="true" name="circle-check-big" />
+                    <p>No public projects need immediate attention.</p>
+                  </Empty>
+                )}
+              </Card>
+            </section>
+
+            <section
+              class="portfolio-section"
+              aria-labelledby="portfolio-heading"
+            >
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Public portfolio</span>
+                  <h2 id="portfolio-heading">
+                    Every published and open-source project
+                  </h2>
+                  <p>
+                    Automatically discovered from GitHub, with product metadata
+                    layered on top.
+                  </p>
+                </div>
+                <div class="category-summary" aria-label="Projects by category">
+                  {Object.entries(categoryCounts).map(([category, count]) => (
+                    <span>
+                      <strong>{count}</strong> {category}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <Table>
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Project</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Reach</th>
+                      <th scope="col">Maintenance</th>
+                      <th scope="col">Health</th>
+                      <th scope="col">Last push</th>
+                      <th scope="col">
+                        <span class="sr-only">Open</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.projects.map((project) => (
+                      <tr>
+                        <td>
+                          <div class="project-cell">
+                            <span class="project-icon">
+                              <Icon
+                                aria-hidden="true"
+                                name={getCategoryIcon(project.category)}
+                              />
+                            </span>
+                            <span>
+                              <strong>{project.name}</strong>
+                              <small>
+                                {project.description ?? project.slug}
+                              </small>
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <StatusBadge status={project.status} />
+                        </td>
+                        <td>
+                          <strong>
+                            {formatNumber(project.npmDownloads30d)}
+                          </strong>
+                          <small>npm / 30d</small>
+                        </td>
+                        <td>
+                          <strong>{project.openIssues} issues</strong>
+                          <small>
+                            {project.stars} stars · {project.forks} forks
+                          </small>
+                        </td>
+                        <td>
+                          <span
+                            class={`health-label health-label--${project.healthStatus}`}
+                          >
+                            <span class="health-dot" />
+                            {project.healthStatus}
+                          </span>
+                          <small>
+                            {formatDuration(project.responseTimeMs)}
+                          </small>
+                        </td>
+                        <td>
+                          <strong>
+                            {formatRelativeDate(project.pushedAt)}
+                          </strong>
+                          <small>{formatDate(project.pushedAt)}</small>
+                        </td>
+                        <td>
+                          <ButtonLink
+                            ariaLabel={`Open ${project.name} on GitHub`}
+                            href={project.sources.github}
+                            newTab
+                            shape="icon"
+                            variant="ghost"
+                          >
+                            <Icon aria-hidden="true" name="arrow-up-right" />
+                          </ButtonLink>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Table>
+            </section>
+          </>
+        )
+      }
+
+      <PrivateProjects />
+    </main>
+
+    <footer class="app-footer">
+      <span>Observatory is private by design.</span>
+      <span>
+        Last successful sync {
+          dashboard.sync.completedAt
+            ? formatDate(dashboard.sync.completedAt)
+            : 'not run'
+        }
+      </span>
+    </footer>
+  </div>
+</AppLayout>

@@ -1,0 +1,136 @@
+---
+import Brand from '@/components/Brand.astro'
+import AppLayout from '@/layouts/AppLayout.astro'
+
+import { getBrowserApiUrl } from '@/lib/api'
+
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  Icon,
+  Input,
+  Label,
+} from '@santi020k/lumen-astro'
+
+const apiUrl = getBrowserApiUrl()
+---
+
+<AppLayout
+  description="Private sign in for Santiago's project analytics dashboard."
+  title="Sign in · Observatory"
+>
+  <main class="auth-shell" id="main-content">
+    <section class="auth-story" aria-labelledby="auth-story-title">
+      <Brand />
+      <div>
+        <span class="eyebrow">One view. Every signal.</span>
+        <h1 id="auth-story-title">Your projects, under one sky.</h1>
+        <p>
+          Track product reach, release momentum, maintenance load, and
+          deployment health without opening ten different dashboards.
+        </p>
+      </div>
+      <ul class="auth-signals" aria-label="Available analytics">
+        <li><Icon aria-hidden="true" name="github" /> Repository momentum</li>
+        <li><Icon aria-hidden="true" name="package" /> Package downloads</li>
+        <li><Icon aria-hidden="true" name="activity" /> Website health</li>
+      </ul>
+    </section>
+
+    <section class="auth-panel" aria-labelledby="sign-in-title">
+      <Card class="auth-card">
+        <span class="auth-card__icon"
+          ><Icon aria-hidden="true" name="key-round" /></span
+        >
+        <span class="eyebrow">Private access</span>
+        <h2 id="sign-in-title">Sign in to Observatory</h2>
+        <p>
+          Enter your authorized email. We’ll send a six-digit code that expires
+          in ten minutes.
+        </p>
+
+        <Alert data-form-alert hidden variant="destructive" />
+
+        <form data-api-url={apiUrl} data-login-form>
+          <Field>
+            <Label for="email">Email address</Label>
+            <Input
+              autocomplete="email"
+              id="email"
+              name="email"
+              placeholder="you@example.com"
+              required
+              size="lg"
+              type="email"
+            />
+          </Field>
+          <Button size="lg" type="submit">
+            Send verification code
+            <Icon aria-hidden="true" name="arrow-right" />
+          </Button>
+        </form>
+        <p class="auth-note">
+          <Icon aria-hidden="true" name="shield" /> Owner-only access. No password
+          stored.
+        </p>
+      </Card>
+    </section>
+  </main>
+
+  <script>
+    const form = document.querySelector<HTMLFormElement>('[data-login-form]')
+    const alert = document.querySelector<HTMLElement>('[data-form-alert]')
+    const apiUrl = form?.dataset.apiUrl ?? '/api'
+
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault()
+
+      const button = form.querySelector('button')
+      const formData = new FormData(form)
+      const email = String(formData.get('email') ?? '')
+
+      if (button) {
+        button.disabled = true
+
+        button.textContent = 'Sending…'
+      }
+
+      if (alert) alert.hidden = true
+
+      try {
+        const response = await fetch(`${apiUrl}/auth/request-code`, {
+          body: JSON.stringify({ email }),
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+        })
+
+        const result = await response.json()
+
+        if (!response.ok)
+          throw new Error(result.error?.message ?? 'Could not send the code.')
+
+        const query = new URLSearchParams({ email })
+
+        if (result.developmentCode) query.set('devCode', result.developmentCode)
+
+        window.location.assign(`/verify/?${query.toString()}`)
+      } catch (error) {
+        if (alert) {
+          alert.hidden = false
+
+          alert.textContent =
+            error instanceof Error ? error.message : 'Could not send the code.'
+        }
+
+        if (button) {
+          button.disabled = false
+
+          button.textContent = 'Send verification code'
+        }
+      }
+    })
+  </script>
+</AppLayout>

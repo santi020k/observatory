@@ -1,0 +1,32 @@
+{
+  "name": "@santi020k/observatory-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "wrangler deploy --dry-run",
+    "check": "tsc --noEmit",
+    "clean": "rm -rf .wrangler dist",
+    "db:migrate:local": "wrangler d1 migrations apply observatory --local",
+    "db:migrate:remote": "wrangler d1 migrations apply observatory --remote",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --port 8787",
+    "lint": "eslint src --cache --no-warn-ignored",
+    "lint:fix": "eslint src --cache --fix --no-warn-ignored",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@santi020k/observatory-api-types": "workspace:*",
+    "@santi020k/observatory-catalog": "workspace:*",
+    "@santi020k/observatory-db": "workspace:*",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

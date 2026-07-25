@@ -1,0 +1,74 @@
+---
+import { Badge, Button, Card, Icon } from '@santi020k/lumen-astro'
+---
+
+<section
+  aria-labelledby="private-heading"
+  class="private-section"
+  id="private-projects"
+>
+  <div class="section-heading">
+    <div>
+      <span class="eyebrow">Next data boundary</span>
+      <h2 id="private-heading">Private projects</h2>
+      <p>
+        Reserved for authenticated GitHub repositories, Cloudflare analytics,
+        deployment costs, and commercial product signals.
+      </p>
+    </div>
+    <Badge variant="secondary">Specified, not connected</Badge>
+  </div>
+
+  <div class="private-grid">
+    <Card class="private-card" variant="muted">
+      <span class="private-card__icon"
+        ><Icon aria-hidden="true" name="github" /></span
+      >
+      <div>
+        <h3>Private repository adapter</h3>
+        <p>
+          Installation-token access, pull request health, Actions usage, and
+          release cadence.
+        </p>
+      </div>
+      <Badge variant="outline">Phase 2</Badge>
+    </Card>
+    <Card class="private-card" variant="muted">
+      <span class="private-card__icon"
+        ><Icon aria-hidden="true" name="cloud" /></span
+      >
+      <div>
+        <h3>Cloudflare operations</h3>
+        <p>
+          Worker requests, D1 reads and writes, error rates, bandwidth, and
+          monthly cost.
+        </p>
+      </div>
+      <Badge variant="outline">Phase 2</Badge>
+    </Card>
+    <Card class="private-card" variant="muted">
+      <span class="private-card__icon"
+        ><Icon aria-hidden="true" name="badge-dollar-sign" /></span
+      >
+      <div>
+        <h3>Product outcomes</h3>
+        <p>
+          Revenue, active users, retention, and support load through opt-in
+          provider adapters.
+        </p>
+      </div>
+      <Badge variant="outline">Phase 3</Badge>
+    </Card>
+  </div>
+
+  <div class="private-callout">
+    <Icon aria-hidden="true" name="shield-check" />
+    <p>
+      Private metrics will use separate encrypted credentials and API routes.
+      Public syncs cannot discover or return private project names.
+    </p>
+    <Button disabled size="sm" variant="secondary"
+      >Connect private sources</Button
+    >
+  </div>
+</section>

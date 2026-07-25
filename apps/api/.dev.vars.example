@@ -1,0 +1,12 @@
+AUTH_SECRET=replace-with-at-least-32-random-characters
+CORS_ORIGIN=http://localhost:4321,http://localhost:4322
+ENVIRONMENT=development
+MAIL_FROM=Observatory <observatory@example.com>
+OWNER_EMAIL=you@example.com
+
+# Optional in local development. When omitted, the API returns the code in
+# `developmentCode` so the full login flow can still be tested.
+RESEND_API_KEY=
+
+# Optional. Enables authenticated GitHub traffic metrics and a higher rate limit.
+GITHUB_TOKEN=

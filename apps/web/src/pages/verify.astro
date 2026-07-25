@@ -1,0 +1,127 @@
+---
+import Brand from '@/components/Brand.astro'
+import AppLayout from '@/layouts/AppLayout.astro'
+
+import { getBrowserApiUrl } from '@/lib/api'
+
+import {
+  Alert,
+  Button,
+  ButtonLink,
+  Card,
+  Field,
+  Icon,
+  InputOTP,
+  Label,
+} from '@santi020k/lumen-astro'
+
+const email = Astro.url.searchParams.get('email') ?? ''
+
+const developmentCode = import.meta.env.DEV
+  ? Astro.url.searchParams.get('devCode')
+  : null
+
+const apiUrl = getBrowserApiUrl()
+
+if (!email) return Astro.redirect('/login/')
+---
+
+<AppLayout
+  description="Verify your Observatory login code."
+  title="Verify · Observatory"
+>
+  <main class="verify-shell" id="main-content">
+    <Brand />
+    <Card class="auth-card verify-card">
+      <span class="auth-card__icon"
+        ><Icon aria-hidden="true" name="mail-check" /></span
+      >
+      <span class="eyebrow">Check your inbox</span>
+      <h1>Enter your code</h1>
+      <p>
+        We sent a six-digit code to <strong>{email}</strong>. It expires in ten
+        minutes.
+      </p>
+
+      {
+        developmentCode && (
+          <Alert variant="default">
+            Local development code: <strong>{developmentCode}</strong>
+          </Alert>
+        )
+      }
+      <Alert data-form-alert hidden variant="destructive" />
+
+      <form data-api-url={apiUrl} data-email={email} data-verify-form>
+        <Field>
+          <Label for="code">Verification code</Label>
+          <InputOTP id="code" name="code" length={6} required />
+        </Field>
+        <Button size="lg" type="submit">
+          Open Observatory
+          <Icon aria-hidden="true" name="arrow-right" />
+        </Button>
+      </form>
+      <ButtonLink href="/login/" variant="inline">
+        <Icon aria-hidden="true" name="arrow-left" />
+        Use a different email
+      </ButtonLink>
+    </Card>
+  </main>
+
+  <script>
+    const form = document.querySelector<HTMLFormElement>('[data-verify-form]')
+    const alert = document.querySelector<HTMLElement>('[data-form-alert]')
+    const apiUrl = form?.dataset.apiUrl ?? '/api'
+    const email = form?.dataset.email ?? ''
+
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault()
+
+      const button = form.querySelector('button')
+      const formData = new FormData(form)
+      const code = String(formData.get('code') ?? '')
+
+      if (button) {
+        button.disabled = true
+
+        button.textContent = 'Verifying…'
+      }
+
+      if (alert) alert.hidden = true
+
+      try {
+        const response = await fetch(`${apiUrl}/auth/verify-code`, {
+          body: JSON.stringify({ code, email }),
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+        })
+
+        const result = await response.json()
+
+        if (!response.ok)
+          throw new Error(
+            result.error?.message ?? 'The code could not be verified.',
+          )
+
+        window.location.assign('/dashboard/')
+      } catch (error) {
+        if (alert) {
+          alert.hidden = false
+
+          alert.textContent =
+            error instanceof Error
+              ? error.message
+              : 'The code could not be verified.'
+        }
+
+        if (button) {
+          button.disabled = false
+
+          button.textContent = 'Open Observatory'
+        }
+      }
+    })
+  </script>
+</AppLayout>

@@ -1,0 +1,32 @@
+{
+  "name": "@santi020k/observatory-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "astro build",
+    "check": "astro check",
+    "clean": "rm -rf .astro dist",
+    "dev": "astro dev --port 4321",
+    "doctor": "astro-doctor --dir . --preset recommended --fail-on error",
+    "lint": "eslint src --cache --no-warn-ignored",
+    "lint:fix": "eslint src --cache --fix --no-warn-ignored",
+    "preview": "astro preview",
+    "test": "vitest run",
+    "type-check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "catalog:",
+    "@santi020k/lumen-astro": "catalog:",
+    "@santi020k/observatory-api-types": "workspace:*",
+    "astro": "catalog:"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@santi020k/astro-doctor": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

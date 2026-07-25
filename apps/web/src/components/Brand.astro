@@ -1,0 +1,21 @@
+---
+import { Icon } from '@santi020k/lumen-astro'
+
+interface Props {
+  compact?: boolean
+}
+
+const { compact = false } = Astro.props
+---
+
+<a
+  class:list={['brand-lockup', compact && 'brand-lockup--compact']}
+  href="/"
+  aria-label="Observatory home"
+>
+  <span class="brand-mark"><Icon aria-hidden="true" name="orbit" /></span>
+  <span>
+    <strong>Observatory</strong>
+    {!compact && <small>Project intelligence</small>}
+  </span>
+</a>

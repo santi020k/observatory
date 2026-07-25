@@ -1,0 +1,86 @@
+---
+import { Badge, Button, Icon } from '@santi020k/lumen-astro'
+
+import Brand from './Brand.astro'
+
+interface Props {
+  apiUrl: string
+  lastSync: string
+}
+
+const { apiUrl, lastSync } = Astro.props
+---
+
+<header class="app-header" data-api-url={apiUrl}>
+  <Brand compact />
+  <div class="app-header__actions">
+    <Badge variant="outline"
+      ><span class="status-dot"></span> Private workspace</Badge
+    >
+    <span class="sync-meta">Updated {lastSync}</span>
+    <Button data-sync-button size="sm" variant="outline">
+      <Icon aria-hidden="true" name="refresh-cw" />
+      Sync now
+    </Button>
+    <Button
+      data-logout-button
+      size="icon"
+      variant="ghost"
+      aria-label="Sign out"
+    >
+      <Icon aria-hidden="true" name="log-out" />
+    </Button>
+  </div>
+</header>
+
+<script>
+  const syncButton =
+    document.querySelector<HTMLButtonElement>('[data-sync-button]')
+
+  const logoutButton = document.querySelector<HTMLButtonElement>(
+    '[data-logout-button]',
+  )
+
+  const header = document.querySelector<HTMLElement>('.app-header')
+  const apiUrl = header?.dataset.apiUrl ?? '/api'
+
+  syncButton?.addEventListener('click', async () => {
+    syncButton.disabled = true
+
+    syncButton.setAttribute('aria-busy', 'true')
+
+    const original = syncButton.innerHTML
+
+    syncButton.textContent = 'Syncing…'
+
+    try {
+      const response = await fetch(`${apiUrl}/sync`, {
+        credentials: 'include',
+        method: 'POST',
+      })
+
+      if (!response.ok) throw new Error('Sync failed')
+
+      window.location.reload()
+    } catch {
+      syncButton.textContent = 'Try again'
+
+      syncButton.disabled = false
+
+      syncButton.removeAttribute('aria-busy')
+
+      window.setTimeout(() => {
+        syncButton.innerHTML = original
+      }, 2_000)
+    }
+  })
+
+  logoutButton?.addEventListener('click', async () => {
+    await fetch(`${apiUrl}/auth/logout`, {
+      credentials: 'include',
+      method: 'POST',
+    })
+
+    window.location.assign('/login/')
+  })
+</script>

@@ -1,0 +1,30 @@
+---
+import '@santi020k/lumen-astro/styles.css'
+import '@/styles/global.css'
+
+import { SkipLink, UIPrimitives } from '@santi020k/lumen-astro'
+
+interface Props {
+  description: string
+  title: string
+}
+
+const { description, title } = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="theme-color" content="hsl(258 48% 11%)" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <SkipLink href="#main-content">Skip to dashboard</SkipLink>
+    <slot />
+    <UIPrimitives />
+  </body>
+</html>

@@ -1,0 +1,195 @@
+import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+
+import { authCodes, projectSnapshots, sessions, syncRuns } from './schema'
+
+export * from './schema'
+
+export type ObservatoryDb = ReturnType<typeof createDb>
+
+export interface SnapshotWrite {
+  archived: boolean
+  category: string
+  collectedAt: number
+  description: string | null
+  forks: number
+  githubClones14d: number | null
+  githubViews14d: number | null
+  healthStatus: string
+  id: string
+  latestVersion: string | null
+  name: string
+  npmDownloads30d: number
+  npmPackages: readonly string[]
+  openIssues: number
+  pushedAt: string | null
+  repositoryUrl: string
+  responseTimeMs: number | null
+  slug: string
+  stars: number
+  status: string
+  topics: readonly string[]
+  visibility: string
+  websiteUrl: string | null
+}
+
+export const createDb = (client: D1Database) => drizzle(client)
+
+export const insertAuthCode = async (
+  db: ObservatoryDb,
+  values: typeof authCodes.$inferInsert,
+): Promise<void> => {
+  await db.insert(authCodes).values(values)
+}
+
+export const countRecentAuthCodes = async (
+  db: ObservatoryDb,
+  email: string,
+  since: number,
+): Promise<number> => {
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(authCodes)
+    .where(and(eq(authCodes.email, email), gt(authCodes.createdAt, since)))
+
+  return result[0]?.count ?? 0
+}
+
+export const findLatestUsableCode = async (
+  db: ObservatoryDb,
+  email: string,
+  now: number,
+) =>
+  db
+    .select()
+    .from(authCodes)
+    .where(
+      and(
+        eq(authCodes.email, email),
+        isNull(authCodes.usedAt),
+        gt(authCodes.expiresAt, now),
+        lt(authCodes.attempts, 5),
+      ),
+    )
+    .orderBy(desc(authCodes.createdAt))
+    .limit(1)
+    .then((rows) => rows[0] ?? null)
+
+export const recordCodeAttempt = async (
+  db: ObservatoryDb,
+  id: string,
+  usedAt?: number,
+): Promise<void> => {
+  await db
+    .update(authCodes)
+    .set({
+      attempts: sql`${authCodes.attempts} + 1`,
+      ...(usedAt === undefined ? {} : { usedAt }),
+    })
+    .where(eq(authCodes.id, id))
+}
+
+export const insertSession = async (
+  db: ObservatoryDb,
+  values: typeof sessions.$inferInsert,
+): Promise<void> => {
+  await db.insert(sessions).values(values)
+}
+
+export const findSession = async (
+  db: ObservatoryDb,
+  tokenHash: string,
+  now: number,
+) =>
+  db
+    .select()
+    .from(sessions)
+    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, now)))
+    .limit(1)
+    .then((rows) => rows[0] ?? null)
+
+export const deleteSession = async (
+  db: ObservatoryDb,
+  tokenHash: string,
+): Promise<void> => {
+  await db.delete(sessions).where(eq(sessions.tokenHash, tokenHash))
+}
+
+export const cleanupExpiredAuth = async (
+  db: ObservatoryDb,
+  now: number,
+): Promise<void> => {
+  await db.delete(authCodes).where(lt(authCodes.expiresAt, now))
+
+  await db.delete(sessions).where(lt(sessions.expiresAt, now))
+}
+
+export const startSyncRun = async (
+  db: ObservatoryDb,
+  id: string,
+  startedAt: number,
+): Promise<void> => {
+  await db.insert(syncRuns).values({
+    id,
+    projectCount: 0,
+    startedAt,
+    status: 'running',
+  })
+}
+
+export const completeSyncRun = async (
+  db: ObservatoryDb,
+  id: string,
+  values: {
+    completedAt: number
+    errorMessage?: string
+    projectCount: number
+    status: string
+  },
+): Promise<void> => {
+  await db
+    .update(syncRuns)
+    .set({
+      completedAt: values.completedAt,
+      errorMessage: values.errorMessage ?? null,
+      projectCount: values.projectCount,
+      status: values.status,
+    })
+    .where(eq(syncRuns.id, id))
+}
+
+export const insertSnapshots = async (
+  db: ObservatoryDb,
+  snapshots: readonly SnapshotWrite[],
+): Promise<void> => {
+  // D1 enforces a low bound-variable limit per statement. One snapshot has 23
+  // columns, so single-row writes remain safely below the limit at any catalog size.
+  for (const snapshot of snapshots) {
+    await db.insert(projectSnapshots).values({
+      ...snapshot,
+      npmPackages: JSON.stringify(snapshot.npmPackages),
+      topics: JSON.stringify(snapshot.topics),
+    })
+  }
+}
+
+export const getLatestSnapshots = async (db: ObservatoryDb) =>
+  db
+    .select()
+    .from(projectSnapshots)
+    .where(
+      sql`${projectSnapshots.collectedAt} = (
+        select max(p2.collected_at)
+        from project_snapshots p2
+        where p2.slug = ${projectSnapshots.slug}
+      )`,
+    )
+    .orderBy(desc(projectSnapshots.pushedAt))
+
+export const getLatestSyncRun = async (db: ObservatoryDb) =>
+  db
+    .select()
+    .from(syncRuns)
+    .orderBy(desc(syncRuns.startedAt))
+    .limit(1)
+    .then((rows) => rows[0] ?? null)

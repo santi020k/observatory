@@ -1,0 +1,12 @@
+.astro/
+.eslintcache
+.env
+.env.local
+.turbo/
+.wrangler/
+coverage/
+dist/
+node_modules/
+apps/api/.dev.vars
+apps/web/.env
+pnpm-debug.log*

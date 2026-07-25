@@ -1,0 +1,19 @@
+---
+import { Card, Icon, Stat } from '@santi020k/lumen-astro'
+
+interface Props {
+  context: string
+  icon: 'activity' | 'circle-dot-dashed' | 'download' | 'eye'
+  label: string
+  value: string
+}
+
+const { context, icon, label, value } = Astro.props
+---
+
+<Card class="metric-card">
+  <span class="metric-card__icon"><Icon aria-hidden="true" name={icon} /></span>
+  <Stat label={label} value={value}>
+    <p>{context}</p>
+  </Stat>
+</Card>
