@@ -7,6 +7,7 @@ import {
   projectSnapshots,
   sessions,
   syncRuns,
+  websiteAnalyticsSnapshots,
 } from './schema'
 
 export * from './schema'
@@ -38,6 +39,18 @@ export interface SnapshotWrite {
   topics: readonly string[]
   visibility: string
   websiteUrl: string | null
+}
+
+export interface WebsiteAnalyticsWrite {
+  collectedAt: number
+  hostname: string
+  id: string
+  pageViews: number
+  periodEnd: number
+  periodStart: number
+  sampleInterval: number
+  slug: string
+  visits: number
 }
 
 export const createDb = (client: D1Database) => drizzle(client)
@@ -244,3 +257,56 @@ export const getLatestSuccessfulSyncRun = async (db: ObservatoryDb) =>
     .orderBy(desc(syncRuns.startedAt))
     .limit(1)
     .then((rows) => rows[0] ?? null)
+
+export const getAnalyticsWebsites = async (db: ObservatoryDb) => {
+  const latestSync = await getLatestSuccessfulSyncRun(db)
+
+  if (!latestSync) return []
+
+  const rows = await getSnapshotsForSyncRun(db, latestSync.id)
+
+  return rows.flatMap((row) => {
+    if (!row.websiteUrl) return []
+
+    try {
+      return [{ hostname: new URL(row.websiteUrl).hostname, slug: row.slug }]
+    } catch {
+      return []
+    }
+  })
+}
+
+export const upsertWebsiteAnalytics = async (
+  db: ObservatoryDb,
+  snapshots: readonly WebsiteAnalyticsWrite[],
+): Promise<void> => {
+  for (const snapshot of snapshots) {
+    await db
+      .insert(websiteAnalyticsSnapshots)
+      .values(snapshot)
+      .onConflictDoUpdate({
+        set: {
+          collectedAt: snapshot.collectedAt,
+          hostname: snapshot.hostname,
+          pageViews: snapshot.pageViews,
+          periodEnd: snapshot.periodEnd,
+          sampleInterval: snapshot.sampleInterval,
+          visits: snapshot.visits,
+        },
+        target: [
+          websiteAnalyticsSnapshots.slug,
+          websiteAnalyticsSnapshots.periodStart,
+        ],
+      })
+  }
+}
+
+export const getWebsiteAnalyticsSince = async (
+  db: ObservatoryDb,
+  since: number,
+) =>
+  db
+    .select()
+    .from(websiteAnalyticsSnapshots)
+    .where(gt(websiteAnalyticsSnapshots.periodStart, since))
+    .orderBy(websiteAnalyticsSnapshots.periodStart)

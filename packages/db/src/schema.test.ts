@@ -1,7 +1,13 @@
 import { getTableName } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
-import { authCodes, projectSnapshots, sessions, syncRuns } from './schema'
+import {
+  authCodes,
+  projectSnapshots,
+  sessions,
+  syncRuns,
+  websiteAnalyticsSnapshots,
+} from './schema'
 
 describe('observatory database schema', () => {
   it('keeps authentication and analytics in separate tables', () => {
@@ -12,6 +18,10 @@ describe('observatory database schema', () => {
     expect(getTableName(projectSnapshots)).toBe('project_snapshots')
 
     expect(getTableName(syncRuns)).toBe('sync_runs')
+
+    expect(getTableName(websiteAnalyticsSnapshots)).toBe(
+      'website_analytics_snapshots',
+    )
   })
 
   it('stores visibility on every project snapshot', () => {

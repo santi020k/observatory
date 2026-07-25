@@ -4,6 +4,7 @@ import MetricCard from '@/components/MetricCard.astro'
 import RangePicker from '@/components/RangePicker.astro'
 import StatusBadge from '@/components/StatusBadge.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
+
 import { getBrowserApiUrl, getProjectDashboard } from '@/lib/api'
 import {
   formatDate,
@@ -12,13 +13,13 @@ import {
   formatRelativeDate,
 } from '@/lib/format'
 
-import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
 import Badge from '@santi020k/lumen-astro/components/Badge'
 import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
 import Card from '@santi020k/lumen-astro/components/Card'
 import Chart from '@santi020k/lumen-astro/components/Chart'
 import Empty from '@santi020k/lumen-astro/components/Empty'
 import Icon from '@santi020k/lumen-astro/components/Icon'
+import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
 
 const slug = Astro.params.slug
 
@@ -27,6 +28,7 @@ if (!slug) return Astro.redirect('/dashboard/')
 const range = analyticsRangeSchema
   .catch('30d')
   .parse(Astro.url.searchParams.get('range'))
+
 const response = await getProjectDashboard(
   slug,
   range,
@@ -35,17 +37,21 @@ const response = await getProjectDashboard(
 )
 
 if (response.status === 401) return Astro.redirect('/login/')
+
 if (response.status === 404) return Astro.redirect('/dashboard/')
+
 if (!response.ok || !response.parsed)
   throw new Error('Observatory API is unavailable.')
 
 const dashboard = response.parsed
 const project = dashboard.project
 const apiUrl = getBrowserApiUrl()
+
 const maxDownloads = Math.max(
   ...dashboard.history.map((point) => point.npmDownloads30d),
   1,
 )
+
 const rangeLabels = {
   '30d': 'last 30 days',
   '1y': 'last year',
@@ -79,8 +85,11 @@ const rangeLabels = {
           <div class="project-meta">
             <StatusBadge status={project.status} />
             <Badge variant="outline">
-              <span class={`health-dot health-dot--${project.healthStatus}`}
-              ></span>
+              <span
+                class:list={[
+                  'health-dot',
+                  `health-dot--${project.healthStatus}`,
+                ]}></span>
               {project.healthStatus}
             </Badge>
             {
@@ -93,7 +102,11 @@ const rangeLabels = {
         <div class="hero-controls">
           <RangePicker range={dashboard.range} />
           <div class="source-legend">
-            <ButtonLink href={project.sources.github} newTab variant="outline">
+            <ButtonLink
+              href={project.sources.github}
+              newTab
+              variant="secondary"
+            >
               <Icon aria-hidden="true" name="github" />
               Repository
             </ButtonLink>
@@ -102,7 +115,7 @@ const rangeLabels = {
                 <ButtonLink
                   href={project.sources.website}
                   newTab
-                  variant="outline"
+                  variant="secondary"
                 >
                   <Icon aria-hidden="true" name="globe" />
                   Website
@@ -198,7 +211,7 @@ const rangeLabels = {
         </Card>
 
         <Card
-          as="aside"
+          as="section"
           class="panel project-facts"
           aria-labelledby="project-facts-heading"
         >

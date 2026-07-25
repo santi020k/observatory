@@ -1,5 +1,7 @@
 export interface Bindings {
   AUTH_SECRET: string
+  CLOUDFLARE_ACCOUNT_ID?: string
+  CLOUDFLARE_API_TOKEN?: string
   CORS_ORIGIN: string
   DB: D1Database
   ENVIRONMENT: 'development' | 'production' | 'test'

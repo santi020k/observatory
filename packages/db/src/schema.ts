@@ -1,4 +1,10 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import {
+  integer,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core'
 
 export const authCodes = sqliteTable('auth_codes', {
   attempts: integer('attempts').notNull().default(0),
@@ -60,3 +66,24 @@ export const projectPreferences = sqliteTable('project_preferences', {
   slug: text('slug').primaryKey(),
   updatedAt: integer('updated_at').notNull(),
 })
+
+export const websiteAnalyticsSnapshots = sqliteTable(
+  'website_analytics_snapshots',
+  {
+    collectedAt: integer('collected_at').notNull(),
+    hostname: text('hostname').notNull(),
+    id: text('id').primaryKey(),
+    pageViews: integer('page_views').notNull().default(0),
+    periodEnd: integer('period_end').notNull(),
+    periodStart: integer('period_start').notNull(),
+    sampleInterval: real('sample_interval').notNull().default(1),
+    slug: text('slug').notNull(),
+    visits: integer('visits').notNull().default(0),
+  },
+  (table) => [
+    uniqueIndex('website_analytics_slug_period_idx').on(
+      table.slug,
+      table.periodStart,
+    ),
+  ],
+)

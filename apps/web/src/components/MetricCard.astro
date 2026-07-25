@@ -5,7 +5,14 @@ import Stat from '@santi020k/lumen-astro/components/Stat'
 
 interface Props {
   context: string
-  icon: 'activity' | 'circle-dot-dashed' | 'download' | 'eye'
+  icon:
+    | 'activity'
+    | 'circle-dot-dashed'
+    | 'download'
+    | 'eye'
+    | 'git-fork'
+    | 'history'
+    | 'star'
   label: string
   value: string
 }

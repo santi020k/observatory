@@ -100,6 +100,27 @@ export const updateProjectSettingSchema = z.object({
   slug: z.string().trim().min(1),
 })
 
+export const websiteAnalyticsPointSchema = z.object({
+  pageViews: z.int().nonnegative(),
+  periodStart: z.string().trim(),
+  sampleInterval: z.number().positive(),
+  visits: z.int().nonnegative(),
+})
+
+export const websiteAnalyticsSiteSchema = z.object({
+  history: z.array(websiteAnalyticsPointSchema),
+  hostname: z.string().trim(),
+  pageViews: z.int().nonnegative(),
+  slug: z.string().trim(),
+  visits: z.int().nonnegative(),
+})
+
+export const websiteAnalyticsSchema = z.object({
+  generatedAt: z.string().trim(),
+  range: analyticsRangeSchema,
+  sites: z.array(websiteAnalyticsSiteSchema),
+})
+
 export type Dashboard = z.infer<typeof dashboardSchema>
 export type AnalyticsRange = z.infer<typeof analyticsRangeSchema>
 export type ProjectDashboard = z.infer<typeof projectDashboardSchema>
@@ -108,6 +129,7 @@ export type ProjectSettings = z.infer<typeof projectSettingsSchema>
 export type UpdateProjectSettingInput = z.infer<
   typeof updateProjectSettingSchema
 >
+export type WebsiteAnalytics = z.infer<typeof websiteAnalyticsSchema>
 export type RequestCodeInput = z.infer<typeof requestCodeSchema>
 export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>
 

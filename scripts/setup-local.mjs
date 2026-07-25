@@ -20,6 +20,8 @@ if (!existsSync(apiEnvironmentPath)) {
     apiEnvironmentPath,
     [
       `AUTH_SECRET=${secret}`,
+      'CLOUDFLARE_ACCOUNT_ID=',
+      'CLOUDFLARE_API_TOKEN=',
       'CORS_ORIGIN=http://localhost:4321,http://localhost:4322',
       'ENVIRONMENT=development',
       'MAIL_FROM=Observatory <observatory@santi020k.com>',

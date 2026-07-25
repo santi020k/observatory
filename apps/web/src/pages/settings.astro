@@ -1,6 +1,7 @@
 ---
 import AppHeader from '@/components/AppHeader.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
+
 import { getBrowserApiUrl, getProjectSettings } from '@/lib/api'
 
 import Badge from '@santi020k/lumen-astro/components/Badge'
@@ -11,14 +12,27 @@ import Icon from '@santi020k/lumen-astro/components/Icon'
 const response = await getProjectSettings(Astro.request, Astro.url)
 
 if (response.status === 401) return Astro.redirect('/login/')
+
 if (!response.ok || !response.parsed)
   throw new Error('Observatory API is unavailable.')
 
 const settings = response.parsed
 const apiUrl = getBrowserApiUrl()
+
 const enabledCount = settings.projects.filter(
   (project) => project.enabled,
 ).length
+const getCategoryIcon = (
+  category: (typeof settings.projects)[number]['category'],
+): 'blocks' | 'layout-dashboard' | 'notebook-tabs' | 'wrench' => {
+  if (category === 'app') return 'layout-dashboard'
+
+  if (category === 'content') return 'notebook-tabs'
+
+  if (category === 'tool') return 'wrench'
+
+  return 'blocks'
+}
 ---
 
 <AppLayout
@@ -88,15 +102,7 @@ const enabledCount = settings.projects.filter(
                   <span class="project-icon">
                     <Icon
                       aria-hidden="true"
-                      name={
-                        project.category === 'app'
-                          ? 'layout-dashboard'
-                          : project.category === 'content'
-                            ? 'notebook-tabs'
-                            : project.category === 'tool'
-                              ? 'wrench'
-                              : 'blocks'
-                      }
+                      name={getCategoryIcon(project.category)}
                     />
                   </span>
                   <div>
@@ -136,10 +142,13 @@ const enabledCount = settings.projects.filter(
 
 <script>
   const panel = document.querySelector<HTMLElement>('[data-settings-panel]')
+
   const apiUrl =
     document.querySelector<HTMLElement>('.app-header')?.dataset.apiUrl
+
   const saveState = document.querySelector<HTMLElement>('[data-save-state]')
   const count = document.querySelector<HTMLElement>('[data-enabled-count]')
+
   const toggles = document.querySelectorAll<HTMLInputElement>(
     '[data-project-toggle]',
   )
@@ -156,7 +165,9 @@ const enabledCount = settings.projects.filter(
       const enabled = toggle.checked
 
       toggle.disabled = true
+
       if (saveState) saveState.textContent = 'Saving…'
+
       updateCount()
 
       try {
@@ -175,7 +186,9 @@ const enabledCount = settings.projects.filter(
         if (saveState) saveState.textContent = 'All changes saved'
       } catch {
         toggle.checked = !enabled
+
         updateCount()
+
         if (saveState) saveState.textContent = 'Could not save — try again'
       } finally {
         toggle.disabled = false

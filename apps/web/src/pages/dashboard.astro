@@ -32,11 +32,13 @@ if (!response.ok || !response.parsed)
 
 const dashboard = response.parsed
 const apiUrl = getBrowserApiUrl()
+
 const rangeLabels = {
   '30d': 'last 30 days',
   '1y': 'last year',
   '5y': 'last 5 years',
 } as const
+
 const rangeLabel = rangeLabels[dashboard.range]
 
 const projectsByDownloads = [...dashboard.projects].sort(
@@ -51,6 +53,7 @@ const maxDownloads = Math.max(
   ...chartProjects.map((project) => project.npmDownloads30d),
   1,
 )
+
 const historySamples =
   dashboard.history.length > 12
     ? dashboard.history.filter(
@@ -59,6 +62,7 @@ const historySamples =
           index === dashboard.history.length - 1,
       )
     : dashboard.history
+
 const maxHistoryDownloads = Math.max(
   ...historySamples.map((point) => point.npmDownloads30d),
   1,

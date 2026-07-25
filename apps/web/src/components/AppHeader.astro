@@ -13,6 +13,7 @@ interface Props {
 
 const { apiUrl, lastSync, syncStatus } = Astro.props
 const currentPath = Astro.url.pathname
+
 const navigation = [
   { href: '/dashboard/', label: 'Overview' },
   { href: '/dashboard/#portfolio', label: 'Projects' },

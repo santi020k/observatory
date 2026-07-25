@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   createDb: vi.fn(() => ({ database: 'test' })),
   getLatestSuccessfulSyncRun: vi.fn(),
   getLatestSyncRun: vi.fn(),
+  getProjectPreferences: vi.fn(),
+  getPublicSnapshotsSince: vi.fn(),
   getSnapshotsForSyncRun: vi.fn(),
 }))
 
@@ -14,6 +16,8 @@ vi.mock('@santi020k/observatory-db', async (importOriginal) => ({
   createDb: mocks.createDb,
   getLatestSuccessfulSyncRun: mocks.getLatestSuccessfulSyncRun,
   getLatestSyncRun: mocks.getLatestSyncRun,
+  getProjectPreferences: mocks.getProjectPreferences,
+  getPublicSnapshotsSince: mocks.getPublicSnapshotsSince,
   getSnapshotsForSyncRun: mocks.getSnapshotsForSyncRun,
 }))
 
@@ -32,6 +36,10 @@ beforeEach(() => {
   vi.clearAllMocks()
 
   mocks.getSnapshotsForSyncRun.mockResolvedValue([])
+
+  mocks.getProjectPreferences.mockResolvedValue([])
+
+  mocks.getPublicSnapshotsSince.mockResolvedValue([])
 })
 
 describe('dashboard snapshot selection', () => {

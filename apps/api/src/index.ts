@@ -1,14 +1,18 @@
-import { Hono } from 'hono'
-import { cors } from 'hono/cors'
-import { logger } from 'hono/logger'
-import { secureHeaders } from 'hono/secure-headers'
 import {
   analyticsRangeSchema,
   updateProjectSettingSchema,
 } from '@santi020k/observatory-api-types'
 import { createDb, setProjectPreference } from '@santi020k/observatory-db'
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import { logger } from 'hono/logger'
+import { secureHeaders } from 'hono/secure-headers'
 
 import { cleanupAuth, requireAuth } from './lib/auth'
+import {
+  buildWebsiteAnalytics,
+  syncCloudflareAnalytics,
+} from './lib/cloudflare'
 import { syncProjects } from './lib/collector'
 import {
   buildDashboard,
@@ -133,6 +137,21 @@ app.post('/sync', requireAuth, async (context) => {
   return context.json({ count, status: 'succeeded' })
 })
 
+app.get('/analytics/websites', requireAuth, async (context) =>
+  context.json(
+    await buildWebsiteAnalytics(
+      context.env,
+      readRange(context.req.query('range')),
+    ),
+  ),
+)
+
+app.post('/sync/cloudflare', requireAuth, async (context) => {
+  const count = await syncCloudflareAnalytics(context.env)
+
+  return context.json({ count, status: 'succeeded' })
+})
+
 app.notFound((context) =>
   context.json(
     { error: { code: 'NOT_FOUND', message: 'Route not found.' } },
@@ -167,7 +186,9 @@ export default {
   ) => {
     executionContext.waitUntil(
       (async () => {
-        await Promise.all([syncProjects(env), cleanupAuth(env)])
+        await syncProjects(env)
+
+        await Promise.all([syncCloudflareAnalytics(env), cleanupAuth(env)])
       })(),
     )
   },

@@ -10,6 +10,7 @@ already separates public collection from the future private-project adapters.
 - GitHub stars, forks, open issues, recency, and repository traffic when `GITHUB_TOKEN` is set
 - 30-day npm downloads and current versions for mapped product packages
 - Published website availability and response time
+- Cloudflare Web Analytics page views and visits, grouped hourly by project website
 - Attention signals for degraded, stale, or issue-heavy projects
 - Hourly D1 snapshots so trends can be added without changing providers
 
@@ -59,6 +60,8 @@ Set Worker secrets directly:
 
 ```bash
 pnpm --filter @santi020k/observatory-api exec wrangler secret put AUTH_SECRET
+pnpm --filter @santi020k/observatory-api exec wrangler secret put CLOUDFLARE_ACCOUNT_ID
+pnpm --filter @santi020k/observatory-api exec wrangler secret put CLOUDFLARE_API_TOKEN
 pnpm --filter @santi020k/observatory-api exec wrangler secret put OWNER_EMAIL
 pnpm --filter @santi020k/observatory-api exec wrangler secret put RESEND_API_KEY
 pnpm --filter @santi020k/observatory-api exec wrangler secret put MAIL_FROM
@@ -71,6 +74,17 @@ cannot follow the public route.
 
 `GITHUB_TOKEN` is optional for public metadata, but required for repository traffic (views and
 clones) and strongly recommended for rate limits. Use the narrowest read-only repository scope.
+
+Cloudflare collection is optional and activates only when both `CLOUDFLARE_ACCOUNT_ID` and
+`CLOUDFLARE_API_TOKEN` are set. Create a scoped token with `Account Analytics: Read`. The collector
+queries the `rumPageloadEventsAdaptiveGroups` dataset for the hostnames already associated with
+public projects, excludes bot-tagged events, and refreshes the latest 48 completed hourly buckets
+on every scheduled run. This overlap captures delayed analytics without duplicating rows.
+
+The owner-authenticated API exposes `GET /analytics/websites?range=30d` and accepts `30d`, `1y`, or
+`5y`. `POST /sync/cloudflare` runs the collector manually. Cloudflare currently retains Web
+Analytics source data for a shorter period, but Observatory's hourly D1 snapshots can accumulate
+longer history from the point collection is enabled.
 
 ## Quality
 

@@ -21,10 +21,12 @@ import type { Bindings } from '../env'
 
 type Snapshot = Awaited<ReturnType<typeof getSnapshotsForSyncRun>>[number]
 
-const rangeMilliseconds: Record<AnalyticsRange, number> = {
-  '30d': 30 * 24 * 60 * 60 * 1_000,
-  '1y': 365 * 24 * 60 * 60 * 1_000,
-  '5y': 5 * 365 * 24 * 60 * 60 * 1_000,
+const getRangeMilliseconds = (range: AnalyticsRange): number => {
+  if (range === '30d') return 30 * 24 * 60 * 60 * 1_000
+
+  if (range === '1y') return 365 * 24 * 60 * 60 * 1_000
+
+  return 5 * 365 * 24 * 60 * 60 * 1_000
 }
 
 const parseStringArray = (value: string): string[] => {
@@ -102,7 +104,7 @@ const buildHistory = (rows: Snapshot[]) => {
 
 const getPeriodSummary = (history: ReturnType<typeof buildHistory>) => {
   const first = history[0]
-  const last = history.at(-1)
+  const last = history[history.length - 1]
 
   return {
     issueChange: first && last ? last.openIssues - first.openIssues : 0,
@@ -113,20 +115,24 @@ const getPeriodSummary = (history: ReturnType<typeof buildHistory>) => {
 
 const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
   const database = createDb(env.DB)
+
   const [sync, latestSuccessfulSync, preferences] = await Promise.all([
     getLatestSyncRun(database),
     getLatestSuccessfulSyncRun(database),
     getProjectPreferences(database),
   ])
+
   const enabledBySlug = new Map(
     preferences.map((preference) => [preference.slug, preference.enabled]),
   )
+
   const isEnabled = (slug: string) => enabledBySlug.get(slug) !== false
+
   const [latestRows, historyRows] = await Promise.all([
     latestSuccessfulSync
       ? getSnapshotsForSyncRun(database, latestSuccessfulSync.id)
       : Promise.resolve([]),
-    getPublicSnapshotsSince(database, Date.now() - rangeMilliseconds[range]),
+    getPublicSnapshotsSince(database, Date.now() - getRangeMilliseconds(range)),
   ])
 
   return {
@@ -144,9 +150,11 @@ export const buildDashboard = async (
 ): Promise<Dashboard> => {
   const { historyRows, isEnabled, latestRows, latestSuccessfulSync, sync } =
     await getDashboardRows(env, range)
+
   const projects = latestRows
     .filter((row) => isEnabled(row.slug))
     .map(toProjectMetric)
+
   const history = buildHistory(historyRows)
 
   return dashboardSchema.parse({
@@ -192,6 +200,7 @@ export const buildProjectDashboard = async (
     env,
     range,
   )
+
   const row = latestRows.find((candidate) => candidate.slug === slug)
 
   if (!row || !isEnabled(slug)) return null
@@ -213,13 +222,16 @@ export const buildProjectSettings = async (
   env: Bindings,
 ): Promise<ProjectSettings> => {
   const database = createDb(env.DB)
+
   const [latestSuccessfulSync, preferences] = await Promise.all([
     getLatestSuccessfulSyncRun(database),
     getProjectPreferences(database),
   ])
+
   const rows = latestSuccessfulSync
     ? await getSnapshotsForSyncRun(database, latestSuccessfulSync.id)
     : []
+
   const enabledBySlug = new Map(
     preferences.map((preference) => [preference.slug, preference.enabled]),
   )

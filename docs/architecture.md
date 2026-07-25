@@ -19,10 +19,12 @@ Cloudflare D1 snapshots, and shared contract/catalog/data packages.
 
 ```text
 GitHub public API ─┐
-npm public API ───┼─> hourly Hono sync ─> D1 snapshots ─> authenticated API ─> Astro + Lumen
-website checks ───┘
+npm public API ───┼─> hourly Hono sync ─────────> project snapshots ─┐
+website checks ───┘                                                  │
+                                                                    ├─> authenticated API
+Cloudflare GraphQL ─> private hourly analytics sync ─> web snapshots ┘
 
-GitHub App / Cloudflare / commercial sources
+GitHub App / commercial sources
         └─> future private collectors ─> isolated credentials + visibility-aware snapshots
 ```
 
@@ -40,3 +42,8 @@ GitHub App / Cloudflare / commercial sources
 The Worker runs at minute 17 of every hour. Manual sync is owner-authenticated. Each run writes one
 immutable snapshot per discovered project and a sync-run audit row. A future retention task may
 compact old hourly snapshots into daily aggregates after 90 days.
+
+After public project discovery completes, the Cloudflare collector queries Web Analytics only for
+hostnames found on those public project snapshots. It upserts the latest 48 completed hourly
+buckets into a separate table, so retries and delayed Cloudflare events do not duplicate totals.
+Missing Cloudflare credentials disable this collector without affecting public project sync.
