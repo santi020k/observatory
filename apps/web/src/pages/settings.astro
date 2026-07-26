@@ -664,6 +664,22 @@ const getCategoryIcon = (
     if (state) state.hidden = !pinned
   }
 
+  const updateSidebar = async () => {
+    try {
+      const response = await fetch(window.location.href)
+      const html = await response.text()
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      const newSidebar = doc.querySelector('.sidebar-projects')
+      const currentSidebar = document.querySelector('.sidebar-projects')
+
+      if (newSidebar && currentSidebar) {
+        currentSidebar.replaceWith(newSidebar)
+      }
+    } catch {
+      // Ignore failures
+    }
+  }
+
   const setControlValue = (
     control: HTMLInputElement | HTMLSelectElement,
     value: string,
@@ -721,6 +737,10 @@ const getCategoryIcon = (
         control.dataset.savedValue = String(value)
 
         if (saveState) saveState.textContent = 'All changes saved'
+
+        if (field === 'enabled' || field === 'pinned') {
+          await updateSidebar()
+        }
       } catch {
         setControlValue(control, savedValue)
 

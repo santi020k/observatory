@@ -108,7 +108,7 @@ const websiteBucketLabels = {
 
       <main class="dashboard project-dashboard" id="main-content">
         <nav aria-label="Breadcrumb" class="breadcrumb">
-          <a href="/dashboard/">Overview</a>
+          <a href={`/dashboard/?range=${dashboard.range}`}>Overview</a>
           <Icon aria-hidden="true" name="chevron-right" />
           <span aria-current="page">{project.name}</span>
         </nav>
@@ -143,7 +143,7 @@ const websiteBucketLabels = {
                 newTab
                 variant="secondary"
               >
-                <Icon aria-hidden="true" name="github" />
+                <Icon aria-hidden="true" name="git-fork" />
                 Repository
               </ButtonLink>
               {

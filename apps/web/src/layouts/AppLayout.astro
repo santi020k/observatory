@@ -23,7 +23,7 @@ const { description, title } = Astro.props
     <meta name="viewport" content="width=device-width" />
     <meta name="theme-color" content="hsl(260 43% 8%)" />
     <script is:inline>
-      (() => {
+      const applyObservatoryPreferences = () => {
         const root = document.documentElement
         let theme = 'dark'
 
@@ -36,8 +36,7 @@ const { description, title } = Astro.props
           if (storedTheme === 'dark' || storedTheme === 'santi020k-dark')
             theme = 'dark'
 
-          if (storedTheme !== theme)
-            localStorage.setItem('lumen-theme', theme)
+          if (storedTheme !== theme) localStorage.setItem('lumen-theme', theme)
 
           const preferences = JSON.parse(
             localStorage.getItem('observatory.settings.preferences') ?? '{}',
@@ -67,12 +66,14 @@ const { description, title } = Astro.props
             'content',
             theme === 'dark' ? 'hsl(260 43% 8%)' : 'hsl(268 20% 98%)',
           )
-      })()
+      }
+
+      applyObservatoryPreferences()
     </script>
     <title>{title}</title>
   </head>
   <body>
-    <SkipLink href="#main-content">Skip to dashboard</SkipLink>
+    <SkipLink href="#main-content">Skip to main content</SkipLink>
     <slot />
     <UIPrimitives />
     <script>

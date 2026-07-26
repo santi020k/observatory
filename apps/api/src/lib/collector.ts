@@ -186,6 +186,22 @@ const collectTraffic = async (
   }
 }
 
+const collectOpenPullRequestsCount = async (
+  repository: string,
+  token?: string,
+): Promise<number> => {
+  try {
+    const pulls = await fetchJson<unknown[]>(
+      `https://api.github.com/repos/${githubOwner}/${repository}/pulls?state=open&per_page=100`,
+      githubHeaders(token),
+    )
+
+    return pulls.length
+  } catch {
+    return 0
+  }
+}
+
 const collectPackageMetrics = async (
   packageNames: readonly string[],
 ): Promise<PackageMetrics> => {
@@ -286,11 +302,12 @@ const collectRepository = async (
   const override = getCatalogOverride(repository.name)
   const packages = override?.npmPackages ?? []
 
-  const [packageMetrics, websiteHealth, views, clones] = await Promise.all([
+  const [packageMetrics, websiteHealth, views, clones, pullRequestsCount] = await Promise.all([
     collectPackageMetrics(packages),
     checkWebsite(repository.homepage),
     collectTraffic(repository.name, 'views', env.GITHUB_TOKEN),
     collectTraffic(repository.name, 'clones', env.GITHUB_TOKEN),
+    collectOpenPullRequestsCount(repository.name, env.GITHUB_TOKEN),
   ])
 
   return {
@@ -307,7 +324,7 @@ const collectRepository = async (
     name: override?.displayName ?? titleFromSlug(repository.name),
     npmDownloads30d: packageMetrics.downloads,
     npmPackages: packages,
-    openIssues: repository.open_issues_count,
+    openIssues: Math.max(0, repository.open_issues_count - pullRequestsCount),
     pushedAt: repository.pushed_at,
     relevanceScore: 0,
     repositoryUrl: repository.html_url,

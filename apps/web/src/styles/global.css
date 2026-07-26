@@ -10,6 +10,7 @@
 
 html {
   min-width: 20rem;
+  overflow-x: clip;
   background: hsl(var(--canvas));
   scroll-behavior: smooth;
 }
@@ -896,6 +897,11 @@ p {
   background: hsl(var(--surface));
 }
 
+.ui-table-wrap:focus-visible {
+  outline: 2px solid hsl(var(--brand));
+  outline-offset: 3px;
+}
+
 .ui-table-wrap table {
   width: 100%;
   min-width: 68rem;
@@ -1392,6 +1398,10 @@ p {
   gap: 0.3rem;
 }
 
+.project-settings-badges .ui-badge[hidden] {
+  display: none;
+}
+
 .project-settings-badges .ui-icon {
   width: 0.75rem;
   height: 0.75rem;
@@ -1710,7 +1720,7 @@ html[data-observatory-reduce-motion='true'] *::after {
     grid-template-columns: 1fr;
   }
 
-  .app-header__actions .ui-button span:not(.ui-icon) {
+  .app-header__actions .ui-button [data-sync-label] {
     display: none;
   }
 
@@ -1767,6 +1777,48 @@ html[data-observatory-reduce-motion='true'] *::after {
 
   .privacy-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 23rem) {
+  .app-header {
+    gap: 0.55rem;
+    padding-inline: 0.75rem;
+  }
+
+  .app-header__workspace {
+    margin-right: 0;
+  }
+
+  .app-header__actions {
+    gap: 0.35rem;
+    margin-left: auto;
+  }
+
+  .app-header__sync {
+    gap: 0;
+  }
+
+  .app-header__sync .ui-button {
+    width: 2.25rem;
+    min-height: 2.25rem;
+    padding: 0;
+  }
+
+  .app-header__utilities {
+    padding-left: 0.35rem;
+  }
+
+  .settings-tabs > [role='tablist'] {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .settings-tabs [role='tab'] {
+    justify-content: center;
+    gap: 0.3rem;
+    padding-inline: 0.45rem;
+    font-size: 0.8rem;
   }
 }
 

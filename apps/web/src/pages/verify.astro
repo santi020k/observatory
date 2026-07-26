@@ -50,15 +50,27 @@ if (!email) return Astro.redirect('/login/')
           </Alert>
         )
       }
-      <Alert data-form-alert hidden variant="destructive" />
+      <Alert
+        aria-atomic="true"
+        aria-live="assertive"
+        data-form-alert
+        hidden
+        role="alert"
+        variant="destructive"
+      />
 
-      <form data-api-url={apiUrl} data-email={email} data-verify-form>
+      <form
+        data-api-url={apiUrl}
+        data-email={email}
+        data-ui-form
+        data-verify-form
+      >
         <Field>
           <Label for="code">Verification code</Label>
           <InputOTP id="code" name="code" length={6} required />
         </Field>
         <Button size="lg" type="submit">
-          Open Observatory
+          <span data-submit-label>Open Observatory</span>
           <Icon aria-hidden="true" name="arrow-right" />
         </Button>
       </form>
@@ -82,10 +94,16 @@ if (!email) return Astro.redirect('/login/')
       const formData = new FormData(form)
       const code = String(formData.get('code') ?? '')
 
+      const buttonLabel = button?.querySelector<HTMLElement>(
+        '[data-submit-label]',
+      )
+
       if (button) {
         button.disabled = true
 
-        button.textContent = 'Verifying…'
+        button.setAttribute('aria-busy', 'true')
+
+        if (buttonLabel) buttonLabel.textContent = 'Verifying…'
       }
 
       if (alert) alert.hidden = true
@@ -119,7 +137,9 @@ if (!email) return Astro.redirect('/login/')
         if (button) {
           button.disabled = false
 
-          button.textContent = 'Open Observatory'
+          button.removeAttribute('aria-busy')
+
+          if (buttonLabel) buttonLabel.textContent = 'Open Observatory'
         }
       }
     })

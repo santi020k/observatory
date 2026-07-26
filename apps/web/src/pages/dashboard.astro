@@ -99,6 +99,19 @@ const getCategoryIcon = (
 const lastSync = dashboard.sync.completedAt
   ? formatRelativeDate(dashboard.sync.completedAt)
   : 'awaiting first sync'
+
+const hourInBogota = Number(
+  new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    hourCycle: 'h23',
+    timeZone: 'America/Bogota',
+  }).format(new Date()),
+)
+
+let greeting = 'Good evening'
+
+if (hourInBogota < 12) greeting = 'Good morning'
+else if (hourInBogota < 18) greeting = 'Good afternoon'
 ---
 
 <AppLayout
@@ -118,7 +131,7 @@ const lastSync = dashboard.sync.completedAt
         <section class="hero-row" aria-labelledby="overview-title">
           <div>
             <span class="eyebrow">Portfolio overview</span>
-            <h1 id="overview-title">Good evening, Santiago.</h1>
+            <h1 id="overview-title">{greeting}, Santiago.</h1>
             <p>
               A focused read on what is growing, what needs attention, and where
               your product energy is going.
@@ -128,7 +141,7 @@ const lastSync = dashboard.sync.completedAt
             <RangePicker range={dashboard.range} />
             <div class="source-legend" aria-label="Active data sources">
               <Badge variant="outline"
-                ><Icon aria-hidden="true" name="github" /> GitHub</Badge
+                ><Icon aria-hidden="true" name="git-fork" /> GitHub</Badge
               >
               <Badge variant="outline"
                 ><Icon aria-hidden="true" name="package" /> npm</Badge
@@ -381,7 +394,11 @@ const lastSync = dashboard.sync.completedAt
                   </div>
                 </div>
 
-                <Table>
+                <Table
+                  aria-label="Project catalog. Scroll horizontally to see all columns."
+                  role="region"
+                  tabindex="0"
+                >
                   <table>
                     <thead>
                       <tr>

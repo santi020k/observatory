@@ -22,9 +22,7 @@ interface Props {
 const { projects, range = '30d' } = Astro.props
 
 const orderedProjects = [...projects].sort(
-  (left, right) =>
-    Number(right.pinned) - Number(left.pinned) ||
-    left.name.localeCompare(right.name),
+  (left, right) => Number(right.pinned) - Number(left.pinned),
 )
 
 const currentPath = Astro.url.pathname
@@ -65,7 +63,7 @@ const getCategoryIcon = (
     <a
       aria-current={currentPath === '/dashboard/' ? 'page' : undefined}
       class="sidebar-link sidebar-link--overview"
-      href="/dashboard/"
+      href={`/dashboard/?range=${range}`}
     >
       <Icon aria-hidden="true" name="layout-dashboard" />
       <span>
@@ -127,7 +125,7 @@ const getCategoryIcon = (
       <Icon aria-hidden="true" name="settings" />
       <span>
         <strong>Settings</strong>
-        <small>Project visibility</small>
+        <small>Project controls</small>
       </span>
     </a>
     <div class="sidebar-private">

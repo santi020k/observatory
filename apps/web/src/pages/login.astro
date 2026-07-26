@@ -33,7 +33,7 @@ const apiUrl = getBrowserApiUrl()
         </p>
       </div>
       <ul class="auth-signals" aria-label="Available analytics">
-        <li><Icon aria-hidden="true" name="github" /> Repository momentum</li>
+        <li><Icon aria-hidden="true" name="git-fork" /> Repository momentum</li>
         <li><Icon aria-hidden="true" name="package" /> Package downloads</li>
         <li><Icon aria-hidden="true" name="activity" /> Website health</li>
       </ul>
@@ -51,9 +51,16 @@ const apiUrl = getBrowserApiUrl()
           in ten minutes.
         </p>
 
-        <Alert data-form-alert hidden variant="destructive" />
+        <Alert
+          aria-atomic="true"
+          aria-live="assertive"
+          data-form-alert
+          hidden
+          role="alert"
+          variant="destructive"
+        />
 
-        <form data-api-url={apiUrl} data-login-form>
+        <form data-api-url={apiUrl} data-login-form data-ui-form>
           <Field>
             <Label for="email">Email address</Label>
             <Input
@@ -67,7 +74,7 @@ const apiUrl = getBrowserApiUrl()
             />
           </Field>
           <Button size="lg" type="submit">
-            Send verification code
+            <span data-submit-label>Send verification code</span>
             <Icon aria-hidden="true" name="arrow-right" />
           </Button>
         </form>
@@ -91,10 +98,16 @@ const apiUrl = getBrowserApiUrl()
       const formData = new FormData(form)
       const email = String(formData.get('email') ?? '')
 
+      const buttonLabel = button?.querySelector<HTMLElement>(
+        '[data-submit-label]',
+      )
+
       if (button) {
         button.disabled = true
 
-        button.textContent = 'Sending…'
+        button.setAttribute('aria-busy', 'true')
+
+        if (buttonLabel) buttonLabel.textContent = 'Sending…'
       }
 
       if (alert) alert.hidden = true
@@ -128,7 +141,9 @@ const apiUrl = getBrowserApiUrl()
         if (button) {
           button.disabled = false
 
-          button.textContent = 'Send verification code'
+          button.removeAttribute('aria-busy')
+
+          if (buttonLabel) buttonLabel.textContent = 'Send verification code'
         }
       }
     })
