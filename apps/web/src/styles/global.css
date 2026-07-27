@@ -277,25 +277,33 @@ p {
 .app-shell {
   display: grid;
   width: min(100%, 112rem);
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   grid-template-columns: 17.5rem minmax(0, 1fr);
   margin-inline: auto;
+  overflow: hidden;
   border-inline: 1px solid hsl(var(--line) / 0.65);
   background: hsl(var(--canvas) / 0.42);
 }
 
 .app-workspace {
+  height: 100%;
   min-width: 0;
-  overflow-x: hidden;
+  min-height: 0;
+  overflow-x: clip;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 .app-sidebar {
-  position: sticky;
+  position: relative;
   z-index: 20;
-  top: 0;
   display: flex;
   width: auto;
-  height: 100vh;
+  height: 100%;
   min-height: 0;
   flex-direction: column;
   padding: 1.1rem 0.8rem;
@@ -354,9 +362,12 @@ p {
 }
 
 .sidebar-projects {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   scrollbar-color: hsl(var(--line)) transparent;
+  scrollbar-gutter: stable;
 }
 
 .sidebar-section-heading {
@@ -683,45 +694,6 @@ p {
   min-height: 22rem;
 }
 
-.history-chart {
-  display: flex;
-  height: 14rem;
-  align-items: end;
-  gap: clamp(0.35rem, 1.5vw, 1rem);
-  padding-top: 2rem;
-  overflow-x: auto;
-}
-
-.history-column {
-  display: grid;
-  min-width: 2.25rem;
-  height: 100%;
-  flex: 1 0 2.25rem;
-  grid-template-rows: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 0.6rem;
-}
-
-.history-column__bar {
-  width: 100%;
-  min-height: 0.35rem;
-  border-radius: 0.45rem 0.45rem 0.15rem 0.15rem;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--brand)),
-    hsl(var(--brand-solid) / 0.45)
-  );
-  box-shadow: 0 0 1.2rem hsl(var(--brand) / 0.15);
-}
-
-.history-column small {
-  overflow: hidden;
-  color: hsl(var(--ink-muted));
-  font-size: 0.62rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .metric-card {
   position: relative;
   min-height: 10.5rem;
@@ -799,29 +771,8 @@ p {
   font-size: 0.75rem;
 }
 
-.bar-chart {
-  display: grid;
-  gap: 1.25rem;
-  margin-top: 1.75rem;
-}
-
-.bar-label {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.48rem;
-  color: hsl(var(--ink-soft));
-  font-size: 0.78rem;
-}
-
-.bar-label strong {
-  color: hsl(var(--ink));
-}
-
-.ui-chart figcaption {
-  margin-top: 1.75rem;
-  color: hsl(var(--ink-muted));
-  font-size: 0.72rem;
+.panel-heading + .ui-chart {
+  margin-top: 1.5rem;
 }
 
 .attention-list {
@@ -1126,83 +1077,6 @@ p {
 .website-traffic-panel {
   min-width: 0;
   min-height: 24rem;
-}
-
-.traffic-legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.8rem;
-  color: hsl(var(--ink-muted));
-  font-size: 0.72rem;
-}
-
-.traffic-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.38rem;
-}
-
-.traffic-key {
-  display: inline-block;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 0.2rem;
-}
-
-.traffic-key--views,
-.traffic-bar--views {
-  background: hsl(var(--brand));
-}
-
-.traffic-key--visits,
-.traffic-bar--visits {
-  background: hsl(var(--accent));
-}
-
-.traffic-chart {
-  display: flex;
-  height: 15rem;
-  align-items: end;
-  gap: clamp(0.25rem, 0.8vw, 0.65rem);
-  padding-top: 2rem;
-  overflow-x: auto;
-}
-
-.traffic-column {
-  display: grid;
-  min-width: 1.8rem;
-  height: 100%;
-  flex: 1 0 1.8rem;
-  grid-template-rows: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 0.6rem;
-}
-
-.traffic-column__bars {
-  display: flex;
-  height: 100%;
-  align-items: end;
-  justify-content: center;
-  gap: 0.16rem;
-}
-
-.traffic-bar {
-  width: min(0.65rem, 42%);
-  min-height: 0.3rem;
-  border-radius: 0.35rem 0.35rem 0.1rem 0.1rem;
-}
-
-.traffic-bar--views {
-  box-shadow: 0 0 1rem hsl(var(--brand) / 0.14);
-}
-
-.traffic-column small {
-  overflow: hidden;
-  color: hsl(var(--ink-muted));
-  font-size: 0.58rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .website-analytics-empty {
@@ -1654,6 +1528,8 @@ html[data-observatory-reduce-motion='true'] *::after {
     right: auto;
     left: 0;
     width: min(19rem, calc(100vw - 3rem));
+    height: 100vh;
+    height: 100dvh;
     transform: translateX(-105%);
     transition: transform 180ms ease;
   }
@@ -1823,7 +1699,8 @@ html[data-observatory-reduce-motion='true'] *::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
+  html,
+  .app-workspace {
     scroll-behavior: auto;
   }
 

@@ -17,12 +17,12 @@ import {
 } from '@/lib/format'
 
 import Badge from '@santi020k/lumen-astro/components/Badge'
+import BarChart from '@santi020k/lumen-astro/components/BarChart'
 import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
 import Card from '@santi020k/lumen-astro/components/Card'
-import Chart from '@santi020k/lumen-astro/components/Chart'
 import Empty from '@santi020k/lumen-astro/components/Empty'
 import Icon from '@santi020k/lumen-astro/components/Icon'
-import Progress from '@santi020k/lumen-astro/components/Progress'
+import LineChart from '@santi020k/lumen-astro/components/LineChart'
 import Table from '@santi020k/lumen-astro/components/Table'
 
 const response = await getDashboard(Astro.request, Astro.url)
@@ -51,11 +51,6 @@ const chartProjects = projectsByDownloads
   .filter((project) => project.npmDownloads30d > 0)
   .slice(0, 6)
 
-const maxDownloads = Math.max(
-  ...chartProjects.map((project) => project.npmDownloads30d),
-  1,
-)
-
 const historySamples =
   dashboard.history.length > 12
     ? dashboard.history.filter(
@@ -65,10 +60,31 @@ const historySamples =
       )
     : dashboard.history
 
-const maxHistoryDownloads = Math.max(
-  ...historySamples.map((point) => point.npmDownloads30d),
-  1,
-)
+const projectDownloadSeries = [
+  {
+    data: chartProjects.map((project) => ({
+      label: formatNumber(project.npmDownloads30d),
+      x: project.name,
+      y: project.npmDownloads30d,
+    })),
+    id: 'downloads',
+    label: 'Downloads',
+    tone: 'brand',
+  },
+] as const
+
+const portfolioHistorySeries = [
+  {
+    data: historySamples.map((point) => ({
+      label: `${formatNumber(point.npmDownloads30d)} downloads`,
+      x: formatDate(point.collectedAt),
+      y: point.npmDownloads30d,
+    })),
+    id: 'downloads',
+    label: 'Rolling 30-day downloads',
+    tone: 'brand',
+  },
+] as const
 
 const attentionProjects = dashboard.projects
   .filter((project) => needsAttention(project))
@@ -228,28 +244,12 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                   </div>
 
                   {chartProjects.length > 0 ? (
-                    <Chart aria-label="Package downloads by project">
-                      <div class="bar-chart">
-                        {chartProjects.map((project) => (
-                          <div class="bar-row">
-                            <div class="bar-label">
-                              <span>{project.name}</span>
-                              <strong>
-                                {formatNumber(project.npmDownloads30d)}
-                              </strong>
-                            </div>
-                            <Progress
-                              max={maxDownloads}
-                              value={project.npmDownloads30d}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      <figcaption>
-                        Aggregated across every npm package mapped to each
-                        product.
-                      </figcaption>
-                    </Chart>
+                    <BarChart
+                      aria-label="Package downloads by project"
+                      caption="Aggregated across every npm package mapped to each product."
+                      orientation="horizontal"
+                      series={projectDownloadSeries}
+                    />
                   ) : (
                     <Empty>
                       <p>No mapped npm package has download data yet.</p>
@@ -328,34 +328,18 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                   <span>{rangeLabel}</span>
                 </div>
                 {historySamples.length > 1 ? (
-                  <Chart
+                  <LineChart
+                    area
                     aria-label={`Portfolio download history for ${rangeLabel}`}
-                  >
-                    <div class="history-chart">
-                      {historySamples.map((point) => (
-                        <div class="history-column">
-                          <span
-                            class="history-column__bar"
-                            style={`height: ${Math.max(
-                              (point.npmDownloads30d / maxHistoryDownloads) *
-                                100,
-                              4,
-                            )}%`}
-                            title={`${formatNumber(point.npmDownloads30d)} downloads`}
-                          />
-                          <small>{formatDate(point.collectedAt)}</small>
-                        </div>
-                      ))}
-                    </div>
-                    <figcaption>
-                      Each bar is the observed 30-day download velocity at a
-                      sync point. {dashboard.period.starsGained >= 0 ? '+' : ''}
-                      {formatNumber(dashboard.period.starsGained)} stars and{' '}
-                      {dashboard.period.issueChange >= 0 ? '+' : ''}
-                      {formatNumber(dashboard.period.issueChange)} open issues
-                      across the selected range.
-                    </figcaption>
-                  </Chart>
+                    caption={`Each point is the observed 30-day download velocity at a sync. ${
+                      dashboard.period.starsGained >= 0 ? '+' : ''
+                    }${formatNumber(dashboard.period.starsGained)} stars and ${
+                      dashboard.period.issueChange >= 0 ? '+' : ''
+                    }${formatNumber(
+                      dashboard.period.issueChange,
+                    )} open issues across the selected range.`}
+                    series={portfolioHistorySeries}
+                  />
                 ) : (
                   <Empty>
                     <p>

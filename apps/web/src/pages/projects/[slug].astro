@@ -22,9 +22,9 @@ import { aggregateWebsiteAnalytics } from '@/lib/website-analytics'
 import Badge from '@santi020k/lumen-astro/components/Badge'
 import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
 import Card from '@santi020k/lumen-astro/components/Card'
-import Chart from '@santi020k/lumen-astro/components/Chart'
 import Empty from '@santi020k/lumen-astro/components/Empty'
 import Icon from '@santi020k/lumen-astro/components/Icon'
+import LineChart from '@santi020k/lumen-astro/components/LineChart'
 import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
 
 const slug = Astro.params.slug
@@ -62,19 +62,9 @@ const sidebarProjects = settingsResponse.parsed.projects.filter(
 
 const apiUrl = getBrowserApiUrl()
 
-const maxDownloads = Math.max(
-  ...dashboard.history.map((point) => point.npmDownloads30d),
-  1,
-)
-
 const websiteHistory = websiteAnalytics
   ? aggregateWebsiteAnalytics(websiteAnalytics.history, dashboard.range)
   : []
-
-const maxWebsiteTraffic = Math.max(
-  ...websiteHistory.flatMap((point) => [point.pageViews, point.visits]),
-  1,
-)
 
 const websiteDataIsSampled = websiteHistory.some(
   (point) => point.sampleInterval > 1,
@@ -91,6 +81,42 @@ const websiteBucketLabels = {
   '1y': 'Monthly',
   '5y': 'Monthly',
 } as const
+
+const websiteTrafficSeries = [
+  {
+    data: websiteHistory.map((point) => ({
+      label: `${formatNumber(point.pageViews)} page views`,
+      x: formatDate(point.periodStart),
+      y: point.pageViews,
+    })),
+    id: 'page-views',
+    label: 'Page views',
+    tone: 'brand',
+  },
+  {
+    data: websiteHistory.map((point) => ({
+      label: `${formatNumber(point.visits)} visits`,
+      x: formatDate(point.periodStart),
+      y: point.visits,
+    })),
+    id: 'visits',
+    label: 'Visits',
+    tone: 'accent',
+  },
+] as const
+
+const downloadHistorySeries = [
+  {
+    data: dashboard.history.map((point) => ({
+      label: `${formatNumber(point.npmDownloads30d)} downloads`,
+      x: formatDate(point.collectedAt),
+      y: point.npmDownloads30d,
+    })),
+    id: 'downloads',
+    label: 'Rolling 30-day downloads',
+    tone: 'brand',
+  },
+] as const
 ---
 
 <AppLayout
@@ -257,55 +283,18 @@ const websiteBucketLabels = {
                           Page views and visits
                         </h3>
                       </div>
-                      <div class="traffic-legend" aria-label="Chart legend">
-                        <span>
-                          <i class="traffic-key traffic-key--views" />
-                          Page views
-                        </span>
-                        <span>
-                          <i class="traffic-key traffic-key--visits" />
-                          Visits
-                        </span>
-                      </div>
                     </div>
 
-                    <Chart aria-label={`${project.name} website traffic history`}>
-                      <div class="traffic-chart">
-                        {websiteHistory.map((point) => (
-                          <div
-                            class="traffic-column"
-                            role="img"
-                            aria-label={`${formatDate(point.periodStart)}: ${formatNumber(point.pageViews)} page views and ${formatNumber(point.visits)} visits`}
-                          >
-                            <div
-                              class="traffic-column__bars"
-                              aria-hidden="true"
-                            >
-                              <span
-                                class="traffic-bar traffic-bar--views"
-                                style={`height: ${Math.max(
-                                  (point.pageViews / maxWebsiteTraffic) * 100,
-                                  3,
-                                )}%`}
-                              />
-                              <span
-                                class="traffic-bar traffic-bar--visits"
-                                style={`height: ${Math.max(
-                                  (point.visits / maxWebsiteTraffic) * 100,
-                                  3,
-                                )}%`}
-                              />
-                            </div>
-                            <small>{formatDate(point.periodStart)}</small>
-                          </div>
-                        ))}
-                      </div>
-                      <figcaption>
-                        {websiteBucketLabels[dashboard.range]} Cloudflare totals.
-                        {websiteDataIsSampled &&
-                          ' Cloudflare adaptive sampling is present in this range.'}
-                      </figcaption>
-                    </Chart>
+                    <LineChart
+                      area
+                      aria-label={`${project.name} website traffic history`}
+                      caption={`${websiteBucketLabels[dashboard.range]} Cloudflare totals.${
+                        websiteDataIsSampled
+                          ? ' Cloudflare adaptive sampling is present in this range.'
+                          : ''
+                      }`}
+                      series={websiteTrafficSeries}
+                    />
                   </Card>
                 </div>
               ) : (
@@ -341,26 +330,12 @@ const websiteBucketLabels = {
             </div>
             {
               dashboard.history.length > 1 ? (
-                <Chart aria-label={`${project.name} download history`}>
-                  <div class="history-chart">
-                    {dashboard.history.map((point) => (
-                      <div class="history-column">
-                        <span
-                          class="history-column__bar"
-                          style={`height: ${Math.max(
-                            (point.npmDownloads30d / maxDownloads) * 100,
-                            4,
-                          )}%`}
-                          title={`${formatNumber(point.npmDownloads30d)} downloads`}
-                        />
-                        <small>{formatDate(point.collectedAt)}</small>
-                      </div>
-                    ))}
-                  </div>
-                  <figcaption>
-                    Rolling 30-day npm downloads observed at each sync point.
-                  </figcaption>
-                </Chart>
+                <LineChart
+                  area
+                  aria-label={`${project.name} download history`}
+                  caption="Rolling 30-day npm downloads observed at each sync point."
+                  series={downloadHistorySeries}
+                />
               ) : (
                 <Empty>
                   <p>
