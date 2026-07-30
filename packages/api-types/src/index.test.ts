@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
   analyticsRangeSchema,
+  projectDashboardSchema,
   requestCodeSchema,
   updateProjectSettingSchema,
   verifyCodeSchema,
@@ -15,6 +16,10 @@ describe('analytics range contracts', () => {
         range => analyticsRangeSchema.safeParse(range).success
       )
     ).toBe(true)
+  })
+
+  test('includes range-owned npm analytics on project dashboards', () => {
+    expect(projectDashboardSchema.shape.npmAnalytics).toBeDefined()
   })
 })
 

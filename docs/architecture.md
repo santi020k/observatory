@@ -19,10 +19,11 @@ Cloudflare D1 snapshots, and shared contract/catalog/data packages.
 
 ```text
 GitHub public API ─┐
-npm public API ───┼─> hourly Hono sync ─────────> project snapshots ─┐
-website checks ───┘                                                  │
-                                                                    ├─> authenticated API
-Cloudflare GraphQL ─> private hourly analytics sync ─> web snapshots ┘
+npm public API ───┼─> hourly Hono sync ──┬─> project snapshots ────┐
+VS Marketplace ──┤                      ├─> npm daily downloads ──┤
+Open VSX API ────┤                      ├─> extension snapshots ──┤
+website checks ───┘                      └─> source identity ──────┤
+Cloudflare GraphQL ─> private hourly sync ──> web snapshots ───────┘
 
 GitHub App / commercial sources
         └─> future private collectors ─> isolated credentials + visibility-aware snapshots
@@ -47,3 +48,15 @@ After public project discovery completes, the Cloudflare collector queries Web A
 hostnames found on those public project snapshots. It upserts the latest 48 completed hourly
 buckets into a separate table, so retries and delayed Cloudflare events do not duplicate totals.
 Missing Cloudflare credentials disable this collector without affecting public project sync.
+
+npm daily downloads use a separate package-and-day table rather than the rolling project snapshot.
+The first sync requests up to one year of completed UTC days. Subsequent syncs request the rolling
+30-day window for current velocity, while only new days and a short correction overlap are upserted.
+The API aggregates those immutable daily facts into calendar weeks, months, and years.
+
+VS Code extension identifiers live in the catalog next to their owning repository. The public
+sync queries the Visual Studio Marketplace for each mapped identifier and stores downloads,
+installs, version, rating, update count, and last-published time in a separate snapshot table.
+This keeps cumulative Marketplace counters distinct from daily npm downloads and GitHub traffic.
+Open VSX uses the same catalog mappings but a different provider identity in that table, so its
+downloads, ratings, reviews, versions, and publish times cannot be conflated with Microsoft data.

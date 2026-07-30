@@ -91,6 +91,32 @@ export const npmDownloadSnapshots = sqliteTable(
   ]
 )
 
+export const vscodeExtensionSnapshots = sqliteTable(
+  'vscode_extension_snapshots', {
+    collectedAt: integer('collected_at').notNull(),
+    downloads: integer('downloads').notNull().default(0),
+    extensionId: text('extension_id').notNull(),
+    id: text('id').primaryKey(),
+    installs: integer('installs').notNull().default(0),
+    lastUpdated: text('last_updated').notNull(),
+    provider: text('provider').notNull(),
+    rating: real('rating'),
+    reviewCount: integer('review_count').notNull().default(0),
+    slug: text('slug').notNull(),
+    syncRunId: text('sync_run_id').references(() => syncRuns.id),
+    updateCount: integer('update_count').notNull().default(0),
+    version: text('version').notNull()
+  }, table => [
+    index('vscode_extension_snapshots_collected_idx').on(table.collectedAt),
+    index('vscode_extension_snapshots_slug_collected_idx').on(
+      table.slug, table.collectedAt
+    ),
+    uniqueIndex('vscode_extension_snapshots_provider_extension_run_idx').on(
+      table.provider, table.extensionId, table.syncRunId
+    )
+  ]
+)
+
 export const projectPreferences = sqliteTable('project_preferences', {
   attentionMode: text('attention_mode').notNull().default('all'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),

@@ -9,7 +9,7 @@ import AppLayout from '@/layouts/AppLayout.astro'
 import {
   analyticsRangeMeta,
   formatHistoryLabel,
-  getHistoryCoverage
+  getNpmChart
 } from '@/lib/analytics-range'
 import {
   getBrowserApiUrl,
@@ -30,6 +30,7 @@ import Card from '@santi020k/lumen-astro/components/Card'
 import Empty from '@santi020k/lumen-astro/components/Empty'
 import Icon from '@santi020k/lumen-astro/components/Icon'
 import LineChart from '@santi020k/lumen-astro/components/LineChart'
+import Table from '@santi020k/lumen-astro/components/Table'
 import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
 
 const slug = Astro.params.slug
@@ -78,10 +79,6 @@ const websiteDataIsSampled = websiteHistory.some(
 const rangeMeta = analyticsRangeMeta[dashboard.range]
 const rangeLabel = rangeMeta.longLabel
 
-const historyCoverage = getHistoryCoverage(
-  dashboard.period.availableFrom, dashboard.period.availableTo, dashboard.range
-)
-
 const websiteTrafficSeries = [
   {
     data: websiteHistory.map(point => ({
@@ -105,18 +102,65 @@ const websiteTrafficSeries = [
   }
 ] as const
 
+const npmChart = getNpmChart(dashboard.npmAnalytics, dashboard.range)
+
+const formatNpmPeriodLabel = (value: string): string => {
+  let options: Intl.DateTimeFormatOptions
+
+  if (npmChart.cadence === 'yearly') options = { year: 'numeric' }
+  else if (npmChart.cadence === 'monthly')
+    options = { month: 'short', year: '2-digit' }
+  else options = { day: 'numeric', month: 'short' }
+
+  return new Intl.DateTimeFormat('en', options).format(new Date(value))
+}
+
 const downloadHistorySeries = [
   {
-    data: dashboard.history.map(point => ({
-      label: `${formatNumber(point.npmDownloads30d)} downloads`,
-      x: formatHistoryLabel(point.collectedAt, dashboard.range),
-      y: point.npmDownloads30d
+    data: npmChart.points.map(point => ({
+      label: `${formatNumber(point.downloads)} downloads`,
+      x: formatNpmPeriodLabel(point.periodStart),
+      y: point.downloads
     })),
     id: 'downloads',
-    label: 'Rolling 30-day downloads',
+    label: 'Downloads',
     tone: 'brand'
   }
 ] as const
+
+const vscodeHistorySeries = [
+  {
+    data: dashboard.vscodeAnalytics.history.map(point => ({
+      label: `${formatNumber(point.downloads)} downloads`,
+      x: formatHistoryLabel(point.collectedAt, dashboard.range),
+      y: point.downloads
+    })),
+    id: 'vscode-downloads',
+    label: 'Marketplace downloads',
+    tone: 'brand'
+  }
+] as const
+
+const openVsxHistorySeries = [
+  {
+    data: dashboard.openVsxAnalytics.history.map(point => ({
+      label: `${formatNumber(point.downloads)} downloads`,
+      x: formatHistoryLabel(point.collectedAt, dashboard.range),
+      y: point.downloads
+    })),
+    id: 'open-vsx-downloads',
+    label: 'Open VSX downloads',
+    tone: 'accent'
+  }
+] as const
+
+const getOpenVsxUrl = (extensionId: string): string => {
+  const extensionParts = extensionId.split('.', 2)
+  const namespace = extensionParts[0] ?? 'santi020k'
+  const name = extensionParts[1] ?? extensionId
+
+  return `https://open-vsx.org/extension/${namespace}/${name}`
+}
 
 const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${formatNumber(value)}`
 ---
@@ -190,16 +234,40 @@ const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${
                   </ButtonLink>
                 )
               }
+              {
+                project.sources.vscode[0] && (
+                  <ButtonLink
+                    href={project.sources.vscode[0]}
+                    newTab
+                    variant="secondary"
+                  >
+                    <Icon aria-hidden="true" name="monitor" />
+                    VS Code
+                  </ButtonLink>
+                )
+              }
+              {
+                project.sources.openVsx[0] && (
+                  <ButtonLink
+                    href={project.sources.openVsx[0]}
+                    newTab
+                    variant="secondary"
+                  >
+                    <Icon aria-hidden="true" name="blocks" />
+                    Open VSX
+                  </ButtonLink>
+                )
+              }
             </div>
           </div>
         </section>
 
         <section class="metric-grid" aria-label={`${project.name} metrics`}>
           <MetricCard
-            context="Current rolling 30-day package reach"
+            context={`Exact completed-day total · ${rangeLabel}`}
             icon="download"
             label="Downloads"
-            value={formatNumber(project.npmDownloads30d)}
+            value={formatNumber(dashboard.npmAnalytics.totalDownloads)}
           />
           <MetricCard
             context={`Net change · ${rangeLabel}`}
@@ -207,6 +275,30 @@ const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${
             label="Stars gained"
             value={formatSignedNumber(dashboard.period.starsGained)}
           />
+          {
+            dashboard.vscodeAnalytics.extensions.length > 0 && (
+              <MetricCard
+                context={`${formatNumber(
+                  dashboard.vscodeAnalytics.totalInstalls
+                )} current installs · VS Code Marketplace`}
+                icon="monitor"
+                label="Extension downloads"
+                value={formatNumber(dashboard.vscodeAnalytics.totalDownloads)}
+              />
+            )
+          }
+          {
+            dashboard.openVsxAnalytics.extensions.length > 0 && (
+              <MetricCard
+                context="Cumulative downloads · Open VSX Registry"
+                icon="blocks"
+                label="Open VSX downloads"
+                value={formatNumber(
+                  dashboard.openVsxAnalytics.totalDownloads
+                )}
+              />
+            )
+          }
           <MetricCard
             context={`${project.forks} forks on GitHub`}
             icon="git-fork"
@@ -321,6 +413,175 @@ const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${
           )
         }
 
+        {
+          dashboard.vscodeAnalytics.extensions.length > 0 && (
+            <section
+              class="vscode-analytics-section"
+              aria-labelledby="project-vscode-heading"
+            >
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">VS Code Marketplace</span>
+                  <h2 id="project-vscode-heading">Extension reach</h2>
+                  <p>
+                    Marketplace data stays separate from npm package downloads
+                    and GitHub repository activity.
+                  </p>
+                </div>
+                <Badge variant="outline">Marketplace snapshot</Badge>
+              </div>
+              <div class="vscode-project-grid">
+                {dashboard.vscodeAnalytics.history.length > 1 && (
+                  <Card
+                    as="section"
+                    class="panel"
+                    aria-labelledby="project-vscode-history-heading"
+                  >
+                    <div class="panel-heading">
+                      <div>
+                        <span class="eyebrow">Observed growth</span>
+                        <h3 id="project-vscode-history-heading">
+                          Cumulative downloads
+                        </h3>
+                      </div>
+                    </div>
+                    <LineChart
+                      markers={dashboard.vscodeAnalytics.history.length <= 24}
+                      aria-label={`${project.name} VS Code Marketplace downloads for ${rangeLabel}`}
+                      caption="Cumulative downloads reported by the VS Code Marketplace at each Observatory sync."
+                      series={vscodeHistorySeries}
+                    />
+                  </Card>
+                )}
+                <Card class="panel">
+                  <Table>
+                    <caption class="sr-only">
+                      {project.name} VS Code Marketplace extensions
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Extension</th>
+                        <th scope="col">Version</th>
+                        <th scope="col">Downloads</th>
+                        <th scope="col">Installs</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dashboard.vscodeAnalytics.extensions.map(extension => (
+                        <tr>
+                          <td>
+                            <a
+                              class="npm-package-link"
+                              href={`https://marketplace.visualstudio.com/items?itemName=${extension.extensionId}`}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              {extension.extensionId}
+                              <Icon aria-hidden="true" name="arrow-up-right" />
+                            </a>
+                          </td>
+                          <td>{extension.version}</td>
+                          <td>{formatNumber(extension.downloads)}</td>
+                          <td>{formatNumber(extension.installs)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </Card>
+              </div>
+            </section>
+          )
+        }
+
+        {
+          dashboard.openVsxAnalytics.extensions.length > 0 && (
+            <section
+              class="vscode-analytics-section"
+              aria-labelledby="project-open-vsx-heading"
+            >
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Open VSX Registry</span>
+                  <h2 id="project-open-vsx-heading">Open editor reach</h2>
+                  <p>
+                    Downloads from Open VSX stay separate from Microsoft
+                    Marketplace installs and npm package usage.
+                  </p>
+                </div>
+                <Badge variant="outline">Open VSX snapshot</Badge>
+              </div>
+              <div class="vscode-project-grid">
+                {dashboard.openVsxAnalytics.history.length > 1 && (
+                  <Card
+                    as="section"
+                    class="panel"
+                    aria-labelledby="project-open-vsx-history-heading"
+                  >
+                    <div class="panel-heading">
+                      <div>
+                        <span class="eyebrow">Observed growth</span>
+                        <h3 id="project-open-vsx-history-heading">
+                          Cumulative downloads
+                        </h3>
+                      </div>
+                    </div>
+                    <LineChart
+                      markers={
+                        dashboard.openVsxAnalytics.history.length <= 24
+                      }
+                      aria-label={`${project.name} Open VSX downloads for ${rangeLabel}`}
+                      caption="Cumulative downloads reported by Open VSX at each Observatory sync."
+                      series={openVsxHistorySeries}
+                    />
+                  </Card>
+                )}
+                <Card class="panel">
+                  <Table>
+                    <table>
+                      <caption class="sr-only">
+                        {project.name} Open VSX extensions
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Extension</th>
+                          <th scope="col">Version</th>
+                          <th scope="col">Downloads</th>
+                          <th scope="col">Reviews</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dashboard.openVsxAnalytics.extensions.map(
+                          extension => (
+                            <tr>
+                              <td>
+                                <a
+                                  class="npm-package-link"
+                                  href={getOpenVsxUrl(extension.extensionId)}
+                                  rel="noreferrer"
+                                  target="_blank"
+                                >
+                                  {extension.extensionId}
+                                  <Icon
+                                    aria-hidden="true"
+                                    name="arrow-up-right"
+                                  />
+                                </a>
+                              </td>
+                              <td>{extension.version}</td>
+                              <td>{formatNumber(extension.downloads)}</td>
+                              <td>{formatNumber(extension.reviewCount)}</td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                    </table>
+                  </Table>
+                </Card>
+              </div>
+            </section>
+          )
+        }
+
         <section class="project-detail-grid">
           <Card
             as="section"
@@ -330,30 +591,24 @@ const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${
             <div class="panel-heading">
               <div>
                 <span class="eyebrow">Reach over time</span>
-                <h2 id="project-history-heading">Download velocity</h2>
+                <h2 id="project-history-heading">{npmChart.heading}</h2>
               </div>
-              <Badge
-                variant={historyCoverage.isPartial ? 'warning' : 'outline'}
-              >
-                {historyCoverage.label}
-              </Badge>
+              <Badge variant="outline">{rangeLabel}</Badge>
             </div>
             {
-              dashboard.history.length > 1 ?
+              npmChart.points.length > 0 ?
                 (
                   <LineChart
                     area
-                    markers={dashboard.history.length <= 24}
-                    aria-label={`${project.name} download history`}
-                    caption={`${rangeMeta.bucketLabel} rolling 30-day npm download velocity built from ${formatNumber(dashboard.period.syncs)} persisted ${dashboard.period.syncs === 1 ? 'sync' : 'syncs'}.`}
+                    markers={npmChart.points.length <= 31}
+                    aria-label={`${project.name} ${npmChart.heading.toLocaleLowerCase()} for ${rangeLabel}`}
+                    caption={npmChart.caption}
                     series={downloadHistorySeries}
                   />
                 ) :
                 (
                   <Empty>
-                    <p>
-                      More history will appear after another sync in this range.
-                    </p>
+                    <p>No npm download history is stored for {rangeLabel}.</p>
                   </Empty>
                 )
             }
@@ -382,6 +637,14 @@ const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${
               <div>
                 <dt>npm packages</dt>
                 <dd>{formatNumber(project.sources.npm.length)}</dd>
+              </div>
+              <div>
+                <dt>VS Code extensions</dt>
+                <dd>{formatNumber(project.sources.vscode.length)}</dd>
+              </div>
+              <div>
+                <dt>Open VSX extensions</dt>
+                <dd>{formatNumber(project.sources.openVsx.length)}</dd>
               </div>
               <div>
                 <dt>Response time</dt>

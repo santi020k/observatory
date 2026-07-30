@@ -8,6 +8,7 @@ import {
   projectSnapshots,
   sessions,
   syncRuns,
+  vscodeExtensionSnapshots,
   websiteAnalyticsSnapshots
 } from './schema'
 
@@ -62,6 +63,22 @@ export interface NpmDownloadWrite {
   packageName: string
   periodStart: number
   slug: string
+}
+
+export interface VscodeExtensionWrite {
+  collectedAt: number
+  downloads: number
+  extensionId: string
+  id: string
+  installs: number
+  lastUpdated: string
+  provider: 'open-vsx' | 'vscode-marketplace'
+  rating: number | null
+  reviewCount: number
+  slug: string
+  syncRunId: string
+  updateCount: number
+  version: string
 }
 
 export interface ProjectPreferenceWrite {
@@ -210,15 +227,19 @@ export const upsertNpmDownloads = async (
   db: ObservatoryDb,
   snapshots: readonly NpmDownloadWrite[]
 ): Promise<void> => {
-  for (const snapshot of snapshots) {
+  const batchSize = 15
+
+  for (let index = 0; index < snapshots.length; index += batchSize) {
+    const batch = snapshots.slice(index, index + batchSize)
+
     await db
       .insert(npmDownloadSnapshots)
-      .values(snapshot)
+      .values(batch)
       .onConflictDoUpdate({
         set: {
-          collectedAt: snapshot.collectedAt,
-          downloads: snapshot.downloads,
-          slug: snapshot.slug
+          collectedAt: sql`excluded.collected_at`,
+          downloads: sql`excluded.downloads`,
+          slug: sql`excluded.slug`
         },
         target: [
           npmDownloadSnapshots.packageName,
@@ -236,14 +257,28 @@ export const getLatestNpmDownloadDates = async (db: ObservatoryDb) => db
   .from(npmDownloadSnapshots)
   .groupBy(npmDownloadSnapshots.packageName)
 
-export const getNpmDownloadsSince = async (
-  db: ObservatoryDb,
-  since: number
-) => db
+export const getNpmDownloadsSince = async (db: ObservatoryDb, since: number) => db
   .select()
   .from(npmDownloadSnapshots)
   .where(gte(npmDownloadSnapshots.periodStart, since))
   .orderBy(npmDownloadSnapshots.periodStart)
+
+export const insertVscodeExtensionSnapshots = async (
+  db: ObservatoryDb,
+  snapshots: readonly VscodeExtensionWrite[]
+): Promise<void> => {
+  for (const snapshot of snapshots)
+    await db.insert(vscodeExtensionSnapshots).values(snapshot)
+}
+
+export const getVscodeExtensionSnapshotsSince = async (
+  db: ObservatoryDb,
+  since: number
+) => db
+  .select()
+  .from(vscodeExtensionSnapshots)
+  .where(gte(vscodeExtensionSnapshots.collectedAt, since))
+  .orderBy(vscodeExtensionSnapshots.collectedAt)
 
 export const getSnapshotsForSyncRun = async (
   db: ObservatoryDb,

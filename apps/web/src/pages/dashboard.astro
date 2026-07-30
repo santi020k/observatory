@@ -9,7 +9,8 @@ import AppLayout from '@/layouts/AppLayout.astro'
 import {
   analyticsRangeMeta,
   formatHistoryLabel,
-  getHistoryCoverage
+  getHistoryCoverage,
+  getNpmChart
 } from '@/lib/analytics-range'
 import { getBrowserApiUrl, getDashboard } from '@/lib/api'
 import { needsAttention } from '@/lib/attention'
@@ -31,6 +32,7 @@ import LineChart from '@santi020k/lumen-astro/components/LineChart'
 import NativeSelect from '@santi020k/lumen-astro/components/NativeSelect'
 import SearchField from '@santi020k/lumen-astro/components/SearchField'
 import Table from '@santi020k/lumen-astro/components/Table'
+import Tabs from '@santi020k/lumen-astro/components/Tabs'
 
 const response = await getDashboard(Astro.request, Astro.url)
 
@@ -48,20 +50,33 @@ const historyCoverage = getHistoryCoverage(
   dashboard.period.availableFrom, dashboard.period.availableTo, dashboard.range
 )
 
-const projectsByDownloads = [...dashboard.projects].sort(
-  (left, right) => right.npmDownloads30d - left.npmDownloads30d
-)
+const downloadsByProject = dashboard.npmAnalytics.packages.reduce<
+  Map<string, number>
+>((downloads, packageDownloads) => {
+  downloads.set(
+    packageDownloads.slug, (downloads.get(packageDownloads.slug) ?? 0) + packageDownloads.downloads
+  )
+
+  return downloads
+}, new Map())
+
+const projectsByDownloads = dashboard.projects
+  .map(project => ({
+    downloads: downloadsByProject.get(project.slug) ?? 0,
+    name: project.name
+  }))
+  .sort((left, right) => right.downloads - left.downloads)
 
 const chartProjects = projectsByDownloads
-  .filter(project => project.npmDownloads30d > 0)
+  .filter(project => project.downloads > 0)
   .slice(0, 6)
 
 const projectDownloadSeries = [
   {
     data: chartProjects.map(project => ({
-      label: formatNumber(project.npmDownloads30d),
+      label: formatNumber(project.downloads),
       x: project.name,
-      y: project.npmDownloads30d
+      y: project.downloads
     })),
     id: 'downloads',
     label: 'Downloads',
@@ -95,6 +110,125 @@ const portfolioStarsSeries = [
   }
 ] as const
 
+const formatNpmPeriodLabel = (
+  value: string,
+  cadence: 'daily' | 'monthly' | 'weekly' | 'yearly'
+): string => {
+  let options: Intl.DateTimeFormatOptions
+
+  if (cadence === 'yearly') options = { year: 'numeric' }
+  else if (cadence === 'monthly') options = { month: 'short', year: '2-digit' }
+  else options = { day: 'numeric', month: 'short' }
+
+  return new Intl.DateTimeFormat('en', options).format(new Date(value))
+}
+
+const toNpmSeries = (
+  points: typeof dashboard.npmAnalytics.daily,
+  cadence: 'daily' | 'monthly' | 'weekly' | 'yearly'
+) => [
+  {
+    data: points.map(point => ({
+      label: `${formatNumber(point.downloads)} downloads`,
+      x: formatNpmPeriodLabel(point.periodStart, cadence),
+      y: point.downloads
+    })),
+    id: `${cadence}-downloads`,
+    label: 'Downloads',
+    tone: 'brand'
+  }
+] as const
+
+const npmChart = getNpmChart(dashboard.npmAnalytics, dashboard.range)
+const npmChartSeries = toNpmSeries(npmChart.points, npmChart.cadence)
+const npmTopPackage = dashboard.npmAnalytics.packages[0]
+
+const npmPeakDay = dashboard.npmAnalytics.daily.reduce<
+  (typeof dashboard.npmAnalytics.daily)[number] | null
+>(
+  (peak, point) => (!peak || point.downloads > peak.downloads ? point : peak), null
+)
+
+const npmAveragePerDay =
+  dashboard.npmAnalytics.daily.length > 0 ?
+    Math.round(
+      dashboard.npmAnalytics.totalDownloads /
+      dashboard.npmAnalytics.daily.length
+    ) :
+    0
+
+const projectNameBySlug = new Map(
+  dashboard.projects.map(project => [project.slug, project.name])
+)
+
+const npmAvailableRangeLabel =
+  dashboard.npmAnalytics.availableFrom && dashboard.npmAnalytics.availableTo ?
+    `${formatDate(dashboard.npmAnalytics.availableFrom)} – ${formatDate(
+      dashboard.npmAnalytics.availableTo
+    )}` :
+    'Awaiting npm history'
+
+const vscodeHistorySeries = [
+  {
+    data: dashboard.vscodeAnalytics.history.map(point => ({
+      label: `${formatNumber(point.downloads)} downloads`,
+      x: formatHistoryLabel(point.collectedAt, dashboard.range),
+      y: point.downloads
+    })),
+    id: 'vscode-downloads',
+    label: 'Marketplace downloads',
+    tone: 'brand'
+  },
+  {
+    data: dashboard.vscodeAnalytics.history.map(point => ({
+      label: `${formatNumber(point.installs)} installs`,
+      x: formatHistoryLabel(point.collectedAt, dashboard.range),
+      y: point.installs
+    })),
+    id: 'vscode-installs',
+    label: 'Current installs',
+    tone: 'accent'
+  }
+] as const
+
+const vscodeAvailableRangeLabel =
+  dashboard.vscodeAnalytics.availableFrom &&
+  dashboard.vscodeAnalytics.availableTo ?
+    `${formatDate(dashboard.vscodeAnalytics.availableFrom)} – ${formatDate(
+      dashboard.vscodeAnalytics.availableTo
+    )}` :
+    'Awaiting Marketplace history'
+
+const openVsxHistorySeries = [
+  {
+    data: dashboard.openVsxAnalytics.history.map(point => ({
+      label: `${formatNumber(point.downloads)} downloads`,
+      x: formatHistoryLabel(point.collectedAt, dashboard.range),
+      y: point.downloads
+    })),
+    id: 'open-vsx-downloads',
+    label: 'Open VSX downloads',
+    tone: 'accent'
+  }
+] as const
+
+const openVsxAvailableRangeLabel =
+  dashboard.openVsxAnalytics.availableFrom &&
+  dashboard.openVsxAnalytics.availableTo ?
+    `${formatDate(dashboard.openVsxAnalytics.availableFrom)} – ${formatDate(
+      dashboard.openVsxAnalytics.availableTo
+    )}` :
+    'Awaiting Open VSX history'
+
+const getOpenVsxUrl = (extensionId: string): string => {
+  const extensionParts = extensionId.split('.', 2)
+  const namespace = extensionParts[0] ?? 'santi020k'
+  const name = extensionParts[1] ?? extensionId
+
+  return `https://open-vsx.org/extension/${namespace}/${name}`
+}
+
+const formatDownloadShare = (downloads: number, total: number): string => total > 0 ? `${((downloads / total) * 100).toFixed(1)}%` : '0%'
 const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${formatNumber(value)}`
 
 const attentionProjects = dashboard.projects
@@ -165,484 +299,1297 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
           </div>
           <div class="hero-controls">
             <RangePicker range={dashboard.range} />
-            <div class="source-legend" aria-label="Active data sources">
-              <Badge variant="outline"><Icon aria-hidden="true" name="git-fork" /> GitHub
-              </Badge
-              >
-              <Badge variant="outline"><Icon aria-hidden="true" name="package" /> npm
-              </Badge
-              >
-              <Badge variant="outline"><Icon aria-hidden="true" name="activity" /> Health
-              </Badge
-              >
-            </div>
           </div>
         </section>
 
-        <section class="metric-grid" aria-label="Portfolio metrics">
-          <MetricCard
-            context={`${dashboard.summary.publicProjects} public repositories tracked`}
-            icon="circle-dot-dashed"
-            label="Active projects"
-            value={formatNumber(dashboard.summary.activeProjects)}
-          />
-          <MetricCard
-            context="Current 30-day velocity across mapped packages"
-            icon="download"
-            label="Package downloads"
-            value={formatNumber(dashboard.summary.npmDownloads30d)}
-          />
-          <MetricCard
-            context="Current authenticated 14-day repository traffic"
-            icon="eye"
-            label="GitHub views"
-            value={formatNumber(dashboard.summary.githubViews14d)}
-          />
-          <MetricCard
-            context={`Change in rolling download velocity · ${rangeLabel}`}
-            icon="activity"
-            label="Download momentum"
-            value={formatSignedNumber(dashboard.period.downloadVelocityChange)}
-          />
-          <MetricCard
-            context={`Net portfolio change · ${rangeLabel}`}
-            icon="star"
-            label="Stars gained"
-            value={formatSignedNumber(dashboard.period.starsGained)}
-          />
-          <MetricCard
-            context={`${formatNumber(dashboard.summary.openIssues)} currently open · ${rangeLabel}`}
-            icon="circle-dot-dashed"
-            label="Issue change"
-            value={formatSignedNumber(dashboard.period.issueChange)}
-          />
-        </section>
-
-        {
-          dashboard.projects.length === 0 ?
-            (
-              <Empty class="first-sync">
-                <span class="empty-icon">
-                  <Icon aria-hidden="true" name="telescope" />
-                </span>
-                <h2>Your catalog is ready for first light</h2>
-                <p>
-                  Run the first sync to collect GitHub, npm, and website health
-                  metrics.
-                </p>
-                <button
-                  class="ui-button ui-button--default"
-                  data-sync-button
-                  type="button"
-                >
-                  Sync public projects
-                </button>
-              </Empty>
-            ) :
-            (
-              <>
-                <section class="insight-grid">
-                  <Card
-                    as="section"
-                    class="panel reach-panel"
-                    aria-labelledby="reach-heading"
+        <Tabs
+          class="dashboard-tabs"
+          initialValue="pulse"
+          storageKey="observatory.dashboard.view"
+        >
+          <div
+            aria-label="Dashboard views"
+            class="dashboard-tablist"
+            role="tablist"
+          >
+            <button aria-selected="true" data-value="pulse" role="tab">
+              <Icon aria-hidden="true" name="gauge" />
+              Pulse
+            </button>
+            {
+              dashboard.projects.length > 0 && (
+                <>
+                  <button aria-selected="false" data-value="focus" role="tab">
+                    <Icon aria-hidden="true" name="scan-eye" />
+                    Focus
+                  </button>
+                  <button
+                    aria-selected="false"
+                    data-value="packages"
+                    role="tab"
                   >
-                    <div class="panel-heading">
-                      <div>
-                        <span class="eyebrow">Reach</span>
-                        <h2 id="reach-heading">Package downloads</h2>
-                      </div>
-                      <span>Last 30 days</span>
-                    </div>
-
-                    {chartProjects.length > 0 ?
-                      (
-                        <BarChart
-                          aria-label="Package downloads by project"
-                          caption="Aggregated across every npm package mapped to each product."
-                          orientation="horizontal"
-                          series={projectDownloadSeries}
-                        />
-                      ) :
-                      (
-                        <Empty>
-                          <p>No mapped npm package has download data yet.</p>
-                        </Empty>
-                      )}
-                  </Card>
-
-                  <Card
-                    as="section"
-                    class="panel attention-panel"
-                    aria-labelledby="attention-heading"
+                    <Icon aria-hidden="true" name="package" />
+                    Packages
+                  </button>
+                  <button
+                    aria-selected="false"
+                    data-value="extensions"
+                    role="tab"
                   >
-                    <div class="panel-heading">
-                      <div>
-                        <span class="eyebrow">Focus</span>
-                        <h2 id="attention-heading">Attention queue</h2>
-                      </div>
-                      <Badge
-                        variant={
-                          attentionProjects.length > 0 ? 'warning' : 'success'
-                        }
-                      >
-                        {attentionProjects.length} signals
-                      </Badge>
-                    </div>
+                    <Icon aria-hidden="true" name="blocks" />
+                    Extensions
+                  </button>
+                  <button
+                    aria-selected="false"
+                    data-value="momentum"
+                    role="tab"
+                  >
+                    <Icon aria-hidden="true" name="chart-no-axes-combined" />
+                    Momentum
+                  </button>
+                  <button
+                    aria-selected="false"
+                    data-value="projects"
+                    role="tab"
+                  >
+                    <Icon aria-hidden="true" name="layout-grid" />
+                    Projects
+                  </button>
+                </>
+              )
+            }
+            <button aria-selected="false" data-value="sources" role="tab">
+              <Icon aria-hidden="true" name="database" />
+              Sources
+            </button>
+          </div>
 
-                    {attentionProjects.length > 0 ?
-                      (
-                        <ul class="attention-list">
-                          {attentionProjects.map(project => (
-                            <li>
-                              <span
-                                class:list={[
-                                  'health-dot',
-                                  `health-dot--${project.healthStatus}`
-                                ]}
-                              />
-                              <div>
-                                <strong>{project.name}</strong>
-                                <span>
-                                  {project.openIssues > 0 ?
-                                    `${project.openIssues} open issue${project.openIssues === 1 ? '' : 's'}` :
-                                    `Last push ${formatRelativeDate(project.pushedAt)}`}
-                                </span>
-                              </div>
-                              <ButtonLink
-                                ariaLabel={`Open ${project.name} on GitHub`}
-                                href={project.sources.github}
-                                newTab
-                                shape="icon"
-                                variant="ghost"
-                              >
-                                <Icon aria-hidden="true" name="arrow-up-right" />
-                              </ButtonLink>
-                            </li>
-                          ))}
-                        </ul>
-                      ) :
-                      (
-                        <Empty>
-                          <Icon aria-hidden="true" name="circle-check-big" />
-                          <p>No public projects need immediate attention.</p>
-                        </Empty>
-                      )}
-                  </Card>
-                </section>
+          <div
+            class="dashboard-tab-panel dashboard-tab-panel--pulse"
+            data-value="pulse"
+            role="tabpanel"
+          >
+            <section class="metric-grid" aria-label="Portfolio metrics">
+              <MetricCard
+                context={`${dashboard.summary.publicProjects} public repositories tracked`}
+                icon="circle-dot-dashed"
+                label="Active projects"
+                value={formatNumber(dashboard.summary.activeProjects)}
+              />
+              <MetricCard
+                context={`Exact completed-day total · ${rangeLabel}`}
+                icon="download"
+                label="Package downloads"
+                value={formatNumber(dashboard.npmAnalytics.totalDownloads)}
+              />
+              <MetricCard
+                context="Current authenticated 14-day repository traffic"
+                icon="eye"
+                label="GitHub views"
+                value={formatNumber(dashboard.summary.githubViews14d)}
+              />
+              <MetricCard
+                context={`Change in rolling download velocity · ${rangeLabel}`}
+                icon="activity"
+                label="Download momentum"
+                value={formatSignedNumber(
+                  dashboard.period.downloadVelocityChange
+                )}
+              />
+              <MetricCard
+                context={`Net portfolio change · ${rangeLabel}`}
+                icon="star"
+                label="Stars gained"
+                value={formatSignedNumber(dashboard.period.starsGained)}
+              />
+              <MetricCard
+                context={`${formatNumber(dashboard.summary.openIssues)} currently open · ${rangeLabel}`}
+                icon="circle-dot-dashed"
+                label="Issue change"
+                value={formatSignedNumber(dashboard.period.issueChange)}
+              />
+            </section>
+          </div>
 
-                <section
-                  aria-labelledby="history-heading"
-                  class="history-section"
-                >
-                  <div class="section-heading">
-                    <div>
-                      <span class="eyebrow">Momentum</span>
-                      <h2 id="history-heading">Growth over time</h2>
-                      <p>
-                        {rangeMeta.bucketLabel} points built from{' '}
-                        {formatNumber(dashboard.period.syncs)} persisted{' '}
-                        {dashboard.period.syncs === 1 ? 'sync' : 'syncs'}.
-                      </p>
-                    </div>
-                    <Badge
-                      variant={historyCoverage.isPartial ? 'warning' : 'outline'}
+          <div class="dashboard-tab-panel" data-value="sources" role="tabpanel">
+            <section class="source-section" aria-labelledby="sources-heading">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Data provenance</span>
+                  <h2 id="sources-heading">What Observatory reads</h2>
+                  <p>
+                    Every signal stays grouped by provider so totals never hide
+                    where the information came from.
+                  </p>
+                </div>
+              </div>
+              <div class="source-grid">
+                <Card class="source-card">
+                  <span class="source-card__icon"><Icon aria-hidden="true" name="git-fork" />
+                  </span>
+                  <div>
+                    <h3>GitHub</h3>
+                    <p>
+                      Repositories, stars, forks, issues, pushes, and
+                      authenticated 14-day traffic.
+                    </p>
+                    <a
+                      href="https://docs.github.com/en/rest"
+                      rel="noreferrer"
+                      target="_blank"
                     >
-                      {historyCoverage.label}
-                    </Badge>
+                      GitHub REST API
+                      <Icon aria-hidden="true" name="arrow-up-right" />
+                    </a>
                   </div>
+                </Card>
+                <Card class="source-card">
+                  <span class="source-card__icon">
+                    <Icon aria-hidden="true" name="package" />
+                  </span>
+                  <div>
+                    <h3>npm</h3>
+                    <p>
+                      Exact daily package downloads and the latest published
+                      version for every discovered package.
+                    </p>
+                    <a
+                      href="https://github.com/npm/registry/blob/main/docs/download-counts.md"
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      npm downloads API
+                      <Icon aria-hidden="true" name="arrow-up-right" />
+                    </a>
+                  </div>
+                </Card>
+                <Card class="source-card">
+                  <span class="source-card__icon">
+                    <Icon aria-hidden="true" name="monitor" />
+                  </span>
+                  <div>
+                    <h3>VS Code</h3>
+                    <p>
+                      Marketplace downloads, current installs, versions,
+                      ratings, updates, and publish activity.
+                    </p>
+                    <a
+                      href="https://marketplace.visualstudio.com/publishers/Santi020k"
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      VS Code Marketplace
+                      <Icon aria-hidden="true" name="arrow-up-right" />
+                    </a>
+                  </div>
+                </Card>
+                <Card class="source-card">
+                  <span class="source-card__icon">
+                    <Icon aria-hidden="true" name="blocks" />
+                  </span>
+                  <div>
+                    <h3>Open VSX</h3>
+                    <p>
+                      Registry downloads, versions, ratings, reviews, and
+                      publish activity for open editor ecosystems.
+                    </p>
+                    <a
+                      href="https://open-vsx.org/namespace/santi020k"
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Open VSX Registry
+                      <Icon aria-hidden="true" name="arrow-up-right" />
+                    </a>
+                  </div>
+                </Card>
+                <Card class="source-card">
+                  <span class="source-card__icon">
+                    <Icon aria-hidden="true" name="globe" />
+                  </span>
+                  <div>
+                    <h3>Website</h3>
+                    <p>
+                      Cloudflare Web Analytics page views and visits, kept
+                      separate from direct uptime and response-time probes.
+                    </p>
+                    <a
+                      href="https://developers.cloudflare.com/analytics/graphql-api/"
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Cloudflare Analytics
+                      <Icon aria-hidden="true" name="arrow-up-right" />
+                    </a>
+                  </div>
+                </Card>
+              </div>
+            </section>
+          </div>
 
-                  {dashboard.history.length > 1 ?
-                    (
-                      <div class="momentum-grid">
-                        <Card
-                          as="section"
-                          class="panel history-panel"
-                          aria-labelledby="download-history-heading"
-                        >
-                          <div class="panel-heading">
-                            <div>
-                              <span class="eyebrow">Usage</span>
-                              <h3 id="download-history-heading">
-                                Download velocity
-                              </h3>
-                            </div>
-                            <span>
-                              {formatSignedNumber(
-                                dashboard.period.downloadVelocityChange
-                              )}
-                            </span>
+          {
+            dashboard.projects.length === 0 ?
+              (
+                <Empty class="first-sync">
+                  <span class="empty-icon">
+                    <Icon aria-hidden="true" name="telescope" />
+                  </span>
+                  <h2>Your catalog is ready for first light</h2>
+                  <p>
+                    Run the first sync to collect GitHub, npm, and website health
+                    metrics.
+                  </p>
+                  <button
+                    class="ui-button ui-button--default"
+                    data-sync-button
+                    type="button"
+                  >
+                    Sync public projects
+                  </button>
+                </Empty>
+              ) :
+              (
+                <>
+                  <div
+                    class="dashboard-tab-panel"
+                    data-value="focus"
+                    role="tabpanel"
+                  >
+                    <section class="insight-grid">
+                      <Card
+                        as="section"
+                        class="panel reach-panel"
+                        aria-labelledby="reach-heading"
+                      >
+                        <div class="panel-heading">
+                          <div>
+                            <span class="eyebrow">Reach</span>
+                            <h2 id="reach-heading">Package downloads</h2>
                           </div>
-                          <LineChart
-                            area
-                            markers={dashboard.history.length <= 24}
-                            aria-label={`Portfolio download velocity for ${rangeLabel}`}
-                            caption={`Rolling 30-day npm downloads observed during ${rangeLabel}.`}
-                            series={portfolioHistorySeries}
-                          />
-                        </Card>
+                          <span>{rangeLabel}</span>
+                        </div>
 
-                        <Card
-                          as="section"
-                          class="panel history-panel"
-                          aria-labelledby="star-history-heading"
-                        >
-                          <div class="panel-heading">
-                            <div>
-                              <span class="eyebrow">Adoption</span>
-                              <h3 id="star-history-heading">Portfolio stars</h3>
-                            </div>
-                            <span>
-                              {formatSignedNumber(dashboard.period.starsGained)}
-                            </span>
-                          </div>
-                          <LineChart
-                            markers={dashboard.history.length <= 24}
-                            aria-label={`Portfolio star growth for ${rangeLabel}`}
-                            caption={`Total GitHub stars across enabled public projects during ${rangeLabel}.`}
-                            series={portfolioStarsSeries}
-                          />
-                        </Card>
-                      </div>
-                    ) :
-                    (
-                      <Card class="panel history-empty">
-                        <Empty>
-                          <p>
-                            Run another sync to establish a trend. Every successful
-                            sync is stored in D1 and becomes part of this range.
-                          </p>
-                        </Empty>
+                        {chartProjects.length > 0 ?
+                          (
+                            <BarChart
+                              aria-label={`Package downloads by project for ${rangeLabel}`}
+                              caption={`Exact npm downloads aggregated by project for ${rangeLabel}.`}
+                              orientation="horizontal"
+                              series={projectDownloadSeries}
+                            />
+                          ) :
+                          (
+                            <Empty>
+                              <p>No mapped npm package has download data yet.</p>
+                            </Empty>
+                          )}
                       </Card>
-                    )}
-                </section>
 
-                <section
-                  class="portfolio-section"
-                  aria-labelledby="portfolio-heading"
-                  id="portfolio"
-                >
-                  <div class="section-heading">
-                    <div>
-                      <span class="eyebrow">Public portfolio</span>
-                      <h2 id="portfolio-heading">
-                        Every published and open-source project
-                      </h2>
-                      <p>
-                        Automatically discovered from GitHub, with product
-                        metadata layered on top.
-                      </p>
-                    </div>
-                    <div
-                      class="category-summary"
-                      aria-label="Projects by category"
-                    >
-                      {Object.entries(categoryCounts).map(([category, count]) => (
-                        <span>
-                          <strong>{count}</strong> {category}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div class="portfolio-toolbar" aria-label="Project filters">
-                    <div class="portfolio-search">
-                      <label class="sr-only" for="project-search">
-                        Search projects
-                      </label>
-                      <SearchField
-                        id="project-search"
-                        autocomplete="off"
-                        data-project-search
-                        placeholder="Search projects…"
-                      />
-                    </div>
-                    <div class="portfolio-selects">
-                      <label class="sr-only" for="project-category">
-                        Filter by category
-                      </label>
-                      <NativeSelect
-                        id="project-category"
-                        data-project-category
-                        options={[
-                          { label: 'All categories', value: 'all' },
-                          { label: 'Apps', value: 'app' },
-                          { label: 'Content', value: 'content' },
-                          { label: 'Libraries', value: 'library' },
-                          { label: 'Tools', value: 'tool' }
-                        ]}
-                        size="sm"
-                      />
-                      <label class="sr-only" for="project-status">
-                        Filter by status
-                      </label>
-                      <NativeSelect
-                        id="project-status"
-                        data-project-status
-                        options={[
-                          { label: 'All statuses', value: 'all' },
-                          { label: 'Active', value: 'active' },
-                          { label: 'Maintained', value: 'maintained' },
-                          { label: 'Paused', value: 'paused' },
-                          { label: 'Archived', value: 'archived' }
-                        ]}
-                        size="sm"
-                      />
-                      <label class="sr-only" for="project-sort">
-                        Sort projects
-                      </label>
-                      <NativeSelect
-                        id="project-sort"
-                        data-project-sort
-                        options={[
-                          { label: 'Most relevant', value: 'relevance' },
-                          { label: 'Most downloads', value: 'downloads' },
-                          { label: 'Most stars', value: 'stars' },
-                          { label: 'Recently updated', value: 'updated' },
-                          { label: 'Name', value: 'name' }
-                        ]}
-                        size="sm"
-                      />
-                      <Button
-                        data-project-clear
-                        size="sm"
-                        type="button"
-                        variant="ghost"
+                      <Card
+                        as="section"
+                        class="panel attention-panel"
+                        aria-labelledby="attention-heading"
                       >
-                        Clear
-                      </Button>
-                    </div>
-                    <span
-                      aria-live="polite"
-                      class="portfolio-result-count"
-                      data-project-result-count
-                    >
-                      {dashboard.projects.length} projects
-                    </span>
-                  </div>
-
-                  <Table
-                    aria-label="Project catalog. Scroll horizontally to see all columns."
-                    role="region"
-                    tabindex="0"
-                  >
-                    <table>
-                      <thead>
-                        <tr>
-                          <th scope="col">Project</th>
-                          <th scope="col">Status</th>
-                          <th scope="col">Reach</th>
-                          <th scope="col">Maintenance</th>
-                          <th scope="col">Health</th>
-                          <th scope="col">Last push</th>
-                          <th scope="col">
-                            <span class="sr-only">Open</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody data-project-rows>
-                        {dashboard.projects.map(project => (
-                          <tr
-                            data-project-category={project.category}
-                            data-project-downloads={project.npmDownloads30d}
-                            data-project-name={project.name.toLocaleLowerCase()}
-                            data-project-relevance={project.relevanceScore}
-                            data-project-stars={project.stars}
-                            data-project-status={project.status}
-                            data-project-updated={
-                              project.pushedAt ? Date.parse(project.pushedAt) : 0
+                        <div class="panel-heading">
+                          <div>
+                            <span class="eyebrow">Focus</span>
+                            <h2 id="attention-heading">Attention queue</h2>
+                          </div>
+                          <Badge
+                            variant={
+                              attentionProjects.length > 0 ? 'warning' : 'success'
                             }
                           >
-                            <td>
-                              <div class="project-cell">
-                                <span class="project-icon">
-                                  <Icon
-                                    aria-hidden="true"
-                                    name={getCategoryIcon(project.category)}
+                            {attentionProjects.length} signals
+                          </Badge>
+                        </div>
+
+                        {attentionProjects.length > 0 ?
+                          (
+                            <ul class="attention-list">
+                              {attentionProjects.map(project => (
+                                <li>
+                                  <span
+                                    class:list={[
+                                      'health-dot',
+                                      `health-dot--${project.healthStatus}`
+                                    ]}
                                   />
-                                </span>
+                                  <div>
+                                    <strong>{project.name}</strong>
+                                    <span>
+                                      {project.openIssues > 0 ?
+                                        `${project.openIssues} open issue${project.openIssues === 1 ? '' : 's'}` :
+                                        `Last push ${formatRelativeDate(project.pushedAt)}`}
+                                    </span>
+                                  </div>
+                                  <ButtonLink
+                                    ariaLabel={`Open ${project.name} on GitHub`}
+                                    href={project.sources.github}
+                                    newTab
+                                    shape="icon"
+                                    variant="ghost"
+                                  >
+                                    <Icon
+                                      aria-hidden="true"
+                                      name="arrow-up-right"
+                                    />
+                                  </ButtonLink>
+                                </li>
+                              ))}
+                            </ul>
+                          ) :
+                          (
+                            <Empty>
+                              <Icon aria-hidden="true" name="circle-check-big" />
+                              <p>No public projects need immediate attention.</p>
+                            </Empty>
+                          )}
+                      </Card>
+                    </section>
+                  </div>
+
+                  <div
+                    class="dashboard-tab-panel dashboard-tab-panel--extensions"
+                    data-value="extensions"
+                    role="tabpanel"
+                  >
+                    <section
+                      aria-labelledby="open-vsx-analytics-heading"
+                      class="vscode-analytics-section"
+                    >
+                      <div class="section-heading">
+                        <div>
+                          <span class="eyebrow">Open editor adoption</span>
+                          <h2 id="open-vsx-analytics-heading">
+                            Open VSX analytics
+                          </h2>
+                          <p>
+                            Registry reach for VSCodium, Eclipse Theia, Gitpod,
+                            and other editors that consume the Open VSX ecosystem.
+                          </p>
+                        </div>
+                        <div class="section-source">
+                          <Badge
+                            variant={
+                              dashboard.openVsxAnalytics.extensions.length > 0 ?
+                                'outline' :
+                                'warning'
+                            }
+                          >
+                            {openVsxAvailableRangeLabel}
+                          </Badge>
+                          <a
+                            href="https://open-vsx.org/namespace/santi020k"
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            Source: Open VSX Registry
+                            <Icon aria-hidden="true" name="arrow-up-right" />
+                          </a>
+                        </div>
+                      </div>
+
+                      {dashboard.openVsxAnalytics.extensions.length > 0 ?
+                        (
+                          <>
+                            <dl class="npm-summary-grid vscode-summary-grid">
+                              <div>
+                                <dt>Cumulative downloads</dt>
+                                <dd>
+                                  {formatNumber(
+                                    dashboard.openVsxAnalytics.totalDownloads
+                                  )}
+                                </dd>
+                                <small>Open VSX total</small>
+                              </div>
+                              <div>
+                                <dt>Extensions</dt>
+                                <dd>
+                                  {formatNumber(
+                                    dashboard.openVsxAnalytics.extensions.length
+                                  )}
+                                </dd>
+                                <small>Mapped registry entries</small>
+                              </div>
+                              <div>
+                                <dt>Reviews</dt>
+                                <dd>
+                                  {formatNumber(
+                                    dashboard.openVsxAnalytics.extensions.reduce(
+                                      (total, extension) => total + extension.reviewCount, 0
+                                    )
+                                  )}
+                                </dd>
+                                <small>Registry reviews</small>
+                              </div>
+                            </dl>
+
+                            {dashboard.openVsxAnalytics.history.length > 1 && (
+                              <Card
+                                as="section"
+                                class="panel vscode-history-panel"
+                                aria-labelledby="open-vsx-history-heading"
+                              >
+                                <div class="panel-heading">
+                                  <div>
+                                    <span class="eyebrow">Observed growth</span>
+                                    <h3 id="open-vsx-history-heading">
+                                      Open VSX reach
+                                    </h3>
+                                  </div>
+                                  <span>{rangeLabel}</span>
+                                </div>
+                                <LineChart
+                                  markers={
+                                    dashboard.openVsxAnalytics.history.length <= 24
+                                  }
+                                  aria-label={`Open VSX downloads for ${rangeLabel}`}
+                                  caption="Cumulative Open VSX downloads captured at each successful Observatory sync."
+                                  series={openVsxHistorySeries}
+                                />
+                              </Card>
+                            )}
+
+                            <Card
+                              as="section"
+                              class="vscode-extension-panel"
+                              aria-labelledby="open-vsx-extensions-heading"
+                            >
+                              <div class="npm-package-heading">
+                                <div>
+                                  <span class="eyebrow">Extension ranking</span>
+                                  <h3 id="open-vsx-extensions-heading">
+                                    Open VSX extensions
+                                  </h3>
+                                </div>
+                                <Badge variant="secondary">Registry snapshot</Badge>
+                              </div>
+                              <Table class="vscode-extension-table">
+                                <table>
+                                  <caption class="sr-only">
+                                    Open VSX extension analytics
+                                  </caption>
+                                  <thead>
+                                    <tr>
+                                      <th scope="col">Extension</th>
+                                      <th scope="col">Version</th>
+                                      <th scope="col">Downloads</th>
+                                      <th scope="col">Rating</th>
+                                      <th scope="col">Reviews</th>
+                                      <th scope="col">Updated</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {dashboard.openVsxAnalytics.extensions.map(
+                                      extension => (
+                                        <tr>
+                                          <td>
+                                            <a
+                                              class="npm-package-link"
+                                              href={getOpenVsxUrl(
+                                                extension.extensionId
+                                              )}
+                                              rel="noreferrer"
+                                              target="_blank"
+                                            >
+                                              {projectNameBySlug.get(
+                                                extension.slug
+                                              ) ?? extension.extensionId}
+                                              <Icon
+                                                aria-hidden="true"
+                                                name="arrow-up-right"
+                                              />
+                                            </a>
+                                            <small>{extension.extensionId}</small>
+                                          </td>
+                                          <td>{extension.version}</td>
+                                          <td>
+                                            <strong>
+                                              {formatNumber(extension.downloads)}
+                                            </strong>
+                                          </td>
+                                          <td>
+                                            {extension.rating === null ?
+                                              '—' :
+                                              extension.rating.toFixed(1)}
+                                          </td>
+                                          <td>
+                                            {formatNumber(extension.reviewCount)}
+                                          </td>
+                                          <td>
+                                            {formatRelativeDate(
+                                              extension.lastUpdated
+                                            )}
+                                          </td>
+                                        </tr>
+                                      )
+                                    )}
+                                  </tbody>
+                                </table>
+                              </Table>
+                            </Card>
+                          </>
+                        ) :
+                        (
+                          <Card class="panel npm-analytics-empty">
+                            <Empty>
+                              <span class="empty-icon">
+                                <Icon aria-hidden="true" name="blocks" />
+                              </span>
+                              <h3>Open VSX data starts with the next sync</h3>
+                              <p>
+                                Observatory will collect the mapped Open VSX
+                                extensions and keep their history independent.
+                              </p>
+                            </Empty>
+                          </Card>
+                        )}
+                    </section>
+
+                    <section
+                      aria-labelledby="vscode-analytics-heading"
+                      class="vscode-analytics-section"
+                    >
+                      <div class="section-heading">
+                        <div>
+                          <span class="eyebrow">VS Code adoption</span>
+                          <h2 id="vscode-analytics-heading">
+                            Extension analytics
+                          </h2>
+                          <p>
+                            Cumulative reach and live installs reported by the
+                            Visual Studio Marketplace, snapshotted on every sync.
+                          </p>
+                        </div>
+                        <div class="section-source">
+                          <Badge
+                            variant={
+                              dashboard.vscodeAnalytics.extensions.length > 0 ?
+                                'outline' :
+                                'warning'
+                            }
+                          >
+                            {vscodeAvailableRangeLabel}
+                          </Badge>
+                          <a
+                            href="https://marketplace.visualstudio.com/publishers/Santi020k"
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            Source: VS Code Marketplace
+                            <Icon aria-hidden="true" name="arrow-up-right" />
+                          </a>
+                        </div>
+                      </div>
+
+                      {dashboard.vscodeAnalytics.extensions.length > 0 ?
+                        (
+                          <>
+                            <dl class="npm-summary-grid vscode-summary-grid">
+                              <div>
+                                <dt>Cumulative downloads</dt>
+                                <dd>
+                                  {formatNumber(
+                                    dashboard.vscodeAnalytics.totalDownloads
+                                  )}
+                                </dd>
+                                <small>Marketplace total</small>
+                              </div>
+                              <div>
+                                <dt>Current installs</dt>
+                                <dd>
+                                  {formatNumber(
+                                    dashboard.vscodeAnalytics.totalInstalls
+                                  )}
+                                </dd>
+                                <small>Reported installed base</small>
+                              </div>
+                              <div>
+                                <dt>Extensions</dt>
+                                <dd>
+                                  {formatNumber(
+                                    dashboard.vscodeAnalytics.extensions.length
+                                  )}
+                                </dd>
+                                <small>Mapped to Observatory projects</small>
+                              </div>
+                            </dl>
+
+                            {dashboard.vscodeAnalytics.history.length > 1 && (
+                              <Card
+                                as="section"
+                                class="panel vscode-history-panel"
+                                aria-labelledby="vscode-history-heading"
+                              >
+                                <div class="panel-heading">
+                                  <div>
+                                    <span class="eyebrow">Observed growth</span>
+                                    <h3 id="vscode-history-heading">
+                                      Marketplace reach
+                                    </h3>
+                                  </div>
+                                  <span>{rangeLabel}</span>
+                                </div>
+                                <LineChart
+                                  markers={
+                                    dashboard.vscodeAnalytics.history.length <= 24
+                                  }
+                                  aria-label={`VS Code Marketplace downloads and installs for ${rangeLabel}`}
+                                  caption="Cumulative Marketplace values captured at each successful Observatory sync."
+                                  series={vscodeHistorySeries}
+                                />
+                              </Card>
+                            )}
+
+                            <Card
+                              as="section"
+                              class="vscode-extension-panel"
+                              aria-labelledby="vscode-extensions-heading"
+                            >
+                              <div class="npm-package-heading">
+                                <div>
+                                  <span class="eyebrow">Extension ranking</span>
+                                  <h3 id="vscode-extensions-heading">
+                                    Marketplace extensions
+                                  </h3>
+                                </div>
+                                <Badge variant="secondary">Live snapshot</Badge>
+                              </div>
+                              <Table class="vscode-extension-table">
+                                <table>
+                                  <caption class="sr-only">
+                                    VS Code Marketplace extension analytics
+                                  </caption>
+                                  <thead>
+                                    <tr>
+                                      <th scope="col">Extension</th>
+                                      <th scope="col">Version</th>
+                                      <th scope="col">Downloads</th>
+                                      <th scope="col">Installs</th>
+                                      <th scope="col">Rating</th>
+                                      <th scope="col">Updated</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {dashboard.vscodeAnalytics.extensions.map(
+                                      extension => (
+                                        <tr>
+                                          <td>
+                                            <a
+                                              class="npm-package-link"
+                                              href={
+                                                'https://marketplace.visualstudio.com/items?itemName=' +
+                                                extension.extensionId
+                                              }
+                                              rel="noreferrer"
+                                              target="_blank"
+                                            >
+                                              {projectNameBySlug.get(
+                                                extension.slug
+                                              ) ?? extension.extensionId}
+                                              <Icon
+                                                aria-hidden="true"
+                                                name="arrow-up-right"
+                                              />
+                                            </a>
+                                            <small>{extension.extensionId}</small>
+                                          </td>
+                                          <td>{extension.version}</td>
+                                          <td>
+                                            <strong>
+                                              {formatNumber(extension.downloads)}
+                                            </strong>
+                                          </td>
+                                          <td>
+                                            {formatNumber(extension.installs)}
+                                          </td>
+                                          <td>
+                                            {extension.rating === null ?
+                                              '—' :
+                                              extension.rating.toFixed(1)}
+                                          </td>
+                                          <td>
+                                            {formatRelativeDate(
+                                              extension.lastUpdated
+                                            )}
+                                          </td>
+                                        </tr>
+                                      )
+                                    )}
+                                  </tbody>
+                                </table>
+                              </Table>
+                            </Card>
+                          </>
+                        ) :
+                        (
+                          <Card class="panel npm-analytics-empty">
+                            <Empty>
+                              <span class="empty-icon">
+                                <Icon aria-hidden="true" name="monitor" />
+                              </span>
+                              <h3>Marketplace data starts with the next sync</h3>
+                              <p>
+                                Observatory will collect the three mapped VS Code
+                                extensions and begin a source-specific history.
+                              </p>
+                            </Empty>
+                          </Card>
+                        )}
+                    </section>
+                  </div>
+
+                  <div
+                    class="dashboard-tab-panel"
+                    data-value="packages"
+                    role="tabpanel"
+                  >
+                    <section
+                      aria-labelledby="npm-analytics-heading"
+                      class="npm-analytics-section"
+                    >
+                      <div class="section-heading">
+                        <div>
+                          <span class="eyebrow">npm adoption</span>
+                          <h2 id="npm-analytics-heading">Download analytics</h2>
+                          <p>
+                            Exact npm downloads, grouped at the cadence that best
+                            fits the selected range.
+                          </p>
+                        </div>
+                        <Badge
+                          variant={
+                            dashboard.npmAnalytics.daily.length > 0 ?
+                              'outline' :
+                              'warning'
+                          }
+                        >
+                          {npmAvailableRangeLabel}
+                        </Badge>
+                      </div>
+
+                      {dashboard.npmAnalytics.daily.length > 0 ?
+                        (
+                          <>
+                            <dl class="npm-summary-grid">
+                              <div>
+                                <dt>Total downloads</dt>
+                                <dd>
+                                  {formatNumber(
+                                    dashboard.npmAnalytics.totalDownloads
+                                  )}
+                                </dd>
+                                <small>{rangeLabel}</small>
+                              </div>
+                              <div>
+                                <dt>Daily average</dt>
+                                <dd>{formatNumber(npmAveragePerDay)}</dd>
+                                <small>Across completed days</small>
+                              </div>
+                              <div>
+                                <dt>Peak day</dt>
+                                <dd>{formatNumber(npmPeakDay?.downloads ?? 0)}</dd>
+                                <small>
+                                  {npmPeakDay ?
+                                    formatDate(npmPeakDay.periodStart) :
+                                    'No activity'}
+                                </small>
+                              </div>
+                              <div>
+                                <dt>Top package</dt>
+                                <dd>
+                                  {formatNumber(npmTopPackage?.downloads ?? 0)}
+                                </dd>
+                                <small>{npmTopPackage?.packageName ?? '—'}</small>
+                              </div>
+                            </dl>
+
+                            <Card
+                              as="section"
+                              class="panel npm-chart-panel"
+                              aria-labelledby="npm-range-chart-heading"
+                            >
+                              <div class="panel-heading">
+                                <div>
+                                  <span class="eyebrow">{rangeLabel}</span>
+                                  <h3 id="npm-range-chart-heading">
+                                    {npmChart.heading}
+                                  </h3>
+                                </div>
                                 <span>
-                                  <strong>
-                                    <a
-                                      class="project-link"
-                                      href={`/projects/${project.slug}/?range=${dashboard.range}`}
-                                    >
-                                      {project.name}
-                                    </a>
-                                  </strong>
-                                  <small>
-                                    {project.description ?? project.slug}
-                                  </small>
+                                  {formatNumber(npmChart.points.length)} points
                                 </span>
                               </div>
-                            </td>
-                            <td>
-                              <StatusBadge status={project.status} />
-                            </td>
-                            <td>
-                              <strong>
-                                {formatNumber(project.npmDownloads30d)}
-                              </strong>
-                              <small>
-                                npm / 30d · relevance {project.relevanceScore}
-                              </small>
-                            </td>
-                            <td>
-                              <strong>{project.openIssues} issues</strong>
-                              <small>
-                                {project.stars} stars · {project.forks} forks
-                              </small>
-                            </td>
-                            <td>
-                              <span
-                                class={`health-label health-label--${project.healthStatus}`}
-                              >
-                                <span class="health-dot" />
-                                {project.healthStatus}
-                              </span>
-                              <small>
-                                {formatDuration(project.responseTimeMs)}
-                              </small>
-                            </td>
-                            <td>
-                              <strong>
-                                {formatRelativeDate(project.pushedAt)}
-                              </strong>
-                              <small>{formatDate(project.pushedAt)}</small>
-                            </td>
-                            <td>
-                              <ButtonLink
-                                ariaLabel={`View ${project.name} dashboard`}
-                                href={`/projects/${project.slug}/?range=${dashboard.range}`}
-                                shape="icon"
-                                variant="ghost"
-                              >
-                                <Icon aria-hidden="true" name="arrow-right" />
-                              </ButtonLink>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </Table>
-                  <Card
-                    class="portfolio-filter-empty"
-                    data-project-filter-empty
-                    hidden
-                  >
-                    <Empty>
-                      <Icon aria-hidden="true" name="search-x" />
-                      <p>No projects match those filters.</p>
-                      <Button data-project-clear type="button" variant="outline">
-                        Clear filters
-                      </Button>
-                    </Empty>
-                  </Card>
-                </section>
-              </>
-            )
-        }
+                              <LineChart
+                                area
+                                markers={npmChart.points.length <= 31}
+                                aria-label={`${npmChart.heading} for ${rangeLabel}`}
+                                caption={npmChart.caption}
+                                series={npmChartSeries}
+                              />
+                            </Card>
 
+                            <Card
+                              as="section"
+                              class="npm-package-panel"
+                              aria-labelledby="npm-packages-heading"
+                            >
+                              <div class="npm-package-heading">
+                                <div>
+                                  <span class="eyebrow">Package ranking</span>
+                                  <h3 id="npm-packages-heading">
+                                    Downloads by package
+                                  </h3>
+                                </div>
+                                <Badge variant="secondary">
+                                  {formatNumber(
+                                    dashboard.npmAnalytics.packages.length
+                                  )}{' '}
+                                  packages
+                                </Badge>
+                              </div>
+                              <Table class="npm-package-table">
+                                <table>
+                                  <caption class="sr-only">
+                                    npm package downloads for {rangeLabel}
+                                  </caption>
+                                  <thead>
+                                    <tr>
+                                      <th scope="col">Package</th>
+                                      <th scope="col">Project</th>
+                                      <th scope="col">Share</th>
+                                      <th scope="col">Downloads</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {dashboard.npmAnalytics.packages.map(
+                                      packageDownloads => (
+                                        <tr>
+                                          <td>
+                                            <a
+                                              class="npm-package-link"
+                                              href={`https://www.npmjs.com/package/${packageDownloads.packageName}`}
+                                              rel="noreferrer"
+                                              target="_blank"
+                                            >
+                                              {packageDownloads.packageName}
+                                              <Icon
+                                                aria-hidden="true"
+                                                name="arrow-up-right"
+                                              />
+                                            </a>
+                                          </td>
+                                          <td>
+                                            {projectNameBySlug.has(
+                                              packageDownloads.slug
+                                            ) ?
+                                              (
+                                                <a
+                                                  class="project-link"
+                                                  href={`/projects/${packageDownloads.slug}/?range=${dashboard.range}`}
+                                                >
+                                                  {projectNameBySlug.get(
+                                                    packageDownloads.slug
+                                                  )}
+                                                </a>
+                                              ) :
+                                              (
+                                                <span>{packageDownloads.slug}</span>
+                                              )}
+                                          </td>
+                                          <td>
+                                            {formatDownloadShare(
+                                              packageDownloads.downloads, dashboard.npmAnalytics.totalDownloads
+                                            )}
+                                          </td>
+                                          <td>
+                                            <strong>
+                                              {formatNumber(
+                                                packageDownloads.downloads
+                                              )}
+                                            </strong>
+                                          </td>
+                                        </tr>
+                                      )
+                                    )}
+                                  </tbody>
+                                  <tfoot>
+                                    <tr>
+                                      <th colspan={3} scope="row">
+                                        Total
+                                      </th>
+                                      <td>
+                                        <strong>
+                                          {formatNumber(
+                                            dashboard.npmAnalytics.totalDownloads
+                                          )}
+                                        </strong>
+                                      </td>
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              </Table>
+                            </Card>
+                          </>
+                        ) :
+                        (
+                          <Card class="panel npm-analytics-empty">
+                            <Empty>
+                              <span class="empty-icon">
+                                <Icon
+                                  aria-hidden="true"
+                                  name="chart-no-axes-column"
+                                />
+                              </span>
+                              <h3>Download history starts with the next sync</h3>
+                              <p>
+                                Observatory will backfill up to one year of daily
+                                npm data, then keep it current with every
+                                public-project sync.
+                              </p>
+                            </Empty>
+                          </Card>
+                        )}
+                    </section>
+                  </div>
+
+                  <div
+                    class="dashboard-tab-panel"
+                    data-value="momentum"
+                    role="tabpanel"
+                  >
+                    <section
+                      aria-labelledby="history-heading"
+                      class="history-section"
+                    >
+                      <div class="section-heading">
+                        <div>
+                          <span class="eyebrow">Momentum</span>
+                          <h2 id="history-heading">Growth over time</h2>
+                          <p>
+                            {rangeMeta.bucketLabel} points built from{' '}
+                            {formatNumber(dashboard.period.syncs)} persisted{' '}
+                            {dashboard.period.syncs === 1 ? 'sync' : 'syncs'}.
+                          </p>
+                        </div>
+                        <Badge
+                          variant={
+                            historyCoverage.isPartial ? 'warning' : 'outline'
+                          }
+                        >
+                          {historyCoverage.label}
+                        </Badge>
+                      </div>
+
+                      {dashboard.history.length > 1 ?
+                        (
+                          <div class="momentum-grid">
+                            <Card
+                              as="section"
+                              class="panel history-panel"
+                              aria-labelledby="download-history-heading"
+                            >
+                              <div class="panel-heading">
+                                <div>
+                                  <span class="eyebrow">Usage</span>
+                                  <h3 id="download-history-heading">
+                                    Download velocity
+                                  </h3>
+                                </div>
+                                <span>
+                                  {formatSignedNumber(
+                                    dashboard.period.downloadVelocityChange
+                                  )}
+                                </span>
+                              </div>
+                              <LineChart
+                                area
+                                markers={dashboard.history.length <= 24}
+                                aria-label={`Portfolio download velocity for ${rangeLabel}`}
+                                caption={`Rolling 30-day npm downloads observed during ${rangeLabel}.`}
+                                series={portfolioHistorySeries}
+                              />
+                            </Card>
+
+                            <Card
+                              as="section"
+                              class="panel history-panel"
+                              aria-labelledby="star-history-heading"
+                            >
+                              <div class="panel-heading">
+                                <div>
+                                  <span class="eyebrow">Adoption</span>
+                                  <h3 id="star-history-heading">Portfolio stars</h3>
+                                </div>
+                                <span>
+                                  {formatSignedNumber(dashboard.period.starsGained)}
+                                </span>
+                              </div>
+                              <LineChart
+                                markers={dashboard.history.length <= 24}
+                                aria-label={`Portfolio star growth for ${rangeLabel}`}
+                                caption={`Total GitHub stars across enabled public projects during ${rangeLabel}.`}
+                                series={portfolioStarsSeries}
+                              />
+                            </Card>
+                          </div>
+                        ) :
+                        (
+                          <Card class="panel history-empty">
+                            <Empty>
+                              <p>
+                                Run another sync to establish a trend. Every
+                                successful sync is stored in D1 and becomes part of
+                                this range.
+                              </p>
+                            </Empty>
+                          </Card>
+                        )}
+                    </section>
+                  </div>
+
+                  <div
+                    class="dashboard-tab-panel"
+                    data-value="projects"
+                    role="tabpanel"
+                  >
+                    <section
+                      class="portfolio-section"
+                      aria-labelledby="portfolio-heading"
+                      id="portfolio"
+                    >
+                      <div class="section-heading">
+                        <div>
+                          <span class="eyebrow">Public portfolio</span>
+                          <h2 id="portfolio-heading">
+                            Every published and open-source project
+                          </h2>
+                          <p>
+                            Automatically discovered from GitHub, with product
+                            metadata layered on top.
+                          </p>
+                        </div>
+                        <div
+                          class="category-summary"
+                          aria-label="Projects by category"
+                        >
+                          {Object.entries(categoryCounts).map(
+                            ([category, count]) => (
+                              <span>
+                                <strong>{count}</strong> {category}
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      <div class="portfolio-toolbar" aria-label="Project filters">
+                        <div class="portfolio-search">
+                          <label class="sr-only" for="project-search">
+                            Search projects
+                          </label>
+                          <SearchField
+                            id="project-search"
+                            autocomplete="off"
+                            data-project-search
+                            placeholder="Search projects…"
+                          />
+                        </div>
+                        <div class="portfolio-selects">
+                          <label class="sr-only" for="project-category">
+                            Filter by category
+                          </label>
+                          <NativeSelect
+                            id="project-category"
+                            data-project-category
+                            options={[
+                              { label: 'All categories', value: 'all' },
+                              { label: 'Apps', value: 'app' },
+                              { label: 'Content', value: 'content' },
+                              { label: 'Libraries', value: 'library' },
+                              { label: 'Tools', value: 'tool' }
+                            ]}
+                            size="sm"
+                          />
+                          <label class="sr-only" for="project-status">
+                            Filter by status
+                          </label>
+                          <NativeSelect
+                            id="project-status"
+                            data-project-status
+                            options={[
+                              { label: 'All statuses', value: 'all' },
+                              { label: 'Active', value: 'active' },
+                              { label: 'Maintained', value: 'maintained' },
+                              { label: 'Paused', value: 'paused' },
+                              { label: 'Archived', value: 'archived' }
+                            ]}
+                            size="sm"
+                          />
+                          <label class="sr-only" for="project-sort">
+                            Sort projects
+                          </label>
+                          <NativeSelect
+                            id="project-sort"
+                            data-project-sort
+                            options={[
+                              { label: 'Most relevant', value: 'relevance' },
+                              { label: 'Most downloads', value: 'downloads' },
+                              { label: 'Most stars', value: 'stars' },
+                              { label: 'Recently updated', value: 'updated' },
+                              { label: 'Name', value: 'name' }
+                            ]}
+                            size="sm"
+                          />
+                          <Button
+                            data-project-clear
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                        <span
+                          aria-live="polite"
+                          class="portfolio-result-count"
+                          data-project-result-count
+                        >
+                          {dashboard.projects.length} projects
+                        </span>
+                      </div>
+
+                      <Table
+                        aria-label="Project catalog. Scroll horizontally to see all columns."
+                        class="portfolio-table"
+                        role="region"
+                        tabindex="0"
+                      >
+                        <table>
+                          <thead>
+                            <tr>
+                              <th scope="col">Project</th>
+                              <th scope="col">Status</th>
+                              <th scope="col">Reach</th>
+                              <th scope="col">Maintenance</th>
+                              <th scope="col">Health</th>
+                              <th scope="col">Last push</th>
+                              <th scope="col">
+                                <span class="sr-only">Open</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody data-project-rows>
+                            {dashboard.projects.map(project => (
+                              <tr
+                                data-project-category={project.category}
+                                data-project-downloads={project.npmDownloads30d}
+                                data-project-name={project.name.toLocaleLowerCase()}
+                                data-project-relevance={project.relevanceScore}
+                                data-project-stars={project.stars}
+                                data-project-status={project.status}
+                                data-project-updated={
+                                  project.pushedAt ?
+                                    Date.parse(project.pushedAt) :
+                                    0
+                                }
+                              >
+                                <td>
+                                  <div class="project-cell">
+                                    <span class="project-icon">
+                                      <Icon
+                                        aria-hidden="true"
+                                        name={getCategoryIcon(project.category)}
+                                      />
+                                    </span>
+                                    <span>
+                                      <strong>
+                                        <a
+                                          class="project-link"
+                                          href={`/projects/${project.slug}/?range=${dashboard.range}`}
+                                        >
+                                          {project.name}
+                                        </a>
+                                      </strong>
+                                      <small>
+                                        {project.description ?? project.slug}
+                                      </small>
+                                    </span>
+                                  </div>
+                                </td>
+                                <td>
+                                  <StatusBadge status={project.status} />
+                                </td>
+                                <td>
+                                  <strong>
+                                    {formatNumber(project.npmDownloads30d)}
+                                  </strong>
+                                  <small>
+                                    npm / 30d · relevance {project.relevanceScore}
+                                  </small>
+                                </td>
+                                <td>
+                                  <strong>{project.openIssues} issues</strong>
+                                  <small>
+                                    {project.stars} stars · {project.forks} forks
+                                  </small>
+                                </td>
+                                <td>
+                                  <span
+                                    class={`health-label health-label--${project.healthStatus}`}
+                                  >
+                                    <span class="health-dot" />
+                                    {project.healthStatus}
+                                  </span>
+                                  <small>
+                                    {formatDuration(project.responseTimeMs)}
+                                  </small>
+                                </td>
+                                <td>
+                                  <strong>
+                                    {formatRelativeDate(project.pushedAt)}
+                                  </strong>
+                                  <small>{formatDate(project.pushedAt)}</small>
+                                </td>
+                                <td>
+                                  <ButtonLink
+                                    ariaLabel={`View ${project.name} dashboard`}
+                                    href={`/projects/${project.slug}/?range=${dashboard.range}`}
+                                    shape="icon"
+                                    variant="ghost"
+                                  >
+                                    <Icon aria-hidden="true" name="arrow-right" />
+                                  </ButtonLink>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </Table>
+                      <Card
+                        class="portfolio-filter-empty"
+                        data-project-filter-empty
+                        hidden
+                      >
+                        <Empty>
+                          <Icon aria-hidden="true" name="search-x" />
+                          <p>No projects match those filters.</p>
+                          <Button
+                            data-project-clear
+                            type="button"
+                            variant="outline"
+                          >
+                            Clear filters
+                          </Button>
+                        </Empty>
+                      </Card>
+                    </section>
+                  </div>
+                </>
+              )
+          }
+        </Tabs>
       </main>
 
       <footer class="app-footer">
@@ -660,163 +1607,160 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
 </AppLayout>
 
 <script>
-const search = document.querySelector<HTMLInputElement>(
-  '[data-project-search]'
+  const search = document.querySelector<HTMLInputElement>(
+    '[data-project-search]'
 )
 
-const category = document.querySelector<HTMLSelectElement>(
-  '[data-project-category]'
+  const category = document.querySelector<HTMLSelectElement>(
+    '[data-project-category]'
 )
 
-const status = document.querySelector<HTMLSelectElement>(
-  '[data-project-status]'
+  const status = document.querySelector<HTMLSelectElement>(
+    '[data-project-status]'
 )
 
-const sort = document.querySelector<HTMLSelectElement>('[data-project-sort]')
+  const sort = document.querySelector<HTMLSelectElement>('[data-project-sort]')
 
-const rowsContainer = document.querySelector<HTMLTableSectionElement>(
-  '[data-project-rows]'
+  const rowsContainer = document.querySelector<HTMLTableSectionElement>(
+    '[data-project-rows]'
 )
 
-const resultCount = document.querySelector<HTMLElement>(
-  '[data-project-result-count]'
+  const resultCount = document.querySelector<HTMLElement>(
+    '[data-project-result-count]'
 )
 
-const empty = document.querySelector<HTMLElement>(
-  '[data-project-filter-empty]'
+  const empty = document.querySelector<HTMLElement>(
+    '[data-project-filter-empty]'
 )
 
-const table = rowsContainer?.closest<HTMLElement>('[role="region"]')
+  const table = rowsContainer?.closest<HTMLElement>('[role="region"]')
 
-const rows = rowsContainer ?
+  const rows = rowsContainer ?
   [...rowsContainer.querySelectorAll<HTMLTableRowElement>('tr')] :
   []
 
-const numericSortValue = (
-  row: HTMLTableRowElement,
-  selectedSort: string
+  const numericSortValue = (
+    row: HTMLTableRowElement,
+    selectedSort: string
 ): number => {
-  switch (selectedSort) {
-    case 'downloads':
-      return Number(row.dataset.projectDownloads ?? 0)
+    switch (selectedSort) {
+      case 'downloads':
+        return Number(row.dataset.projectDownloads ?? 0)
 
-    case 'stars':
-      return Number(row.dataset.projectStars ?? 0)
+      case 'stars':
+        return Number(row.dataset.projectStars ?? 0)
 
-    case 'updated':
-      return Number(row.dataset.projectUpdated ?? 0)
+      case 'updated':
+        return Number(row.dataset.projectUpdated ?? 0)
 
-    default:
-      return Number(row.dataset.projectRelevance ?? 0)
+      default:
+        return Number(row.dataset.projectRelevance ?? 0)
+    }
   }
-}
 
-const compareProjectRows = (
-  left: HTMLTableRowElement,
-  right: HTMLTableRowElement,
-  selectedSort: string
+  const compareProjectRows = (
+    left: HTMLTableRowElement,
+    right: HTMLTableRowElement,
+    selectedSort: string
 ): number => {
-  if (selectedSort === 'name')
-    return (left.dataset.projectName ?? '').localeCompare(
-      right.dataset.projectName ?? ''
+    if (selectedSort === 'name')
+      return (left.dataset.projectName ?? '').localeCompare(
+        right.dataset.projectName ?? ''
     )
 
-  return (
-    numericSortValue(right, selectedSort) -
-    numericSortValue(left, selectedSort)
-  )
-}
+    return (
+      numericSortValue(right, selectedSort) -
+      numericSortValue(left, selectedSort)
+    )
+  }
 
-const rowMatchesFilters = (
-  row: HTMLTableRowElement,
-  query: string,
-  selectedCategory: string,
-  selectedStatus: string
+  const rowMatchesFilters = (
+    row: HTMLTableRowElement,
+    query: string,
+    selectedCategory: string,
+    selectedStatus: string
 ): boolean => {
-  const matchesQuery =
-    query.length === 0 ||
-    row.textContent?.toLocaleLowerCase().includes(query) === true
+    const matchesQuery =
+      query.length === 0 ||
+      row.textContent?.toLocaleLowerCase().includes(query) === true
 
-  const matchesCategory =
-    selectedCategory === 'all' ||
-    row.dataset.projectCategory === selectedCategory
+    const matchesCategory =
+      selectedCategory === 'all' ||
+      row.dataset.projectCategory === selectedCategory
 
-  const matchesStatus =
-    selectedStatus === 'all' || row.dataset.projectStatus === selectedStatus
+    const matchesStatus =
+      selectedStatus === 'all' || row.dataset.projectStatus === selectedStatus
 
-  return matchesQuery && matchesCategory && matchesStatus
-}
+    return matchesQuery && matchesCategory && matchesStatus
+  }
 
-const formatProjectCount = (count: number): string => `${count} project${count === 1 ? '' : 's'}`
+  const formatProjectCount = (count: number): string => `${count} project${count === 1 ? '' : 's'}`
 
-const readFilterValue = (
-  control: HTMLInputElement | HTMLSelectElement | null,
-  fallback: string
+  const readFilterValue = (
+    control: HTMLInputElement | HTMLSelectElement | null,
+    fallback: string
 ): string => control?.value ?? fallback
 
-const applyRowVisibility = (
-  row: HTMLTableRowElement,
-  isVisible: boolean
-) => {
-  row.hidden = !isVisible
+  const applyRowVisibility = (row: HTMLTableRowElement, isVisible: boolean) => {
+    row.hidden = !isVisible
 
-  rowsContainer?.append(row)
-}
-
-const updateFilterSummary = (visibleCount: number) => {
-  if (resultCount) resultCount.textContent = formatProjectCount(visibleCount)
-
-  table?.toggleAttribute('hidden', visibleCount === 0)
-
-  empty?.toggleAttribute('hidden', visibleCount > 0)
-}
-
-const updateProjects = () => {
-  const query = readFilterValue(search, '').trim().toLocaleLowerCase()
-  const selectedCategory = readFilterValue(category, 'all')
-  const selectedStatus = readFilterValue(status, 'all')
-  const selectedSort = readFilterValue(sort, 'relevance')
-
-  rows.sort((left, right) => compareProjectRows(left, right, selectedSort))
-
-  let visibleCount = 0
-
-  for (const row of rows) {
-    const isVisible = rowMatchesFilters(
-      row, query, selectedCategory, selectedStatus
-    )
-
-    if (isVisible) visibleCount += 1
-
-    applyRowVisibility(row, isVisible)
+    rowsContainer?.append(row)
   }
 
-  updateFilterSummary(visibleCount)
-}
+  const updateFilterSummary = (visibleCount: number) => {
+    if (resultCount) resultCount.textContent = formatProjectCount(visibleCount)
 
-search?.addEventListener('input', updateProjects)
+    table?.toggleAttribute('hidden', visibleCount === 0)
 
-category?.addEventListener('change', updateProjects)
+    empty?.toggleAttribute('hidden', visibleCount > 0)
+  }
 
-status?.addEventListener('change', updateProjects)
+  const updateProjects = () => {
+    const query = readFilterValue(search, '').trim().toLocaleLowerCase()
+    const selectedCategory = readFilterValue(category, 'all')
+    const selectedStatus = readFilterValue(status, 'all')
+    const selectedSort = readFilterValue(sort, 'relevance')
 
-sort?.addEventListener('change', updateProjects)
+    rows.sort((left, right) => compareProjectRows(left, right, selectedSort))
 
-for (const clear of document.querySelectorAll<HTMLButtonElement>(
-  '[data-project-clear]'
+    let visibleCount = 0
+
+    for (const row of rows) {
+      const isVisible = rowMatchesFilters(
+        row, query, selectedCategory, selectedStatus
+      )
+
+      if (isVisible) visibleCount += 1
+
+      applyRowVisibility(row, isVisible)
+    }
+
+    updateFilterSummary(visibleCount)
+  }
+
+  search?.addEventListener('input', updateProjects)
+
+  category?.addEventListener('change', updateProjects)
+
+  status?.addEventListener('change', updateProjects)
+
+  sort?.addEventListener('change', updateProjects)
+
+  for (const clear of document.querySelectorAll<HTMLButtonElement>(
+    '[data-project-clear]'
 )) {
-  clear.addEventListener('click', () => {
-    if (search) search.value = ''
+    clear.addEventListener('click', () => {
+      if (search) search.value = ''
 
-    if (category) category.value = 'all'
+      if (category) category.value = 'all'
 
-    if (status) status.value = 'all'
+      if (status) status.value = 'all'
 
-    if (sort) sort.value = 'relevance'
+      if (sort) sort.value = 'relevance'
 
-    updateProjects()
+      updateProjects()
 
-    search?.focus()
-  })
-}
+      search?.focus()
+    })
+  }
 </script>

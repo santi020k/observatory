@@ -6,6 +6,7 @@ export interface CatalogOverride {
   displayName: string
   npmPackages?: readonly string[]
   status: ProjectStatus
+  vscodeExtensions?: readonly string[]
 }
 
 export const githubOwner = 'santi020k'
@@ -20,13 +21,15 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
         '@santi020k/eslint-plugin-astro-doctor',
         '@santi020k/oxlint-config-astro-doctor'
       ],
-      status: 'active'
+      status: 'active',
+      vscodeExtensions: ['santi020k.vscode-astro-doctor']
     },
     'dep-beacon': {
       category: 'tool',
       displayName: 'Dep Beacon',
       npmPackages: ['@santi020k/dep-beacon-core'],
-      status: 'active'
+      status: 'active',
+      vscodeExtensions: ['santi020k.vscode-dep-beacon']
     },
     difftale: {
       category: 'tool',
@@ -59,11 +62,9 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
     'santi020k-theme': {
       category: 'library',
       displayName: 'Santi020k Theme',
-      npmPackages: [
-        '@santi020k/theme',
-        '@santi020k/theme-core'
-      ],
-      status: 'active'
+      npmPackages: ['@santi020k/theme', '@santi020k/theme-core'],
+      status: 'active',
+      vscodeExtensions: ['santi020k.santi020k-theme']
     },
     website: {
       category: 'content',
@@ -81,6 +82,22 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
 export const getCatalogOverride = (
   repository: string
 ): CatalogOverride | undefined => catalogOverrides.get(repository)
+
+interface VscodeExtensionMapping {
+  extensionId: string
+  slug: string
+}
+
+const toVscodeExtensionMappings = ([slug, project]: [
+  string,
+  CatalogOverride
+]): VscodeExtensionMapping[] => (project.vscodeExtensions ?? []).map(
+  extensionId => ({ extensionId, slug })
+)
+
+export const getVscodeExtensionMappings = (): VscodeExtensionMapping[] => Array
+  .from(catalogOverrides)
+  .flatMap(toVscodeExtensionMappings)
 
 export const titleFromSlug = (slug: string): string => slug
   .split('-')

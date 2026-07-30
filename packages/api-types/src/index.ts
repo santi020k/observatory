@@ -14,6 +14,8 @@ export const verifyCodeSchema = requestCodeSchema.extend({
 export const projectSourceSchema = z.object({
   github: z.string().trim(),
   npm: z.array(z.string().trim()).default([]),
+  openVsx: z.array(z.url()).default([]),
+  vscode: z.array(z.url()).default([]),
   website: z.url().nullable()
 })
 
@@ -98,10 +100,57 @@ export const npmAnalyticsSchema = z.object({
   yearly: z.array(npmDownloadPointSchema)
 })
 
+export const vscodeExtensionSchema = z.object({
+  downloads: z.int().nonnegative(),
+  extensionId: z.string().trim(),
+  installs: z.int().nonnegative(),
+  lastUpdated: z.string().trim(),
+  rating: z.number().nonnegative().nullable(),
+  slug: z.string().trim(),
+  updateCount: z.int().nonnegative(),
+  version: z.string().trim()
+})
+
+export const openVsxExtensionSchema = z.object({
+  downloads: z.int().nonnegative(),
+  extensionId: z.string().trim(),
+  lastUpdated: z.string().trim(),
+  rating: z.number().nonnegative().nullable(),
+  reviewCount: z.int().nonnegative(),
+  slug: z.string().trim(),
+  version: z.string().trim()
+})
+
+export const vscodeAnalyticsPointSchema = z.object({
+  collectedAt: z.string().trim(),
+  downloads: z.int().nonnegative(),
+  installs: z.int().nonnegative()
+})
+
+export const openVsxAnalyticsSchema = z.object({
+  availableFrom: z.string().trim().nullable(),
+  availableTo: z.string().trim().nullable(),
+  extensions: z.array(openVsxExtensionSchema),
+  history: z.array(
+    vscodeAnalyticsPointSchema.pick({ collectedAt: true, downloads: true })
+  ),
+  totalDownloads: z.int().nonnegative()
+})
+
+export const vscodeAnalyticsSchema = z.object({
+  availableFrom: z.string().trim().nullable(),
+  availableTo: z.string().trim().nullable(),
+  extensions: z.array(vscodeExtensionSchema),
+  history: z.array(vscodeAnalyticsPointSchema),
+  totalDownloads: z.int().nonnegative(),
+  totalInstalls: z.int().nonnegative()
+})
+
 export const dashboardSchema = z.object({
   generatedAt: z.string().trim(),
   history: z.array(historyPointSchema),
   npmAnalytics: npmAnalyticsSchema,
+  openVsxAnalytics: openVsxAnalyticsSchema,
   period: periodSummarySchema,
   projects: z.array(projectMetricSchema),
   range: analyticsRangeSchema,
@@ -113,7 +162,8 @@ export const dashboardSchema = z.object({
     openIssues: z.int().nonnegative(),
     publicProjects: z.int().nonnegative()
   }),
-  sync: syncStateSchema
+  sync: syncStateSchema,
+  vscodeAnalytics: vscodeAnalyticsSchema
 })
 
 export const projectSettingSchema = z.object({
@@ -173,10 +223,13 @@ export const websiteAnalyticsSchema = z.object({
 export const projectDashboardSchema = z.object({
   generatedAt: z.string().trim(),
   history: z.array(historyPointSchema),
+  npmAnalytics: npmAnalyticsSchema,
+  openVsxAnalytics: openVsxAnalyticsSchema,
   period: periodSummarySchema,
   project: projectMetricSchema,
   range: analyticsRangeSchema,
   sync: syncStateSchema,
+  vscodeAnalytics: vscodeAnalyticsSchema,
   websiteAnalytics: websiteAnalyticsSiteSchema.nullable()
 })
 

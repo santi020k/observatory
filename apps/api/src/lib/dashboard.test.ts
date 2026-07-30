@@ -7,9 +7,11 @@ const mocks = vi.hoisted(() => ({
   buildWebsiteAnalytics: vi.fn(),
   getLatestSuccessfulSyncRun: vi.fn(),
   getLatestSyncRun: vi.fn(),
+  getNpmDownloadsSince: vi.fn(),
   getProjectPreferences: vi.fn(),
   getPublicSnapshotsSince: vi.fn(),
-  getSnapshotsForSyncRun: vi.fn()
+  getSnapshotsForSyncRun: vi.fn(),
+  getVscodeExtensionSnapshotsSince: vi.fn()
 }))
 
 vi.mock('./cloudflare', () => ({
@@ -21,13 +23,21 @@ vi.mock('@santi020k/observatory-db', async importOriginal => ({
   createDb: mocks.createDb,
   getLatestSuccessfulSyncRun: mocks.getLatestSuccessfulSyncRun,
   getLatestSyncRun: mocks.getLatestSyncRun,
+  getNpmDownloadsSince: mocks.getNpmDownloadsSince,
   getProjectPreferences: mocks.getProjectPreferences,
   getPublicSnapshotsSince: mocks.getPublicSnapshotsSince,
-  getSnapshotsForSyncRun: mocks.getSnapshotsForSyncRun
+  getSnapshotsForSyncRun: mocks.getSnapshotsForSyncRun,
+  getVscodeExtensionSnapshotsSince: mocks.getVscodeExtensionSnapshotsSince
 }))
 
-const { buildDashboard, buildProjectDashboard, buildProjectSettings } =
-  await import('./dashboard')
+const {
+  buildDashboard,
+  buildOpenVsxAnalytics,
+  buildNpmAnalytics,
+  buildProjectDashboard,
+  buildProjectSettings,
+  buildVscodeAnalytics
+} = await import('./dashboard')
 
 const environment = {
   AUTH_SECRET: 'test-secret',
@@ -82,10 +92,153 @@ beforeEach(() => {
 
   mocks.getPublicSnapshotsSince.mockResolvedValue([])
 
+  mocks.getNpmDownloadsSince.mockResolvedValue([])
+
+  mocks.getVscodeExtensionSnapshotsSince.mockResolvedValue([])
+
   mocks.buildWebsiteAnalytics.mockResolvedValue({
     generatedAt: new Date(0).toISOString(),
     range: '30d',
     sites: []
+  })
+})
+
+describe('npm download analytics', () => {
+  test('builds calendar aggregates and a ranked package table', () => {
+    const analytics = buildNpmAnalytics([
+      {
+        collectedAt: Date.UTC(2026, 6, 30),
+        downloads: 30,
+        id: 'lumen-1',
+        packageName: '@santi020k/lumen',
+        periodStart: Date.UTC(2026, 6, 26),
+        slug: 'lumen'
+      },
+      {
+        collectedAt: Date.UTC(2026, 6, 30),
+        downloads: 20,
+        id: 'lumen-2',
+        packageName: '@santi020k/lumen',
+        periodStart: Date.UTC(2026, 6, 28),
+        slug: 'lumen'
+      },
+      {
+        collectedAt: Date.UTC(2026, 6, 30),
+        downloads: 80,
+        id: 'observatory-1',
+        packageName: '@santi020k/observatory',
+        periodStart: Date.UTC(2026, 6, 28),
+        slug: 'observatory'
+      }
+    ])
+
+    expect(analytics).toMatchObject({
+      totalDownloads: 130,
+      weekly: [{ downloads: 30 }, { downloads: 100 }]
+    })
+
+    expect(analytics.packages[0]).toMatchObject({
+      downloads: 80,
+      packageName: '@santi020k/observatory'
+    })
+  })
+})
+
+describe('VS Code Marketplace analytics', () => {
+  test('uses the latest extension snapshot and preserves portfolio history', () => {
+    const first = Date.UTC(2026, 6, 29)
+    const last = Date.UTC(2026, 6, 30)
+
+    const analytics = buildVscodeAnalytics([
+      {
+        collectedAt: first,
+        downloads: 100,
+        extensionId: 'santi020k.vscode-astro-doctor',
+        id: 'first',
+        installs: 4,
+        lastUpdated: '2026-07-27T00:00:00.000Z',
+        provider: 'vscode-marketplace',
+        rating: 4.5,
+        reviewCount: 0,
+        slug: 'astro-doctor',
+        syncRunId: 'first-run',
+        updateCount: 5,
+        version: '1.2.1'
+      },
+      {
+        collectedAt: last,
+        downloads: 120,
+        extensionId: 'santi020k.vscode-astro-doctor',
+        id: 'last',
+        installs: 5,
+        lastUpdated: '2026-07-30T00:00:00.000Z',
+        provider: 'vscode-marketplace',
+        rating: 4.6,
+        reviewCount: 0,
+        slug: 'astro-doctor',
+        syncRunId: 'last-run',
+        updateCount: 6,
+        version: '1.2.2'
+      }
+    ])
+
+    expect(analytics).toMatchObject({
+      extensions: [
+        {
+          downloads: 120,
+          extensionId: 'santi020k.vscode-astro-doctor',
+          installs: 5,
+          version: '1.2.2'
+        }
+      ],
+      totalDownloads: 120,
+      totalInstalls: 5
+    })
+
+    expect(analytics.history).toHaveLength(2)
+  })
+
+  test('keeps Open VSX downloads separate from Microsoft Marketplace data', () => {
+    const analytics = buildOpenVsxAnalytics([
+      {
+        collectedAt: Date.UTC(2026, 6, 30),
+        downloads: 1_280,
+        extensionId: 'santi020k.vscode-astro-doctor',
+        id: 'open-vsx',
+        installs: 0,
+        lastUpdated: '2026-07-27T01:40:02.517Z',
+        provider: 'open-vsx',
+        rating: null,
+        reviewCount: 0,
+        slug: 'astro-doctor',
+        syncRunId: 'sync-run',
+        updateCount: 0,
+        version: '1.2.2'
+      },
+      {
+        collectedAt: Date.UTC(2026, 6, 30),
+        downloads: 166,
+        extensionId: 'santi020k.vscode-astro-doctor',
+        id: 'vscode',
+        installs: 5,
+        lastUpdated: '2026-07-27T01:44:14.250Z',
+        provider: 'vscode-marketplace',
+        rating: 4.5,
+        reviewCount: 0,
+        slug: 'astro-doctor',
+        syncRunId: 'sync-run',
+        updateCount: 7,
+        version: '1.2.2'
+      }
+    ])
+
+    expect(analytics).toMatchObject({
+      extensions: [{
+        downloads: 1_280,
+        extensionId: 'santi020k.vscode-astro-doctor'
+      }],
+      totalDownloads: 1_280
+    })
   })
 })
 
@@ -248,7 +401,8 @@ describe('dashboard snapshot selection', () => {
   })
 
   test('queries genuinely different persisted windows for each range', async () => {
-    const now = Date.UTC(2026, 6, 30)
+    const now = Date.UTC(2026, 6, 30, 12)
+    const todayStart = Date.UTC(2026, 6, 30)
     const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(now)
 
     mocks.getLatestSyncRun.mockResolvedValue(null)
@@ -263,6 +417,18 @@ describe('dashboard snapshot selection', () => {
 
     expect(mocks.getPublicSnapshotsSince).toHaveBeenNthCalledWith(
       2, expect.anything(), now - 30 * 24 * 60 * 60 * 1_000
+    )
+
+    expect(mocks.getNpmDownloadsSince).toHaveBeenNthCalledWith(
+      1, expect.anything(), todayStart - 5 * 24 * 60 * 60 * 1_000
+    )
+
+    expect(mocks.getNpmDownloadsSince).toHaveBeenNthCalledWith(
+      2, expect.anything(), todayStart - 30 * 24 * 60 * 60 * 1_000
+    )
+
+    expect(mocks.getVscodeExtensionSnapshotsSince).toHaveBeenNthCalledWith(
+      1, expect.anything(), now - 5 * 24 * 60 * 60 * 1_000
     )
 
     dateSpy.mockRestore()
@@ -356,20 +522,18 @@ describe('dashboard snapshot selection', () => {
   })
 
   test('uses weekly chart buckets for the 90-day range', async () => {
-    const week = 7 * 24 * 60 * 60 * 1_000
-    const bucketStart = Math.floor(Date.UTC(2026, 6, 1) / week) * week
-    const first = bucketStart + 24 * 60 * 60 * 1_000
-    const threeDaysLater = first + 3 * 24 * 60 * 60 * 1_000
+    const wednesday = Date.UTC(2026, 6, 1)
+    const thursday = Date.UTC(2026, 6, 2)
 
     mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
     mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
     mocks.getSnapshotsForSyncRun.mockResolvedValue([websiteSnapshot])
     mocks.getPublicSnapshotsSince.mockResolvedValue([
-      { ...websiteSnapshot, collectedAt: first, id: 'first' },
+      { ...websiteSnapshot, collectedAt: wednesday, id: 'wednesday' },
       {
         ...websiteSnapshot,
-        collectedAt: threeDaysLater,
-        id: 'three-days-later'
+        collectedAt: thursday,
+        id: 'thursday'
       }
     ])
 
@@ -377,5 +541,42 @@ describe('dashboard snapshot selection', () => {
 
     expect(dashboard.history).toHaveLength(1)
     expect(dashboard.period.syncs).toBe(2)
+  })
+
+  test('returns selected-range npm analytics for a project dashboard', async () => {
+    mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([websiteSnapshot])
+    mocks.getNpmDownloadsSince.mockResolvedValue([
+      {
+        collectedAt: Date.UTC(2026, 6, 30),
+        downloads: 42,
+        id: 'website-downloads',
+        packageName: '@santi020k/website',
+        periodStart: Date.UTC(2026, 6, 29),
+        slug: 'website'
+      },
+      {
+        collectedAt: Date.UTC(2026, 6, 30),
+        downloads: 99,
+        id: 'other-downloads',
+        packageName: '@santi020k/other',
+        periodStart: Date.UTC(2026, 6, 29),
+        slug: 'other'
+      }
+    ])
+
+    const dashboard = await buildProjectDashboard(environment, 'website', '5d')
+
+    expect(dashboard?.npmAnalytics).toMatchObject({
+      packages: [
+        {
+          downloads: 42,
+          packageName: '@santi020k/website',
+          slug: 'website'
+        }
+      ],
+      totalDownloads: 42
+    })
   })
 })

@@ -138,9 +138,68 @@ describe('public project collection', () => {
     await expect(
       collectorInternals.collectPackageMetrics(['@santi020k/lumen-astro'])
     ).resolves.toEqual({
+      downloadHistory: [],
       downloads: 0,
-      latestVersion: '0.1.0'
+      latestVersion: '0.1.0',
+      packages: [
+        {
+          downloadHistory: [],
+          downloads: 0,
+          latestVersion: '0.1.0',
+          packageName: '@santi020k/lumen-astro'
+        }
+      ]
     })
+  })
+
+  test('collects exact daily npm history and derives the rolling total', async () => {
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = requestUrl(input)
+
+      if (url.includes('api.npmjs.org/downloads')) {
+        return Promise.resolve(
+          Response.json({
+            downloads: [
+              { day: '2026-07-28', downloads: 20 },
+              { day: '2026-07-29', downloads: 30 }
+            ]
+          })
+        )
+      }
+
+      return Promise.resolve(
+        Response.json({ 'dist-tags': { latest: '0.4.0' } })
+      )
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      collectorInternals.collectPackageMetrics(
+        ['@santi020k/lumen'], new Map(), Date.parse('2026-07-30T12:00:00.000Z')
+      )
+    ).resolves.toMatchObject({
+      downloadHistory: [
+        {
+          day: '2026-07-28',
+          downloads: 20,
+          packageName: '@santi020k/lumen'
+        },
+        {
+          day: '2026-07-29',
+          downloads: 30,
+          packageName: '@santi020k/lumen'
+        }
+      ],
+      downloads: 50,
+      latestVersion: '0.4.0'
+    })
+
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).includes(
+        '/range/2025-07-30:2026-07-29/%40santi020k%2Flumen'
+      ))
+    ).toBe(true)
   })
 
   test('still fails when the package itself is missing from the npm registry', async () => {
@@ -159,6 +218,101 @@ describe('public project collection', () => {
     await expect(
       collectorInternals.collectPackageMetrics(['missing-package'])
     ).rejects.toThrow('Provider request failed with 404')
+  })
+
+  test('collects mapped VS Code Marketplace extension statistics', async () => {
+    const fetchMock = vi.fn(
+      (_input: string | URL | Request, init?: RequestInit) => {
+        const requestBody = init?.body
+
+        if (typeof requestBody !== 'string')
+          throw new TypeError('Expected a serialized request body.')
+
+        const body = JSON.parse(requestBody) as {
+          filters: { criteria: { value: string }[] }[]
+        }
+        const extensionId = body.filters[0]?.criteria[0]?.value ?? ''
+        const extensionParts = extensionId.split('.')
+        const extensionName =
+          extensionParts[extensionParts.length - 1] ?? extensionId
+
+        return Promise.resolve(
+          Response.json({
+            results: [
+              {
+                extensions: [
+                  {
+                    extensionName,
+                    publisher: { publisherName: 'Santi020k' },
+                    statistics: [
+                      { statisticName: 'downloadCount', value: 166 },
+                      { statisticName: 'install', value: 5 },
+                      { statisticName: 'updateCount', value: 7 },
+                      { statisticName: 'weightedRating', value: 4.5 }
+                    ],
+                    versions: [
+                      {
+                        lastUpdated: '2026-07-27T01:44:14.250Z',
+                        version: '1.2.2'
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          })
+        )
+      }
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const snapshots = await collectorInternals.collectVscodeExtensions(
+      Date.UTC(2026, 6, 30), 'sync-run'
+    )
+
+    expect(snapshots).toHaveLength(3)
+    expect(snapshots).toContainEqual(
+      expect.objectContaining({
+        downloads: 166,
+        extensionId: 'santi020k.vscode-astro-doctor',
+        installs: 5,
+        slug: 'astro-doctor',
+        syncRunId: 'sync-run',
+        version: '1.2.2'
+      })
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('extensionquery'), expect.objectContaining({ method: 'POST' })
+    )
+  })
+
+  test('collects mapped Open VSX extension statistics separately', async () => {
+    vi.stubGlobal(
+      'fetch', vi.fn(() => Promise.resolve(Response.json({
+        averageRating: null,
+        downloadCount: 1_280,
+        name: 'vscode-astro-doctor',
+        namespace: 'santi020k',
+        reviewCount: 0,
+        timestamp: '2026-07-27T01:40:02.517925Z',
+        version: '1.2.2'
+      })))
+    )
+
+    const snapshots = await collectorInternals.collectOpenVsxExtensions(
+      Date.UTC(2026, 6, 30), 'sync-run'
+    )
+
+    expect(snapshots).toHaveLength(3)
+    expect(snapshots).toContainEqual(expect.objectContaining({
+      downloads: 1_280,
+      extensionId: 'santi020k.vscode-astro-doctor',
+      provider: 'open-vsx',
+      reviewCount: 0,
+      slug: 'astro-doctor'
+    }))
   })
 
   test('falls back to a small GET when a website rejects HEAD requests', async () => {

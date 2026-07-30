@@ -1,5 +1,6 @@
 import {
   getCatalogOverride,
+  getVscodeExtensionMappings,
   githubOwner,
   type ProjectCategory,
   type ProjectStatus,
@@ -8,10 +9,15 @@ import {
 import {
   completeSyncRun,
   createDb,
+  getLatestNpmDownloadDates,
   getWebsiteAnalyticsSince,
   insertSnapshots,
+  insertVscodeExtensionSnapshots,
+  type NpmDownloadWrite,
   type SnapshotWrite,
-  startSyncRun
+  startSyncRun,
+  upsertNpmDownloads,
+  type VscodeExtensionWrite
 } from '@santi020k/observatory-db'
 
 import type { Bindings } from '../env'
@@ -36,8 +42,46 @@ interface GithubTraffic {
 }
 
 interface PackageMetrics {
+  downloadHistory: readonly PackageDownload[]
   downloads: number
   latestVersion: string | null
+  packages: readonly PackageMetric[]
+}
+
+interface PackageMetric {
+  downloadHistory: readonly PackageDownload[]
+  downloads: number
+  latestVersion: string | null
+  packageName: string
+}
+
+interface PackageDownload {
+  day: string
+  downloads: number
+  packageName: string
+}
+
+interface AuthorPackage {
+  name: string
+  repository: string | null
+  version: string
+}
+
+interface VscodeGalleryExtension {
+  extensionName: string
+  publisher: { publisherName: string }
+  statistics: { statisticName: string, value: number }[]
+  versions: { lastUpdated: string, version: string }[]
+}
+
+interface OpenVsxExtension {
+  averageRating: number | null
+  downloadCount: number
+  name: string
+  namespace: string
+  reviewCount: number
+  timestamp: string
+  version: string
 }
 
 interface WebsiteHealth {
@@ -136,9 +180,11 @@ const githubHeaders = (token?: string): HeadersInit => ({
 
 const fetchJson = async <Result>(
   url: string,
-  headers?: HeadersInit
+  headers?: HeadersInit,
+  init?: RequestInit
 ): Promise<Result> => {
   const response = await fetch(url, {
+    ...init,
     ...(headers ? { headers } : {}),
     signal: AbortSignal.timeout(8_000)
   })
@@ -149,6 +195,96 @@ const fetchJson = async <Result>(
 
   return response.json<Result>()
 }
+
+const collectVscodeExtensions = async (
+  collectedAt: number,
+  syncRunId: string
+): Promise<VscodeExtensionWrite[]> => Promise.all(
+  getVscodeExtensionMappings().map(async ({ extensionId, slug }) => {
+    const result = await fetchJson<{
+      results: { extensions: VscodeGalleryExtension[] }[]
+    }>(
+      'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery', {
+        Accept: 'application/json;api-version=7.2-preview.1',
+        'Content-Type': 'application/json',
+        'User-Agent': 'santi-observatory'
+      }, {
+        body: JSON.stringify({
+          assetTypes: [],
+          filters: [
+            {
+              criteria: [{ filterType: 7, value: extensionId }],
+              pageNumber: 1,
+              pageSize: 1,
+              sortBy: 0,
+              sortOrder: 0
+            }
+          ],
+          flags: 870
+        }),
+        method: 'POST'
+      }
+    )
+
+    const extension = result.results[0]?.extensions[0]
+    const latestVersion = extension?.versions[0]
+
+    if (!extension || !latestVersion)
+      throw new Error(`VS Code extension was not found: ${extensionId}`)
+
+    const statistics = new Map(
+      extension.statistics.map(statistic => [
+        statistic.statisticName,
+        statistic.value
+      ])
+    )
+
+    return {
+      collectedAt,
+      downloads: Math.round(statistics.get('downloadCount') ?? 0),
+      extensionId,
+      id: crypto.randomUUID(),
+      installs: Math.round(statistics.get('install') ?? 0),
+      lastUpdated: latestVersion.lastUpdated,
+      provider: 'vscode-marketplace',
+      rating: statistics.get('weightedRating') ?? null,
+      reviewCount: 0,
+      slug,
+      syncRunId,
+      updateCount: Math.round(statistics.get('updateCount') ?? 0),
+      version: latestVersion.version
+    }
+  })
+)
+
+const collectOpenVsxExtensions = async (
+  collectedAt: number,
+  syncRunId: string
+): Promise<VscodeExtensionWrite[]> => Promise.all(
+  getVscodeExtensionMappings().map(async ({ extensionId, slug }) => {
+    const [namespace = '', name = ''] = extensionId.split('.', 2)
+
+    const extension = await fetchJson<OpenVsxExtension>(
+      `https://open-vsx.org/api/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`
+    )
+
+    return {
+      collectedAt,
+      downloads: extension.downloadCount,
+      extensionId,
+      id: crypto.randomUUID(),
+      installs: 0,
+      lastUpdated: extension.timestamp,
+      provider: 'open-vsx',
+      rating: extension.averageRating,
+      reviewCount: extension.reviewCount,
+      slug,
+      syncRunId,
+      updateCount: 0,
+      version: extension.version
+    }
+  })
+)
 
 const collectGithubRepositories = async (
   token?: string
@@ -205,45 +341,141 @@ const collectOpenPullRequestsCount = async (
   }
 }
 
+const collectAuthorPackages = async (): Promise<AuthorPackage[]> => {
+  const result = await fetchJson<{
+    objects: {
+      package: {
+        links?: { repository?: string }
+        name: string
+        version: string
+      }
+    }[]
+  }>(
+    `https://registry.npmjs.org/-/v1/search?text=maintainer%3A${githubOwner}&size=250`
+  )
+
+  return result.objects.map(({ package: packageResult }) => ({
+    name: packageResult.name,
+    repository: packageResult.links?.repository ?? null,
+    version: packageResult.version
+  }))
+}
+
 const collectPackageMetrics = async (
-  packageNames: readonly string[]
+  packageNames: readonly string[],
+  latestDownloadDates: ReadonlyMap<string, number> = new Map(),
+  now: number = Date.now(),
+  latestVersions: ReadonlyMap<string, string> = new Map()
 ): Promise<PackageMetrics> => {
+  const today = new Date(now)
+
+  const completedDayEnd = Date.UTC(
+    today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 1
+  )
+
+  const rollingStart = completedDayEnd - 29 * dayMilliseconds
+  const bootstrapStart = completedDayEnd - 364 * dayMilliseconds
+  const toDate = (timestamp: number): string => new Date(timestamp).toISOString().slice(0, 10)
+
   const metrics = await Promise.all(
     packageNames.map(async packageName => {
       const encoded = encodeURIComponent(packageName)
+      const latestDownloadDate = latestDownloadDates.get(packageName)
 
-      const [downloads, registry] = await Promise.all([
-        fetchJson<{ downloads: number }>(
-          `https://api.npmjs.org/downloads/point/last-month/${encoded}`
-        ).catch((error: unknown) => {
+      const rangeStart =
+        latestDownloadDate === undefined ? bootstrapStart : rollingStart
+
+      const period = `${toDate(rangeStart)}:${toDate(completedDayEnd)}`
+
+      const downloads = await fetchJson<{
+        downloads: { day: string, downloads: number }[]
+      }>(`https://api.npmjs.org/downloads/range/${period}/${encoded}`).catch(
+        (error: unknown) => {
           if (error instanceof ProviderRequestError && error.status === 404) {
-            return { downloads: 0 }
+            return { downloads: [] }
           }
 
           throw error
-        }),
-        fetchJson<{ 'dist-tags'?: { latest?: string } }>(
-          `https://registry.npmjs.org/${encoded}`
-        )
-      ])
+        }
+      )
+
+      const knownVersion = latestVersions.get(packageName)
+
+      const registry =
+        knownVersion === undefined ?
+          await fetchJson<{ 'dist-tags'?: { latest?: string } }>(
+            `https://registry.npmjs.org/${encoded}`
+          ) :
+          null
 
       return {
-        downloads: downloads.downloads,
-        latestVersion: registry['dist-tags']?.latest ?? null
+        downloadHistory: downloads.downloads.map(point => ({
+          ...point,
+          packageName
+        })),
+        downloads: downloads.downloads.reduce((total, point) => {
+          const timestamp = Date.parse(`${point.day}T00:00:00.000Z`)
+
+          return timestamp >= rollingStart ? total + point.downloads : total
+        }, 0),
+        latestVersion: knownVersion ?? registry?.['dist-tags']?.latest ?? null,
+        packageName
       }
     })
   )
 
   return {
+    downloadHistory: metrics.flatMap(metric => metric.downloadHistory),
     downloads: metrics.reduce((total, metric) => total + metric.downloads, 0),
     latestVersion:
-      metrics.find(metric => metric.latestVersion)?.latestVersion ?? null
+      metrics.find(metric => metric.latestVersion)?.latestVersion ?? null,
+    packages: metrics
   }
 }
 
-const checkWebsite = async (
-  website: string | null
-): Promise<WebsiteHealth> => {
+const mergePackageMetrics = (
+  packageNames: readonly string[],
+  metricsByPackage: ReadonlyMap<string, PackageMetric>
+): PackageMetrics => {
+  const metrics = packageNames.flatMap(packageName => {
+    const metric = metricsByPackage.get(packageName)
+
+    return metric ? [metric] : []
+  })
+
+  return {
+    downloadHistory: metrics.flatMap(metric => metric.downloadHistory),
+    downloads: metrics.reduce((total, metric) => total + metric.downloads, 0),
+    latestVersion:
+      metrics.find(metric => metric.latestVersion)?.latestVersion ?? null,
+    packages: metrics
+  }
+}
+
+const getPackageProjectSlug = (packageResult: AuthorPackage): string => {
+  if (packageResult.repository) {
+    try {
+      const repositoryUrl = new URL(
+        packageResult.repository.replace(/^git\+/, '')
+      )
+
+      const [owner, repository] = repositoryUrl.pathname
+        .replace(/\.git$/, '')
+        .split('/')
+        .filter(Boolean)
+
+      if (owner === githubOwner && repository) return repository
+    } catch {
+      // Fall through to the stable package-name fallback.
+    }
+  }
+
+  const packageNameParts = packageResult.name.split('/')
+
+  return packageNameParts[packageNameParts.length - 1] ?? packageResult.name
+}
+
+const checkWebsite = async (website: string | null): Promise<WebsiteHealth> => {
   if (!website) return { responseTimeMs: null, status: 'unknown' }
 
   const startedAt = Date.now()
@@ -303,9 +535,12 @@ interface CollectedRepositoryData {
 
 const getSnapshotCategory = (
   repository: GithubRepository
-): ProjectCategory => getCatalogOverride(repository.name)?.category ?? inferCategory(repository)
+): ProjectCategory => getCatalogOverride(repository.name)?.category ??
+  inferCategory(repository)
 
-const getSnapshotName = (repository: GithubRepository): string => getCatalogOverride(repository.name)?.displayName ??
+const getSnapshotName = (
+  repository: GithubRepository
+): string => getCatalogOverride(repository.name)?.displayName ??
   titleFromSlug(repository.name)
 
 const getSnapshotPackages = (
@@ -359,13 +594,14 @@ const collectRepository = async (
   repository: GithubRepository,
   env: Bindings,
   collectedAt: number,
-  syncRunId: string
+  syncRunId: string,
+  metricsByPackage: ReadonlyMap<string, PackageMetric>
 ): Promise<SnapshotWrite> => {
   const packages = getCatalogOverride(repository.name)?.npmPackages ?? []
 
   const [packageMetrics, websiteHealth, views, clones, pullRequestsCount] =
     await Promise.all([
-      collectPackageMetrics(packages),
+      Promise.resolve(mergePackageMetrics(packages, metricsByPackage)),
       checkWebsite(repository.homepage),
       collectTraffic(repository.name, 'views', env.GITHUB_TOKEN),
       collectTraffic(repository.name, 'clones', env.GITHUB_TOKEN),
@@ -389,11 +625,22 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
   await startSyncRun(database, runId, startedAt)
 
   try {
-    const [repositories, websiteAnalytics] = await Promise.all([
+    const [
+      repositories,
+      websiteAnalytics,
+      latestNpmDownloadDates,
+      authorPackages,
+      vscodeExtensions,
+      openVsxExtensions
+    ] = await Promise.all([
       collectGithubRepositories(env.GITHUB_TOKEN),
       getWebsiteAnalyticsSince(
         database, startedAt - relevanceWindowMilliseconds
-      )
+      ),
+      getLatestNpmDownloadDates(database),
+      collectAuthorPackages(),
+      collectVscodeExtensions(startedAt, runId),
+      collectOpenVsxExtensions(startedAt, runId)
     ])
 
     const websitePageViewsBySlug = new Map<string, number>()
@@ -404,15 +651,77 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
       )
     }
 
+    const latestDownloadDates = new Map(
+      latestNpmDownloadDates.flatMap(row => row.periodStart === null ?
+        [] :
+        [[row.packageName, row.periodStart] as const])
+    )
+
+    const packageMetrics = await collectPackageMetrics(
+      authorPackages.map(packageResult => packageResult.name), latestDownloadDates, startedAt, new Map(
+        authorPackages.map(packageResult => [
+          packageResult.name,
+          packageResult.version
+        ])
+      )
+    )
+
+    const metricsByPackage = new Map(
+      packageMetrics.packages.map(metric => [metric.packageName, metric])
+    )
+
+    const slugByPackage = new Map(
+      authorPackages.map(packageResult => [
+        packageResult.name,
+        getPackageProjectSlug(packageResult)
+      ])
+    )
+
     const collectedSnapshots = await Promise.all(
-      repositories.map(repository => collectRepository(repository, env, startedAt, runId))
+      repositories.map(repository => collectRepository(repository, env, startedAt, runId, metricsByPackage))
     )
 
     const snapshots = scoreSnapshotsByRelevance(
       collectedSnapshots, websitePageViewsBySlug, startedAt
     )
 
+    const npmDownloads: NpmDownloadWrite[] =
+      packageMetrics.downloadHistory.flatMap(point => {
+        const periodStart = Date.parse(`${point.day}T00:00:00.000Z`)
+        const latestPeriod = latestDownloadDates.get(point.packageName)
+
+        if (
+          latestPeriod !== undefined &&
+          periodStart < latestPeriod - 2 * dayMilliseconds
+        ) {
+          return []
+        }
+
+        return [
+          {
+            collectedAt: startedAt,
+            downloads: point.downloads,
+            id: crypto.randomUUID(),
+            packageName: point.packageName,
+            periodStart,
+            slug:
+              slugByPackage.get(point.packageName) ??
+              getPackageProjectSlug({
+                name: point.packageName,
+                repository: null,
+                version: ''
+              })
+          }
+        ]
+      })
+
     await insertSnapshots(database, snapshots)
+
+    await upsertNpmDownloads(database, npmDownloads)
+
+    await insertVscodeExtensionSnapshots(
+      database, [...vscodeExtensions, ...openVsxExtensions]
+    )
 
     await completeSyncRun(database, runId, {
       completedAt: Date.now(),
@@ -436,7 +745,10 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
 
 export const collectorInternals = {
   checkWebsite,
+  collectAuthorPackages,
   collectGithubRepositories,
+  collectOpenVsxExtensions,
   collectPackageMetrics,
+  collectVscodeExtensions,
   scoreSnapshotsByRelevance
 }

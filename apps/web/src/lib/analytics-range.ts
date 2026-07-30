@@ -1,4 +1,7 @@
-import type { AnalyticsRange } from '@santi020k/observatory-api-types'
+import type {
+  AnalyticsRange,
+  Dashboard
+} from '@santi020k/observatory-api-types'
 
 const dayMilliseconds = 24 * 60 * 60 * 1_000
 
@@ -99,12 +102,67 @@ export const getHistoryCoverage = (
     return { days: 0, isPartial: true, label: 'No history stored yet' }
   }
 
-  const days = Math.max(1, Math.ceil((to - from) / dayMilliseconds))
+  const days = Math.max(1, Math.floor((to - from) / dayMilliseconds) + 1)
 
   return {
     days,
     isPartial: days < getRangeDays(range),
     label: `${days.toLocaleString()} day${days === 1 ? '' : 's'} stored`
+  }
+}
+
+type NpmCadence = 'daily' | 'monthly' | 'weekly' | 'yearly'
+
+const npmChartMeta = {
+  '5d': {
+    cadence: 'daily',
+    caption: 'Completed UTC days across every enabled mapped package.',
+    heading: 'Downloads per day'
+  },
+  '30d': {
+    cadence: 'daily',
+    caption: 'Completed UTC days across every enabled mapped package.',
+    heading: 'Downloads per day'
+  },
+  '90d': {
+    cadence: 'weekly',
+    caption: 'Daily downloads grouped into Monday-starting UTC weeks.',
+    heading: 'Downloads per week'
+  },
+  ytd: {
+    cadence: 'monthly',
+    caption: 'Daily downloads grouped by UTC calendar month.',
+    heading: 'Downloads per month'
+  },
+  '1y': {
+    cadence: 'monthly',
+    caption: 'Daily downloads grouped by UTC calendar month.',
+    heading: 'Downloads per month'
+  },
+  '5y': {
+    cadence: 'yearly',
+    caption: 'Daily downloads grouped by UTC calendar year.',
+    heading: 'Downloads per year'
+  }
+} as const satisfies Record<
+  AnalyticsRange,
+  { cadence: NpmCadence, caption: string, heading: string }
+>
+
+type NpmChartSource = Pick<
+  Dashboard['npmAnalytics'],
+  'daily' | 'monthly' | 'weekly' | 'yearly'
+>
+
+export const getNpmChart = (
+  analytics: NpmChartSource,
+  range: AnalyticsRange
+) => {
+  const meta = npmChartMeta[range]
+
+  return {
+    ...meta,
+    points: analytics[meta.cadence]
   }
 }
 

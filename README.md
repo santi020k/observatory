@@ -8,11 +8,23 @@ already separates public collection from the future private-project adapters.
 
 - Every non-fork public repository under `santi020k`, discovered automatically
 - GitHub stars, forks, open issues, recency, and repository traffic when `GITHUB_TOKEN` is set
-- 30-day npm downloads and current versions for mapped product packages
+- Exact daily npm downloads, calendar rollups, and rankings across every
+  package maintained by `santi020k`, plus current versions for mapped products
+- VS Code Marketplace downloads, current installs, versions, ratings, updates,
+  and per-sync history for mapped extensions
+- Open VSX downloads, versions, ratings, reviews, publish times, and per-sync
+  history, kept separate from Microsoft Marketplace counters
 - Published website availability and response time
 - Cloudflare Web Analytics page views and visits, grouped hourly by project website
 - Attention signals for degraded, stale, or issue-heavy projects
 - Hourly D1 snapshots so trends can be added without changing providers
+
+The first successful public-project sync backfills up to one year of completed
+daily npm download data. Later syncs refresh the rolling 30-day metric and
+persist new or recently revised npm days without rewriting the full history.
+VS Code Marketplace values are cumulative provider counters, so Observatory
+stores one source-specific snapshot per extension on every project sync.
+The same mapped extensions are queried independently from Open VSX.
 
 The private projects section is specified but not connected. See
 [`docs/private-projects.md`](docs/private-projects.md).

@@ -25,9 +25,19 @@ const getBucketStart = (
       break
 
     case '90d': {
-      const day = date.getUTCDay()
+      const mondayOffset = (date.getUTCDay() + 6) % 7
 
-      date.setUTCDate(date.getUTCDate() - day)
+      date.setUTCDate(date.getUTCDate() - mondayOffset)
+
+      date.setUTCHours(0)
+
+      break
+    }
+
+    case 'ytd': {
+      const mondayOffset = (date.getUTCDay() + 6) % 7
+
+      date.setUTCDate(date.getUTCDate() - mondayOffset)
 
       date.setUTCHours(0)
 

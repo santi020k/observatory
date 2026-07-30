@@ -108,7 +108,7 @@ describe('website analytics chart aggregation', () => {
 
     expect(points[0]).toMatchObject({
       pageViews: 30,
-      periodStart: '2026-07-05T00:00:00.000Z',
+      periodStart: '2026-07-06T00:00:00.000Z',
       visits: 18
     })
   })

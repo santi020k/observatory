@@ -8,6 +8,7 @@ import {
   projectSnapshots,
   sessions,
   syncRuns,
+  vscodeExtensionSnapshots,
   websiteAnalyticsSnapshots
 } from './schema'
 
@@ -23,6 +24,10 @@ describe('observatory database schema', () => {
 
     expect(getTableName(syncRuns)).toBe('sync_runs')
 
+    expect(getTableName(vscodeExtensionSnapshots)).toBe(
+      'vscode_extension_snapshots'
+    )
+
     expect(getTableName(websiteAnalyticsSnapshots)).toBe(
       'website_analytics_snapshots'
     )
@@ -32,6 +37,14 @@ describe('observatory database schema', () => {
     expect(npmDownloadSnapshots.packageName.name).toBe('package_name')
 
     expect(npmDownloadSnapshots.periodStart.name).toBe('period_start')
+  })
+
+  test('stores Marketplace snapshots with their source identity', () => {
+    expect(vscodeExtensionSnapshots.extensionId.name).toBe('extension_id')
+
+    expect(vscodeExtensionSnapshots.provider.name).toBe('provider')
+
+    expect(vscodeExtensionSnapshots.syncRunId.name).toBe('sync_run_id')
   })
 
   test('stores visibility on every project snapshot', () => {

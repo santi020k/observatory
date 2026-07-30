@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest'
 
-import { getCatalogOverride, titleFromSlug } from './index'
+import {
+  getCatalogOverride,
+  getVscodeExtensionMappings,
+  titleFromSlug
+} from './index'
 
 describe('project catalog', () => {
   test('provides source mappings for first-party tools', () => {
@@ -18,5 +22,12 @@ describe('project catalog', () => {
 
   test('creates readable fallback names', () => {
     expect(titleFromSlug('workspace-organizer')).toBe('Workspace Organizer')
+  })
+
+  test('maps VS Code extensions to their owning projects', () => {
+    expect(getVscodeExtensionMappings()).toContainEqual({
+      extensionId: 'santi020k.vscode-astro-doctor',
+      slug: 'astro-doctor'
+    })
   })
 })

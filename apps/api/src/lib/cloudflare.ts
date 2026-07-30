@@ -25,6 +25,12 @@ const getRangeMilliseconds = (range: AnalyticsRange): number => {
 
   if (range === '90d') return 90 * 24 * hourMilliseconds
 
+  if (range === 'ytd') {
+    const now = new Date()
+
+    return Date.now() - Date.UTC(now.getUTCFullYear(), 0, 1)
+  }
+
   if (range === '1y') return 365 * 24 * hourMilliseconds
 
   return 5 * 365 * 24 * hourMilliseconds

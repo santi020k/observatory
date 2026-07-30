@@ -8,6 +8,7 @@ import {
   type ProjectSettings,
   projectSettingsSchema
 } from '@santi020k/observatory-api-types'
+import { getCatalogOverride } from '@santi020k/observatory-catalog'
 import {
   createDb,
   getLatestSuccessfulSyncRun,
@@ -15,7 +16,8 @@ import {
   getNpmDownloadsSince,
   getProjectPreferences,
   getPublicSnapshotsSince,
-  getSnapshotsForSyncRun
+  getSnapshotsForSyncRun,
+  getVscodeExtensionSnapshotsSince
 } from '@santi020k/observatory-db'
 
 import type { Bindings } from '../env'
@@ -23,8 +25,13 @@ import type { Bindings } from '../env'
 import { buildWebsiteAnalytics } from './cloudflare'
 
 type Snapshot = Awaited<ReturnType<typeof getSnapshotsForSyncRun>>[number]
+
 type NpmDownloadSnapshot = Awaited<
   ReturnType<typeof getNpmDownloadsSince>
+>[number]
+
+type VscodeExtensionSnapshot = Awaited<
+  ReturnType<typeof getVscodeExtensionSnapshotsSince>
 >[number]
 
 type ProjectPreference = Pick<
@@ -61,6 +68,21 @@ const getRangeMilliseconds = (range: AnalyticsRange): number => {
   if (range === '1y') return 365 * 24 * 60 * 60 * 1_000
 
   return 5 * 365 * 24 * 60 * 60 * 1_000
+}
+
+const getNpmRangeStart = (
+  range: AnalyticsRange,
+  now: number = Date.now()
+): number => {
+  const date = new Date(now)
+
+  const todayStart = Date.UTC(
+    date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()
+  )
+
+  if (range === 'ytd') return Date.UTC(date.getUTCFullYear(), 0, 1)
+
+  return todayStart - getRangeMilliseconds(range)
 }
 
 const parseStringArray = (value: string): string[] => {
@@ -100,6 +122,18 @@ const toProjectMetric = (
   sources: {
     github: row.repositoryUrl,
     npm: parseStringArray(row.npmPackages),
+    openVsx: (getCatalogOverride(row.slug)?.vscodeExtensions ?? []).map(
+      extensionId => {
+        const extensionParts = extensionId.split('.', 2)
+        const namespace = extensionParts[0] ?? 'santi020k'
+        const name = extensionParts[1] ?? extensionId
+
+        return `https://open-vsx.org/extension/${namespace}/${name}`
+      }
+    ),
+    vscode: (getCatalogOverride(row.slug)?.vscodeExtensions ?? []).map(
+      extensionId => `https://marketplace.visualstudio.com/items?itemName=${extensionId}`
+    ),
     website: row.websiteUrl
   },
   stars: row.stars,
@@ -118,35 +152,24 @@ const sumNullable = (values: readonly (number | null)[]): number | null => {
 }
 
 const getBucketStart = (timestamp: number, range: AnalyticsRange): number => {
-  if (range === '5y') {
-    const date = new Date(timestamp)
+  const date = new Date(timestamp)
+  const year = date.getUTCFullYear()
+  const month = date.getUTCMonth()
+  const day = date.getUTCDate()
 
-    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)
+  if (range === '5y') return Date.UTC(year, month, 1)
+
+  if (range === '30d') return Date.UTC(year, month, day)
+
+  if (range !== '5d') {
+    const mondayOffset = (date.getUTCDay() + 6) % 7
+
+    return Date.UTC(year, month, day - mondayOffset)
   }
 
-  let bucketMilliseconds: number
+  const sixHours = 6 * 60 * 60 * 1_000
 
-  switch (range) {
-    case '5d':
-      bucketMilliseconds = 6 * 60 * 60 * 1_000
-
-      break
-
-    case '30d':
-      bucketMilliseconds = 24 * 60 * 60 * 1_000
-
-      break
-
-    case '90d':
-      bucketMilliseconds = 7 * 24 * 60 * 60 * 1_000
-
-      break
-
-    default:
-      bucketMilliseconds = 7 * 24 * 60 * 60 * 1_000
-  }
-
-  return Math.floor(timestamp / bucketMilliseconds) * bucketMilliseconds
+  return Math.floor(timestamp / sixHours) * sixHours
 }
 
 const buildHistory = (rows: Snapshot[], range: AnalyticsRange) => {
@@ -212,9 +235,7 @@ const buildRawHistory = (rows: Snapshot[]) => {
       openIssues: snapshots.reduce(
         (total, snapshot) => total + snapshot.openIssues, 0
       ),
-      stars: snapshots.reduce(
-        (total, snapshot) => total + snapshot.stars, 0
-      )
+      stars: snapshots.reduce((total, snapshot) => total + snapshot.stars, 0)
     }))
 }
 
@@ -222,7 +243,7 @@ const getHistoryChange = <T>(
   first: T | undefined,
   last: T | undefined,
   select: (value: T) => number
-): number => first && last ? select(last) - select(first) : 0
+): number => (first && last ? select(last) - select(first) : 0)
 
 const getPeriodSummary = (rows: Snapshot[]) => {
   const history = buildRawHistory(rows)
@@ -243,10 +264,7 @@ const getPeriodSummary = (rows: Snapshot[]) => {
 
 type NpmBucket = 'day' | 'month' | 'week' | 'year'
 
-const getNpmBucketStart = (
-  timestamp: number,
-  bucket: NpmBucket
-): number => {
+const getNpmBucketStart = (timestamp: number, bucket: NpmBucket): number => {
   const date = new Date(timestamp)
   const year = date.getUTCFullYear()
   const month = date.getUTCMonth()
@@ -287,12 +305,11 @@ const aggregateNpmDownloads = (
     }))
 }
 
-export const buildNpmAnalytics = (
-  rows: readonly NpmDownloadSnapshot[]
-) => {
+export const buildNpmAnalytics = (rows: readonly NpmDownloadSnapshot[]) => {
   const sortedRows = [...rows].sort(
     (left, right) => left.periodStart - right.periodStart
   )
+
   const downloadsByPackage = new Map<
     string,
     { downloads: number, packageName: string, slug: string }
@@ -314,15 +331,13 @@ export const buildNpmAnalytics = (
       left.packageName.localeCompare(right.packageName)
   )
 
+  const lastRow = sortedRows[sortedRows.length - 1]
+
   return {
-    availableFrom:
-      sortedRows[0] ?
-        new Date(sortedRows[0].periodStart).toISOString() :
-        null,
-    availableTo:
-      sortedRows.at(-1) ?
-        new Date(sortedRows.at(-1)?.periodStart ?? 0).toISOString() :
-        null,
+    availableFrom: sortedRows[0] ?
+      new Date(sortedRows[0].periodStart).toISOString() :
+      null,
+    availableTo: lastRow ? new Date(lastRow.periodStart).toISOString() : null,
     daily: aggregateNpmDownloads(sortedRows, 'day'),
     monthly: aggregateNpmDownloads(sortedRows, 'month'),
     packages,
@@ -331,6 +346,123 @@ export const buildNpmAnalytics = (
     ),
     weekly: aggregateNpmDownloads(sortedRows, 'week'),
     yearly: aggregateNpmDownloads(sortedRows, 'year')
+  }
+}
+
+export const buildVscodeAnalytics = (
+  rows: readonly VscodeExtensionSnapshot[]
+) => {
+  const sortedRows = rows
+    .filter(row => row.provider === 'vscode-marketplace')
+    .sort((left, right) => left.collectedAt - right.collectedAt)
+
+  const latestByExtension = new Map<string, VscodeExtensionSnapshot>()
+
+  const totalsByCollection = new Map<
+    number,
+    { downloads: number, installs: number }
+  >()
+
+  for (const row of sortedRows) {
+    latestByExtension.set(row.extensionId, row)
+
+    const totals = totalsByCollection.get(row.collectedAt) ?? {
+      downloads: 0,
+      installs: 0
+    }
+
+    totals.downloads += row.downloads
+
+    totals.installs += row.installs
+
+    totalsByCollection.set(row.collectedAt, totals)
+  }
+
+  const extensions = [...latestByExtension.values()]
+    .sort(
+      (left, right) => right.downloads - left.downloads ||
+        left.extensionId.localeCompare(right.extensionId)
+    )
+    .map(row => ({
+      downloads: row.downloads,
+      extensionId: row.extensionId,
+      installs: row.installs,
+      lastUpdated: row.lastUpdated,
+      rating: row.rating,
+      slug: row.slug,
+      updateCount: row.updateCount,
+      version: row.version
+    }))
+
+  const history = [...totalsByCollection.entries()].map(
+    ([collectedAt, totals]) => ({
+      collectedAt: new Date(collectedAt).toISOString(),
+      ...totals
+    })
+  )
+
+  return {
+    availableFrom: history[0]?.collectedAt ?? null,
+    availableTo: history[history.length - 1]?.collectedAt ?? null,
+    extensions,
+    history,
+    totalDownloads: extensions.reduce(
+      (total, extension) => total + extension.downloads, 0
+    ),
+    totalInstalls: extensions.reduce(
+      (total, extension) => total + extension.installs, 0
+    )
+  }
+}
+
+export const buildOpenVsxAnalytics = (
+  rows: readonly VscodeExtensionSnapshot[]
+) => {
+  const sortedRows = rows
+    .filter(row => row.provider === 'open-vsx')
+    .sort((left, right) => left.collectedAt - right.collectedAt)
+
+  const latestByExtension = new Map<string, VscodeExtensionSnapshot>()
+  const downloadsByCollection = new Map<number, number>()
+
+  for (const row of sortedRows) {
+    latestByExtension.set(row.extensionId, row)
+
+    downloadsByCollection.set(
+      row.collectedAt, (downloadsByCollection.get(row.collectedAt) ?? 0) + row.downloads
+    )
+  }
+
+  const extensions = [...latestByExtension.values()]
+    .sort(
+      (left, right) => right.downloads - left.downloads ||
+        left.extensionId.localeCompare(right.extensionId)
+    )
+    .map(row => ({
+      downloads: row.downloads,
+      extensionId: row.extensionId,
+      lastUpdated: row.lastUpdated,
+      rating: row.rating,
+      reviewCount: row.reviewCount,
+      slug: row.slug,
+      version: row.version
+    }))
+
+  const history = [...downloadsByCollection.entries()].map(
+    ([collectedAt, downloads]) => ({
+      collectedAt: new Date(collectedAt).toISOString(),
+      downloads
+    })
+  )
+
+  return {
+    availableFrom: history[0]?.collectedAt ?? null,
+    availableTo: history[history.length - 1]?.collectedAt ?? null,
+    extensions,
+    history,
+    totalDownloads: extensions.reduce(
+      (total, extension) => total + extension.downloads, 0
+    )
   }
 }
 
@@ -372,15 +504,18 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
   }
 
   const isEnabled = (slug: string) => preferencesBySlug.get(slug)?.enabled !== false
+  const now = Date.now()
+  const since = now - getRangeMilliseconds(range)
 
-  const since = Date.now() - getRangeMilliseconds(range)
-  const [latestRows, historyRows, npmDownloadRows] = await Promise.all([
-    latestSuccessfulSync ?
-      getSnapshotsForSyncRun(database, latestSuccessfulSync.id) :
-      Promise.resolve([]),
-    getPublicSnapshotsSince(database, since),
-    getNpmDownloadsSince(database, since)
-  ])
+  const [latestRows, historyRows, npmDownloadRows, vscodeExtensionRows] =
+    await Promise.all([
+      latestSuccessfulSync ?
+        getSnapshotsForSyncRun(database, latestSuccessfulSync.id) :
+        Promise.resolve([]),
+      getPublicSnapshotsSince(database, since),
+      getNpmDownloadsSince(database, getNpmRangeStart(range, now)),
+      getVscodeExtensionSnapshotsSince(database, since)
+    ])
 
   return {
     historyRows: historyRows.filter(row => isEnabled(row.slug)),
@@ -389,7 +524,8 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
     latestRows,
     latestSuccessfulSync,
     npmDownloadRows: npmDownloadRows.filter(row => isEnabled(row.slug)),
-    sync
+    sync,
+    vscodeExtensionRows: vscodeExtensionRows.filter(row => isEnabled(row.slug))
   }
 }
 
@@ -404,7 +540,8 @@ export const buildDashboard = async (
     latestRows,
     latestSuccessfulSync,
     npmDownloadRows,
-    sync
+    sync,
+    vscodeExtensionRows
   } = await getDashboardRows(env, range)
 
   const projects = latestRows
@@ -418,6 +555,7 @@ export const buildDashboard = async (
     generatedAt: new Date().toISOString(),
     history,
     npmAnalytics: buildNpmAnalytics(npmDownloadRows),
+    openVsxAnalytics: buildOpenVsxAnalytics(vscodeExtensionRows),
     period: getPeriodSummary(historyRows),
     projects,
     range,
@@ -438,7 +576,8 @@ export const buildDashboard = async (
       ),
       publicProjects: projects.length
     },
-    sync: toSyncState(sync, latestSuccessfulSync)
+    sync: toSyncState(sync, latestSuccessfulSync),
+    vscodeAnalytics: buildVscodeAnalytics(vscodeExtensionRows)
   })
 }
 
@@ -453,7 +592,9 @@ export const buildProjectDashboard = async (
     isEnabled,
     latestRows,
     latestSuccessfulSync,
-    sync
+    npmDownloadRows,
+    sync,
+    vscodeExtensionRows
   } = await getDashboardRows(env, range)
 
   const row = latestRows.find(candidate => candidate.slug === slug)
@@ -475,13 +616,24 @@ export const buildProjectDashboard = async (
       ) ?? null) :
       null
 
+  const projectNpmDownloadRows = npmDownloadRows.filter(
+    snapshot => snapshot.slug === slug
+  )
+
   return projectDashboardSchema.parse({
     generatedAt: new Date().toISOString(),
     history,
+    npmAnalytics: buildNpmAnalytics(projectNpmDownloadRows),
+    openVsxAnalytics: buildOpenVsxAnalytics(
+      vscodeExtensionRows.filter(snapshot => snapshot.slug === slug)
+    ),
     period: getPeriodSummary(projectHistoryRows),
     project: toProjectMetric(row, preference),
     range,
     sync: toSyncState(sync, latestSuccessfulSync),
+    vscodeAnalytics: buildVscodeAnalytics(
+      vscodeExtensionRows.filter(snapshot => snapshot.slug === slug)
+    ),
     websiteAnalytics
   })
 }
@@ -524,8 +676,7 @@ export const buildProjectSettings = async (
       relevanceScore: row.relevanceScore,
       slug: row.slug,
       status: row.status as ProjectSettings['projects'][number]['status'],
-      websiteAnalyticsEnabled:
-          preference?.websiteAnalyticsEnabled ?? true
+      websiteAnalyticsEnabled: preference?.websiteAnalyticsEnabled ?? true
     }
   })
 
