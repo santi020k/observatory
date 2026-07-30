@@ -16,9 +16,9 @@ import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
 
 const email = Astro.url.searchParams.get('email') ?? ''
 
-const developmentCode = import.meta.env.DEV
-  ? Astro.url.searchParams.get('devCode')
-  : null
+const developmentCode = import.meta.env.DEV ?
+  Astro.url.searchParams.get('devCode') :
+  null
 
 const apiUrl = getBrowserApiUrl()
 
@@ -33,8 +33,8 @@ if (!email) return Astro.redirect('/login/')
   <main class="verify-shell" id="main-content">
     <Brand />
     <Card class="auth-card verify-card">
-      <span class="auth-card__icon"
-        ><Icon aria-hidden="true" name="mail-check" /></span
+      <span class="auth-card__icon"><Icon aria-hidden="true" name="mail-check" />
+      </span
       >
       <span class="eyebrow">Check your inbox</span>
       <h1>Enter your code</h1>
@@ -82,66 +82,66 @@ if (!email) return Astro.redirect('/login/')
   </main>
 
   <script>
-    const form = document.querySelector<HTMLFormElement>('[data-verify-form]')
-    const alert = document.querySelector<HTMLElement>('[data-form-alert]')
-    const apiUrl = form?.dataset.apiUrl ?? '/api'
-    const email = form?.dataset.email ?? ''
+  const form = document.querySelector<HTMLFormElement>('[data-verify-form]')
+  const alert = document.querySelector<HTMLElement>('[data-form-alert]')
+  const apiUrl = form?.dataset.apiUrl ?? '/api'
+  const email = form?.dataset.email ?? ''
 
-    form?.addEventListener('submit', async (event) => {
-      event.preventDefault()
+  form?.addEventListener('submit', async event => {
+    event.preventDefault()
 
-      const button = form.querySelector('button')
-      const formData = new FormData(form)
-      const code = String(formData.get('code') ?? '')
+    const button = form.querySelector('button')
+    const formData = new FormData(form)
+    const code = String(formData.get('code') ?? '')
 
-      const buttonLabel = button?.querySelector<HTMLElement>(
-        '[data-submit-label]',
-      )
+    const buttonLabel = button?.querySelector<HTMLElement>(
+      '[data-submit-label]'
+  )
+
+    if (button) {
+      button.disabled = true
+
+      button.setAttribute('aria-busy', 'true')
+
+      if (buttonLabel) buttonLabel.textContent = 'Verifying…'
+    }
+
+    if (alert) alert.hidden = true
+
+    try {
+      const response = await fetch(`${apiUrl}/auth/verify-code`, {
+        body: JSON.stringify({ code, email }),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST'
+      })
+
+      const result = await response.json()
+
+      if (!response.ok)
+        throw new Error(
+          result.error?.message ?? 'The code could not be verified.'
+        )
+
+      window.location.assign('/dashboard/')
+    } catch (error) {
+      if (alert) {
+        alert.hidden = false
+
+        alert.textContent =
+          error instanceof Error ?
+            error.message :
+            'The code could not be verified.'
+      }
 
       if (button) {
-        button.disabled = true
+        button.disabled = false
 
-        button.setAttribute('aria-busy', 'true')
+        button.removeAttribute('aria-busy')
 
-        if (buttonLabel) buttonLabel.textContent = 'Verifying…'
+        if (buttonLabel) buttonLabel.textContent = 'Open Observatory'
       }
-
-      if (alert) alert.hidden = true
-
-      try {
-        const response = await fetch(`${apiUrl}/auth/verify-code`, {
-          body: JSON.stringify({ code, email }),
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          method: 'POST',
-        })
-
-        const result = await response.json()
-
-        if (!response.ok)
-          throw new Error(
-            result.error?.message ?? 'The code could not be verified.',
-          )
-
-        window.location.assign('/dashboard/')
-      } catch (error) {
-        if (alert) {
-          alert.hidden = false
-
-          alert.textContent =
-            error instanceof Error
-              ? error.message
-              : 'The code could not be verified.'
-        }
-
-        if (button) {
-          button.disabled = false
-
-          button.removeAttribute('aria-busy')
-
-          if (buttonLabel) buttonLabel.textContent = 'Open Observatory'
-        }
-      }
-    })
+    }
+  })
   </script>
 </AppLayout>

@@ -12,7 +12,7 @@ const { range } = Astro.props
 
 <nav aria-label="Analytics time range" class="range-picker">
   {
-    analyticsRangeOptions.map((item) => (
+    analyticsRangeOptions.map(item => (
       <a
         aria-current={range === item.value ? 'page' : undefined}
         href={`?range=${item.value}`}

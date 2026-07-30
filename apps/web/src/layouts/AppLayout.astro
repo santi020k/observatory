@@ -20,16 +20,19 @@ const typographyVariables = `
 `
 
 const lightVariables = colors
-  .map((token) => `--${token.name}: ${token.light};`)
+  .map(token => `--${token.name}: ${token.light};`)
   .join('')
+
 const darkVariables = colors
-  .map((token) => `--${token.name}: ${token.dark};`)
+  .map(token => `--${token.name}: ${token.dark};`)
   .join('')
+
 const lightContrastVariables = colors
-  .map((token) => `--${token.name}: ${token.lightContrast ?? token.light};`)
+  .map(token => `--${token.name}: ${token.lightContrast ?? token.light};`)
   .join('')
+
 const darkContrastVariables = colors
-  .map((token) => `--${token.name}: ${token.darkContrast ?? token.dark};`)
+  .map(token => `--${token.name}: ${token.darkContrast ?? token.dark};`)
   .join('')
 
 const themeCss = `
@@ -68,52 +71,57 @@ const themeCss = `
     <meta name="theme-color" content="hsl(260 43% 8%)" />
     <style is:global set:html={themeCss}></style>
     <script is:inline>
-      const applyObservatoryPreferences = () => {
-        const root = document.documentElement
-        let theme = 'dark'
+    const readStoredTheme = () => {
+      const storedTheme = localStorage.getItem('lumen-theme')
 
-        try {
-          const storedTheme = localStorage.getItem('lumen-theme')
+      if (storedTheme === 'light' || storedTheme === 'santi020k-light')
+        return 'light'
 
-          if (storedTheme === 'light' || storedTheme === 'santi020k-light')
-            theme = 'light'
+      return 'dark'
+    }
 
-          if (storedTheme === 'dark' || storedTheme === 'santi020k-dark')
-            theme = 'dark'
+    const applyStoredPreferences = root => {
+      const preferences = JSON.parse(
+        localStorage.getItem('observatory.settings.preferences') ?? '{}'
+      )
 
-          if (storedTheme !== theme) localStorage.setItem('lumen-theme', theme)
+      root.dataset.observatoryDensity =
+        preferences.density === 'compact' ? 'compact' : 'comfortable'
 
-          const preferences = JSON.parse(
-            localStorage.getItem('observatory.settings.preferences') ?? '{}',
-          )
+      root.dataset.observatoryReduceMotion = String(
+        preferences.reduceMotion === true
+      )
 
-          root.dataset.observatoryDensity =
-            preferences.density === 'compact' ? 'compact' : 'comfortable'
+      root.dataset.observatoryShowDetails = String(
+        preferences.showDetails !== false
+      )
+    }
 
-          root.dataset.observatoryReduceMotion = String(
-            preferences.reduceMotion === true,
-          )
+    const applyObservatoryPreferences = () => {
+      const root = document.documentElement
+      let theme = 'dark'
 
-          root.dataset.observatoryShowDetails = String(
-            preferences.showDetails !== false,
-          )
-        } catch {
-          // Storage may be unavailable; retain Observatory's defaults.
-        }
+      try {
+        theme = readStoredTheme()
 
-        root.dataset.theme = theme
-
-        root.classList.toggle('dark', theme === 'dark')
-
-        document
-          .querySelector('meta[name="theme-color"]')
-          ?.setAttribute(
-            'content',
-            theme === 'dark' ? 'hsl(260 43% 8%)' : 'hsl(268 20% 98%)',
-          )
+        localStorage.setItem('lumen-theme', theme)
+        applyStoredPreferences(root)
+      } catch {
+        // Storage may be unavailable; retain Observatory's defaults.
       }
 
-      applyObservatoryPreferences()
+      root.dataset.theme = theme
+
+      root.classList.toggle('dark', theme === 'dark')
+
+      document
+        .querySelector('meta[name="theme-color"]')
+        ?.setAttribute(
+          'content', theme === 'dark' ? 'hsl(260 43% 8%)' : 'hsl(268 20% 98%)'
+    )
+    }
+
+    applyObservatoryPreferences()
     </script>
     <title>{title}</title>
   </head>
@@ -122,18 +130,17 @@ const themeCss = `
     <slot />
     <UIPrimitives />
     <script>
-      document.addEventListener('ui:theme-change', (event) => {
-        const theme = (event as CustomEvent<{ theme?: string }>).detail?.theme
+    document.addEventListener('ui:theme-change', event => {
+      const theme = (event as CustomEvent<{ theme?: string }>).detail?.theme
 
-        if (theme !== 'light' && theme !== 'dark') return
+      if (theme !== 'light' && theme !== 'dark') return
 
-        document
-          .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-          ?.setAttribute(
-            'content',
-            theme === 'dark' ? 'hsl(260 43% 8%)' : 'hsl(268 20% 98%)',
-          )
-      })
+      document
+        .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+        ?.setAttribute(
+          'content', theme === 'dark' ? 'hsl(260 43% 8%)' : 'hsl(268 20% 98%)'
+    )
+    })
     </script>
   </body>
 </html>

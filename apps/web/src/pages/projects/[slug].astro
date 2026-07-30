@@ -9,18 +9,18 @@ import AppLayout from '@/layouts/AppLayout.astro'
 import {
   analyticsRangeMeta,
   formatHistoryLabel,
-  getHistoryCoverage,
+  getHistoryCoverage
 } from '@/lib/analytics-range'
 import {
   getBrowserApiUrl,
   getProjectDashboard,
-  getProjectSettings,
+  getProjectSettings
 } from '@/lib/api'
 import {
   formatDate,
   formatDuration,
   formatNumber,
-  formatRelativeDate,
+  formatRelativeDate
 } from '@/lib/format'
 import { aggregateWebsiteAnalytics } from '@/lib/website-analytics'
 
@@ -42,7 +42,7 @@ const range = analyticsRangeSchema
 
 const [response, settingsResponse] = await Promise.all([
   getProjectDashboard(slug, range, Astro.request, Astro.url),
-  getProjectSettings(Astro.request, Astro.url),
+  getProjectSettings(Astro.request, Astro.url)
 ])
 
 if (response.status === 401) return Astro.redirect('/login/')
@@ -62,65 +62,63 @@ const project = dashboard.project
 const websiteAnalytics = dashboard.websiteAnalytics
 
 const sidebarProjects = settingsResponse.parsed.projects.filter(
-  (candidate) => candidate.enabled,
+  candidate => candidate.enabled
 )
 
 const apiUrl = getBrowserApiUrl()
 
-const websiteHistory = websiteAnalytics
-  ? aggregateWebsiteAnalytics(websiteAnalytics.history, dashboard.range)
-  : []
+const websiteHistory = websiteAnalytics ?
+  aggregateWebsiteAnalytics(websiteAnalytics.history, dashboard.range) :
+  []
 
 const websiteDataIsSampled = websiteHistory.some(
-  (point) => point.sampleInterval > 1,
+  point => point.sampleInterval > 1
 )
 
 const rangeMeta = analyticsRangeMeta[dashboard.range]
 const rangeLabel = rangeMeta.longLabel
+
 const historyCoverage = getHistoryCoverage(
-  dashboard.period.availableFrom,
-  dashboard.period.availableTo,
-  dashboard.range,
+  dashboard.period.availableFrom, dashboard.period.availableTo, dashboard.range
 )
 
 const websiteTrafficSeries = [
   {
-    data: websiteHistory.map((point) => ({
+    data: websiteHistory.map(point => ({
       label: `${formatNumber(point.pageViews)} page views`,
       x: formatHistoryLabel(point.periodStart, dashboard.range),
-      y: point.pageViews,
+      y: point.pageViews
     })),
     id: 'page-views',
     label: 'Page views',
-    tone: 'brand',
+    tone: 'brand'
   },
   {
-    data: websiteHistory.map((point) => ({
+    data: websiteHistory.map(point => ({
       label: `${formatNumber(point.visits)} visits`,
       x: formatHistoryLabel(point.periodStart, dashboard.range),
-      y: point.visits,
+      y: point.visits
     })),
     id: 'visits',
     label: 'Visits',
-    tone: 'accent',
-  },
+    tone: 'accent'
+  }
 ] as const
 
 const downloadHistorySeries = [
   {
-    data: dashboard.history.map((point) => ({
+    data: dashboard.history.map(point => ({
       label: `${formatNumber(point.npmDownloads30d)} downloads`,
       x: formatHistoryLabel(point.collectedAt, dashboard.range),
-      y: point.npmDownloads30d,
+      y: point.npmDownloads30d
     })),
     id: 'downloads',
     label: 'Rolling 30-day downloads',
-    tone: 'brand',
-  },
+    tone: 'brand'
+  }
 ] as const
 
-const formatSignedNumber = (value: number): string =>
-  `${value > 0 ? '+' : ''}${formatNumber(value)}`
+const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${formatNumber(value)}`
 ---
 
 <AppLayout
@@ -154,8 +152,10 @@ const formatSignedNumber = (value: number): string =>
                 <span
                   class:list={[
                     'health-dot',
-                    `health-dot--${project.healthStatus}`,
-                  ]}></span>
+                    `health-dot--${project.healthStatus}`
+                  ]}
+                >
+                </span>
                 {project.healthStatus}
               </Badge>
               {
@@ -253,66 +253,68 @@ const formatSignedNumber = (value: number): string =>
                 )}
               </div>
 
-              {websiteAnalytics ? (
-                <div class="website-analytics-grid">
-                  <div
-                    class="website-metric-grid"
-                    aria-label={`${project.name} website metrics`}
-                  >
-                    <MetricCard
-                      context={`Cloudflare total · ${rangeLabel}`}
-                      icon="mouse-pointer-click"
-                      label="Page views"
-                      value={formatNumber(websiteAnalytics.pageViews)}
-                    />
-                    <MetricCard
-                      context="Direct or externally referred sessions"
-                      icon="users"
-                      label="Visits"
-                      value={formatNumber(websiteAnalytics.visits)}
-                    />
-                  </div>
-
-                  <Card
-                    as="section"
-                    class="panel website-traffic-panel"
-                    aria-labelledby="website-traffic-history-heading"
-                  >
-                    <div class="panel-heading">
-                      <div>
-                        <span class="eyebrow">Traffic over time</span>
-                        <h3 id="website-traffic-history-heading">
-                          Page views and visits
-                        </h3>
-                      </div>
+              {websiteAnalytics ?
+                (
+                  <div class="website-analytics-grid">
+                    <div
+                      class="website-metric-grid"
+                      aria-label={`${project.name} website metrics`}
+                    >
+                      <MetricCard
+                        context={`Cloudflare total · ${rangeLabel}`}
+                        icon="mouse-pointer-click"
+                        label="Page views"
+                        value={formatNumber(websiteAnalytics.pageViews)}
+                      />
+                      <MetricCard
+                        context="Direct or externally referred sessions"
+                        icon="users"
+                        label="Visits"
+                        value={formatNumber(websiteAnalytics.visits)}
+                      />
                     </div>
 
-                    <LineChart
-                      area
-                      aria-label={`${project.name} website traffic history`}
-                      caption={`${rangeMeta.bucketLabel} Cloudflare totals.${
-                        websiteDataIsSampled
-                          ? ' Cloudflare adaptive sampling is present in this range.'
-                          : ''
-                      }`}
-                      series={websiteTrafficSeries}
-                    />
+                    <Card
+                      as="section"
+                      class="panel website-traffic-panel"
+                      aria-labelledby="website-traffic-history-heading"
+                    >
+                      <div class="panel-heading">
+                        <div>
+                          <span class="eyebrow">Traffic over time</span>
+                          <h3 id="website-traffic-history-heading">
+                            Page views and visits
+                          </h3>
+                        </div>
+                      </div>
+
+                      <LineChart
+                        area
+                        aria-label={`${project.name} website traffic history`}
+                        caption={`${rangeMeta.bucketLabel} Cloudflare totals.${
+                          websiteDataIsSampled ?
+                            ' Cloudflare adaptive sampling is present in this range.' :
+                            ''
+                        }`}
+                        series={websiteTrafficSeries}
+                      />
+                    </Card>
+                  </div>
+                ) :
+                (
+                  <Card class="panel website-analytics-empty">
+                    <Empty>
+                      <span class="empty-icon">
+                        <Icon aria-hidden="true" name="chart-no-axes-column" />
+                      </span>
+                      <h3>No Cloudflare traffic yet</h3>
+                      <p>
+                        Data will appear after the Web Analytics beacon reports
+                        activity and the next analytics sync completes.
+                      </p>
+                    </Empty>
                   </Card>
-                </div>
-              ) : (
-                <Card class="panel website-analytics-empty">
-                  <Empty>
-                    <span class="empty-icon">
-                      <Icon aria-hidden="true" name="chart-no-axes-column" />
-                    </span>
-                    <h3>No Cloudflare traffic yet</h3>
-                    <p>
-                      Data will appear after the Web Analytics beacon reports
-                      activity and the next analytics sync completes.
-                    </p>
-                  </Empty>
-                </Card>
-              )}
+                )}
             </section>
           )
         }
@@ -335,21 +337,23 @@ const formatSignedNumber = (value: number): string =>
               </Badge>
             </div>
             {
-              dashboard.history.length > 1 ? (
-                <LineChart
-                  area
-                  markers={dashboard.history.length <= 24}
-                  aria-label={`${project.name} download history`}
-                  caption={`${rangeMeta.bucketLabel} rolling 30-day npm download velocity built from ${formatNumber(dashboard.period.syncs)} persisted ${dashboard.period.syncs === 1 ? 'sync' : 'syncs'}.`}
-                  series={downloadHistorySeries}
-                />
-              ) : (
-                <Empty>
-                  <p>
-                    More history will appear after another sync in this range.
-                  </p>
-                </Empty>
-              )
+              dashboard.history.length > 1 ?
+                (
+                  <LineChart
+                    area
+                    markers={dashboard.history.length <= 24}
+                    aria-label={`${project.name} download history`}
+                    caption={`${rangeMeta.bucketLabel} rolling 30-day npm download velocity built from ${formatNumber(dashboard.period.syncs)} persisted ${dashboard.period.syncs === 1 ? 'sync' : 'syncs'}.`}
+                    series={downloadHistorySeries}
+                  />
+                ) :
+                (
+                  <Empty>
+                    <p>
+                      More history will appear after another sync in this range.
+                    </p>
+                  </Empty>
+                )
             }
           </Card>
 
@@ -389,7 +393,7 @@ const formatSignedNumber = (value: number): string =>
             {
               project.topics.length > 0 && (
                 <div class="topic-list" aria-label="Repository topics">
-                  {project.topics.map((topic) => (
+                  {project.topics.map(topic => (
                     <Badge variant="outline">{topic}</Badge>
                   ))}
                 </div>

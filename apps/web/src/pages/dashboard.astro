@@ -10,7 +10,7 @@ import AppLayout from '@/layouts/AppLayout.astro'
 import {
   analyticsRangeMeta,
   formatHistoryLabel,
-  getHistoryCoverage,
+  getHistoryCoverage
 } from '@/lib/analytics-range'
 import { getBrowserApiUrl, getDashboard } from '@/lib/api'
 import { needsAttention } from '@/lib/attention'
@@ -18,7 +18,7 @@ import {
   formatDate,
   formatDuration,
   formatNumber,
-  formatRelativeDate,
+  formatRelativeDate
 } from '@/lib/format'
 
 import Badge from '@santi020k/lumen-astro/components/Badge'
@@ -42,67 +42,64 @@ if (!response.ok || !response.parsed)
 
 const dashboard = response.parsed
 const apiUrl = getBrowserApiUrl()
-
 const rangeMeta = analyticsRangeMeta[dashboard.range]
 const rangeLabel = rangeMeta.longLabel
+
 const historyCoverage = getHistoryCoverage(
-  dashboard.period.availableFrom,
-  dashboard.period.availableTo,
-  dashboard.range,
+  dashboard.period.availableFrom, dashboard.period.availableTo, dashboard.range
 )
 
 const projectsByDownloads = [...dashboard.projects].sort(
-  (left, right) => right.npmDownloads30d - left.npmDownloads30d,
+  (left, right) => right.npmDownloads30d - left.npmDownloads30d
 )
 
 const chartProjects = projectsByDownloads
-  .filter((project) => project.npmDownloads30d > 0)
+  .filter(project => project.npmDownloads30d > 0)
   .slice(0, 6)
 
 const projectDownloadSeries = [
   {
-    data: chartProjects.map((project) => ({
+    data: chartProjects.map(project => ({
       label: formatNumber(project.npmDownloads30d),
       x: project.name,
-      y: project.npmDownloads30d,
+      y: project.npmDownloads30d
     })),
     id: 'downloads',
     label: 'Downloads',
-    tone: 'brand',
-  },
+    tone: 'brand'
+  }
 ] as const
 
 const portfolioHistorySeries = [
   {
-    data: dashboard.history.map((point) => ({
+    data: dashboard.history.map(point => ({
       label: `${formatNumber(point.npmDownloads30d)} downloads`,
       x: formatHistoryLabel(point.collectedAt, dashboard.range),
-      y: point.npmDownloads30d,
+      y: point.npmDownloads30d
     })),
     id: 'downloads',
     label: 'Rolling 30-day downloads',
-    tone: 'brand',
-  },
+    tone: 'brand'
+  }
 ] as const
 
 const portfolioStarsSeries = [
   {
-    data: dashboard.history.map((point) => ({
+    data: dashboard.history.map(point => ({
       label: `${formatNumber(point.stars)} stars`,
       x: formatHistoryLabel(point.collectedAt, dashboard.range),
-      y: point.stars,
+      y: point.stars
     })),
     id: 'stars',
     label: 'Total stars',
-    tone: 'accent',
-  },
+    tone: 'accent'
+  }
 ] as const
 
-const formatSignedNumber = (value: number): string =>
-  `${value > 0 ? '+' : ''}${formatNumber(value)}`
+const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${formatNumber(value)}`
 
 const attentionProjects = dashboard.projects
-  .filter((project) => needsAttention(project))
+  .filter(project => needsAttention(project))
   .sort((left, right) => right.openIssues - left.openIssues)
   .slice(0, 5)
 
@@ -111,12 +108,11 @@ const categoryCounts = dashboard.projects.reduce<Record<string, number>>(
     counts[project.category] = (counts[project.category] ?? 0) + 1
 
     return counts
-  },
-  {},
+  }, {}
 )
 
 const getCategoryIcon = (
-  category: (typeof dashboard.projects)[number]['category'],
+  category: (typeof dashboard.projects)[number]['category']
 ): 'blocks' | 'layout-dashboard' | 'notebook-tabs' | 'wrench' => {
   if (category === 'app') return 'layout-dashboard'
 
@@ -127,16 +123,16 @@ const getCategoryIcon = (
   return 'blocks'
 }
 
-const lastSync = dashboard.sync.completedAt
-  ? formatRelativeDate(dashboard.sync.completedAt)
-  : 'awaiting first sync'
+const lastSync = dashboard.sync.completedAt ?
+  formatRelativeDate(dashboard.sync.completedAt) :
+  'awaiting first sync'
 
 const hourInBogota = Number(
   new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     hourCycle: 'h23',
-    timeZone: 'America/Bogota',
-  }).format(new Date()),
+    timeZone: 'America/Bogota'
+  }).format(new Date())
 )
 
 let greeting = 'Good evening'
@@ -171,14 +167,14 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
           <div class="hero-controls">
             <RangePicker range={dashboard.range} />
             <div class="source-legend" aria-label="Active data sources">
-              <Badge variant="outline"
-                ><Icon aria-hidden="true" name="git-fork" /> GitHub</Badge
+              <Badge variant="outline"><Icon aria-hidden="true" name="git-fork" /> GitHub
+              </Badge
               >
-              <Badge variant="outline"
-                ><Icon aria-hidden="true" name="package" /> npm</Badge
+              <Badge variant="outline"><Icon aria-hidden="true" name="package" /> npm
+              </Badge
               >
-              <Badge variant="outline"
-                ><Icon aria-hidden="true" name="activity" /> Health</Badge
+              <Badge variant="outline"><Icon aria-hidden="true" name="activity" /> Health
+              </Badge
               >
             </div>
           </div>
@@ -224,420 +220,428 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
         </section>
 
         {
-          dashboard.projects.length === 0 ? (
-            <Empty class="first-sync">
-              <span class="empty-icon">
-                <Icon aria-hidden="true" name="telescope" />
-              </span>
-              <h2>Your catalog is ready for first light</h2>
-              <p>
-                Run the first sync to collect GitHub, npm, and website health
-                metrics.
-              </p>
-              <button
-                class="ui-button ui-button--default"
-                data-sync-button
-                type="button"
-              >
-                Sync public projects
-              </button>
-            </Empty>
-          ) : (
-            <>
-              <section class="insight-grid">
-                <Card
-                  as="section"
-                  class="panel reach-panel"
-                  aria-labelledby="reach-heading"
+          dashboard.projects.length === 0 ?
+            (
+              <Empty class="first-sync">
+                <span class="empty-icon">
+                  <Icon aria-hidden="true" name="telescope" />
+                </span>
+                <h2>Your catalog is ready for first light</h2>
+                <p>
+                  Run the first sync to collect GitHub, npm, and website health
+                  metrics.
+                </p>
+                <button
+                  class="ui-button ui-button--default"
+                  data-sync-button
+                  type="button"
                 >
-                  <div class="panel-heading">
-                    <div>
-                      <span class="eyebrow">Reach</span>
-                      <h2 id="reach-heading">Package downloads</h2>
+                  Sync public projects
+                </button>
+              </Empty>
+            ) :
+            (
+              <>
+                <section class="insight-grid">
+                  <Card
+                    as="section"
+                    class="panel reach-panel"
+                    aria-labelledby="reach-heading"
+                  >
+                    <div class="panel-heading">
+                      <div>
+                        <span class="eyebrow">Reach</span>
+                        <h2 id="reach-heading">Package downloads</h2>
+                      </div>
+                      <span>Last 30 days</span>
                     </div>
-                    <span>Last 30 days</span>
-                  </div>
 
-                  {chartProjects.length > 0 ? (
-                    <BarChart
-                      aria-label="Package downloads by project"
-                      caption="Aggregated across every npm package mapped to each product."
-                      orientation="horizontal"
-                      series={projectDownloadSeries}
-                    />
-                  ) : (
-                    <Empty>
-                      <p>No mapped npm package has download data yet.</p>
-                    </Empty>
-                  )}
-                </Card>
+                    {chartProjects.length > 0 ?
+                      (
+                        <BarChart
+                          aria-label="Package downloads by project"
+                          caption="Aggregated across every npm package mapped to each product."
+                          orientation="horizontal"
+                          series={projectDownloadSeries}
+                        />
+                      ) :
+                      (
+                        <Empty>
+                          <p>No mapped npm package has download data yet.</p>
+                        </Empty>
+                      )}
+                  </Card>
 
-                <Card
-                  as="section"
-                  class="panel attention-panel"
-                  aria-labelledby="attention-heading"
+                  <Card
+                    as="section"
+                    class="panel attention-panel"
+                    aria-labelledby="attention-heading"
+                  >
+                    <div class="panel-heading">
+                      <div>
+                        <span class="eyebrow">Focus</span>
+                        <h2 id="attention-heading">Attention queue</h2>
+                      </div>
+                      <Badge
+                        variant={
+                          attentionProjects.length > 0 ? 'warning' : 'success'
+                        }
+                      >
+                        {attentionProjects.length} signals
+                      </Badge>
+                    </div>
+
+                    {attentionProjects.length > 0 ?
+                      (
+                        <ul class="attention-list">
+                          {attentionProjects.map(project => (
+                            <li>
+                              <span
+                                class:list={[
+                                  'health-dot',
+                                  `health-dot--${project.healthStatus}`
+                                ]}
+                              />
+                              <div>
+                                <strong>{project.name}</strong>
+                                <span>
+                                  {project.openIssues > 0 ?
+                                    `${project.openIssues} open issue${project.openIssues === 1 ? '' : 's'}` :
+                                    `Last push ${formatRelativeDate(project.pushedAt)}`}
+                                </span>
+                              </div>
+                              <ButtonLink
+                                ariaLabel={`Open ${project.name} on GitHub`}
+                                href={project.sources.github}
+                                newTab
+                                shape="icon"
+                                variant="ghost"
+                              >
+                                <Icon aria-hidden="true" name="arrow-up-right" />
+                              </ButtonLink>
+                            </li>
+                          ))}
+                        </ul>
+                      ) :
+                      (
+                        <Empty>
+                          <Icon aria-hidden="true" name="circle-check-big" />
+                          <p>No public projects need immediate attention.</p>
+                        </Empty>
+                      )}
+                  </Card>
+                </section>
+
+                <section
+                  aria-labelledby="history-heading"
+                  class="history-section"
                 >
-                  <div class="panel-heading">
+                  <div class="section-heading">
                     <div>
-                      <span class="eyebrow">Focus</span>
-                      <h2 id="attention-heading">Attention queue</h2>
+                      <span class="eyebrow">Momentum</span>
+                      <h2 id="history-heading">Growth over time</h2>
+                      <p>
+                        {rangeMeta.bucketLabel} points built from{' '}
+                        {formatNumber(dashboard.period.syncs)} persisted{' '}
+                        {dashboard.period.syncs === 1 ? 'sync' : 'syncs'}.
+                      </p>
                     </div>
                     <Badge
-                      variant={
-                        attentionProjects.length > 0 ? 'warning' : 'success'
-                      }
+                      variant={historyCoverage.isPartial ? 'warning' : 'outline'}
                     >
-                      {attentionProjects.length} signals
+                      {historyCoverage.label}
                     </Badge>
                   </div>
 
-                  {attentionProjects.length > 0 ? (
-                    <ul class="attention-list">
-                      {attentionProjects.map((project) => (
-                        <li>
-                          <span
-                            class:list={[
-                              'health-dot',
-                              `health-dot--${project.healthStatus}`,
-                            ]}
-                          />
-                          <div>
-                            <strong>{project.name}</strong>
+                  {dashboard.history.length > 1 ?
+                    (
+                      <div class="momentum-grid">
+                        <Card
+                          as="section"
+                          class="panel history-panel"
+                          aria-labelledby="download-history-heading"
+                        >
+                          <div class="panel-heading">
+                            <div>
+                              <span class="eyebrow">Usage</span>
+                              <h3 id="download-history-heading">
+                                Download velocity
+                              </h3>
+                            </div>
                             <span>
-                              {project.openIssues > 0
-                                ? `${project.openIssues} open issue${project.openIssues === 1 ? '' : 's'}`
-                                : `Last push ${formatRelativeDate(project.pushedAt)}`}
+                              {formatSignedNumber(
+                                dashboard.period.downloadVelocityChange
+                              )}
                             </span>
                           </div>
-                          <ButtonLink
-                            ariaLabel={`Open ${project.name} on GitHub`}
-                            href={project.sources.github}
-                            newTab
-                            shape="icon"
-                            variant="ghost"
-                          >
-                            <Icon aria-hidden="true" name="arrow-up-right" />
-                          </ButtonLink>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <Empty>
-                      <Icon aria-hidden="true" name="circle-check-big" />
-                      <p>No public projects need immediate attention.</p>
-                    </Empty>
-                  )}
-                </Card>
-              </section>
+                          <LineChart
+                            area
+                            markers={dashboard.history.length <= 24}
+                            aria-label={`Portfolio download velocity for ${rangeLabel}`}
+                            caption={`Rolling 30-day npm downloads observed during ${rangeLabel}.`}
+                            series={portfolioHistorySeries}
+                          />
+                        </Card>
 
-              <section
-                aria-labelledby="history-heading"
-                class="history-section"
-              >
-                <div class="section-heading">
-                  <div>
-                    <span class="eyebrow">Momentum</span>
-                    <h2 id="history-heading">Growth over time</h2>
-                    <p>
-                      {rangeMeta.bucketLabel} points built from{' '}
-                      {formatNumber(dashboard.period.syncs)} persisted{' '}
-                      {dashboard.period.syncs === 1 ? 'sync' : 'syncs'}.
-                    </p>
-                  </div>
-                  <Badge
-                    variant={historyCoverage.isPartial ? 'warning' : 'outline'}
-                  >
-                    {historyCoverage.label}
-                  </Badge>
-                </div>
-
-                {dashboard.history.length > 1 ? (
-                  <div class="momentum-grid">
-                    <Card
-                      as="section"
-                      class="panel history-panel"
-                      aria-labelledby="download-history-heading"
-                    >
-                      <div class="panel-heading">
-                        <div>
-                          <span class="eyebrow">Usage</span>
-                          <h3 id="download-history-heading">
-                            Download velocity
-                          </h3>
-                        </div>
-                        <span>
-                          {formatSignedNumber(
-                            dashboard.period.downloadVelocityChange,
-                          )}
-                        </span>
+                        <Card
+                          as="section"
+                          class="panel history-panel"
+                          aria-labelledby="star-history-heading"
+                        >
+                          <div class="panel-heading">
+                            <div>
+                              <span class="eyebrow">Adoption</span>
+                              <h3 id="star-history-heading">Portfolio stars</h3>
+                            </div>
+                            <span>
+                              {formatSignedNumber(dashboard.period.starsGained)}
+                            </span>
+                          </div>
+                          <LineChart
+                            markers={dashboard.history.length <= 24}
+                            aria-label={`Portfolio star growth for ${rangeLabel}`}
+                            caption={`Total GitHub stars across enabled public projects during ${rangeLabel}.`}
+                            series={portfolioStarsSeries}
+                          />
+                        </Card>
                       </div>
-                      <LineChart
-                        area
-                        markers={dashboard.history.length <= 24}
-                        aria-label={`Portfolio download velocity for ${rangeLabel}`}
-                        caption={`Rolling 30-day npm downloads observed during ${rangeLabel}.`}
-                        series={portfolioHistorySeries}
-                      />
-                    </Card>
+                    ) :
+                    (
+                      <Card class="panel history-empty">
+                        <Empty>
+                          <p>
+                            Run another sync to establish a trend. Every successful
+                            sync is stored in D1 and becomes part of this range.
+                          </p>
+                        </Empty>
+                      </Card>
+                    )}
+                </section>
 
-                    <Card
-                      as="section"
-                      class="panel history-panel"
-                      aria-labelledby="star-history-heading"
-                    >
-                      <div class="panel-heading">
-                        <div>
-                          <span class="eyebrow">Adoption</span>
-                          <h3 id="star-history-heading">Portfolio stars</h3>
-                        </div>
-                        <span>
-                          {formatSignedNumber(dashboard.period.starsGained)}
-                        </span>
-                      </div>
-                      <LineChart
-                        markers={dashboard.history.length <= 24}
-                        aria-label={`Portfolio star growth for ${rangeLabel}`}
-                        caption={`Total GitHub stars across enabled public projects during ${rangeLabel}.`}
-                        series={portfolioStarsSeries}
-                      />
-                    </Card>
-                  </div>
-                ) : (
-                  <Card class="panel history-empty">
-                    <Empty>
+                <section
+                  class="portfolio-section"
+                  aria-labelledby="portfolio-heading"
+                  id="portfolio"
+                >
+                  <div class="section-heading">
+                    <div>
+                      <span class="eyebrow">Public portfolio</span>
+                      <h2 id="portfolio-heading">
+                        Every published and open-source project
+                      </h2>
                       <p>
-                        Run another sync to establish a trend. Every successful
-                        sync is stored in D1 and becomes part of this range.
+                        Automatically discovered from GitHub, with product
+                        metadata layered on top.
                       </p>
+                    </div>
+                    <div
+                      class="category-summary"
+                      aria-label="Projects by category"
+                    >
+                      {Object.entries(categoryCounts).map(([category, count]) => (
+                        <span>
+                          <strong>{count}</strong> {category}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div class="portfolio-toolbar" aria-label="Project filters">
+                    <div class="portfolio-search">
+                      <label class="sr-only" for="project-search">
+                        Search projects
+                      </label>
+                      <SearchField
+                        id="project-search"
+                        autocomplete="off"
+                        data-project-search
+                        placeholder="Search projects…"
+                      />
+                    </div>
+                    <div class="portfolio-selects">
+                      <label class="sr-only" for="project-category">
+                        Filter by category
+                      </label>
+                      <NativeSelect
+                        id="project-category"
+                        data-project-category
+                        options={[
+                          { label: 'All categories', value: 'all' },
+                          { label: 'Apps', value: 'app' },
+                          { label: 'Content', value: 'content' },
+                          { label: 'Libraries', value: 'library' },
+                          { label: 'Tools', value: 'tool' }
+                        ]}
+                        size="sm"
+                      />
+                      <label class="sr-only" for="project-status">
+                        Filter by status
+                      </label>
+                      <NativeSelect
+                        id="project-status"
+                        data-project-status
+                        options={[
+                          { label: 'All statuses', value: 'all' },
+                          { label: 'Active', value: 'active' },
+                          { label: 'Maintained', value: 'maintained' },
+                          { label: 'Paused', value: 'paused' },
+                          { label: 'Archived', value: 'archived' }
+                        ]}
+                        size="sm"
+                      />
+                      <label class="sr-only" for="project-sort">
+                        Sort projects
+                      </label>
+                      <NativeSelect
+                        id="project-sort"
+                        data-project-sort
+                        options={[
+                          { label: 'Most relevant', value: 'relevance' },
+                          { label: 'Most downloads', value: 'downloads' },
+                          { label: 'Most stars', value: 'stars' },
+                          { label: 'Recently updated', value: 'updated' },
+                          { label: 'Name', value: 'name' }
+                        ]}
+                        size="sm"
+                      />
+                      <Button
+                        data-project-clear
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                    <span
+                      aria-live="polite"
+                      class="portfolio-result-count"
+                      data-project-result-count
+                    >
+                      {dashboard.projects.length} projects
+                    </span>
+                  </div>
+
+                  <Table
+                    aria-label="Project catalog. Scroll horizontally to see all columns."
+                    role="region"
+                    tabindex="0"
+                  >
+                    <table>
+                      <thead>
+                        <tr>
+                          <th scope="col">Project</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Reach</th>
+                          <th scope="col">Maintenance</th>
+                          <th scope="col">Health</th>
+                          <th scope="col">Last push</th>
+                          <th scope="col">
+                            <span class="sr-only">Open</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody data-project-rows>
+                        {dashboard.projects.map(project => (
+                          <tr
+                            data-project-category={project.category}
+                            data-project-downloads={project.npmDownloads30d}
+                            data-project-name={project.name.toLocaleLowerCase()}
+                            data-project-relevance={project.relevanceScore}
+                            data-project-stars={project.stars}
+                            data-project-status={project.status}
+                            data-project-updated={
+                              project.pushedAt ? Date.parse(project.pushedAt) : 0
+                            }
+                          >
+                            <td>
+                              <div class="project-cell">
+                                <span class="project-icon">
+                                  <Icon
+                                    aria-hidden="true"
+                                    name={getCategoryIcon(project.category)}
+                                  />
+                                </span>
+                                <span>
+                                  <strong>
+                                    <a
+                                      class="project-link"
+                                      href={`/projects/${project.slug}/?range=${dashboard.range}`}
+                                    >
+                                      {project.name}
+                                    </a>
+                                  </strong>
+                                  <small>
+                                    {project.description ?? project.slug}
+                                  </small>
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              <StatusBadge status={project.status} />
+                            </td>
+                            <td>
+                              <strong>
+                                {formatNumber(project.npmDownloads30d)}
+                              </strong>
+                              <small>
+                                npm / 30d · relevance {project.relevanceScore}
+                              </small>
+                            </td>
+                            <td>
+                              <strong>{project.openIssues} issues</strong>
+                              <small>
+                                {project.stars} stars · {project.forks} forks
+                              </small>
+                            </td>
+                            <td>
+                              <span
+                                class={`health-label health-label--${project.healthStatus}`}
+                              >
+                                <span class="health-dot" />
+                                {project.healthStatus}
+                              </span>
+                              <small>
+                                {formatDuration(project.responseTimeMs)}
+                              </small>
+                            </td>
+                            <td>
+                              <strong>
+                                {formatRelativeDate(project.pushedAt)}
+                              </strong>
+                              <small>{formatDate(project.pushedAt)}</small>
+                            </td>
+                            <td>
+                              <ButtonLink
+                                ariaLabel={`View ${project.name} dashboard`}
+                                href={`/projects/${project.slug}/?range=${dashboard.range}`}
+                                shape="icon"
+                                variant="ghost"
+                              >
+                                <Icon aria-hidden="true" name="arrow-right" />
+                              </ButtonLink>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </Table>
+                  <Card
+                    class="portfolio-filter-empty"
+                    data-project-filter-empty
+                    hidden
+                  >
+                    <Empty>
+                      <Icon aria-hidden="true" name="search-x" />
+                      <p>No projects match those filters.</p>
+                      <Button data-project-clear type="button" variant="outline">
+                        Clear filters
+                      </Button>
                     </Empty>
                   </Card>
-                )}
-              </section>
-
-              <section
-                class="portfolio-section"
-                aria-labelledby="portfolio-heading"
-                id="portfolio"
-              >
-                <div class="section-heading">
-                  <div>
-                    <span class="eyebrow">Public portfolio</span>
-                    <h2 id="portfolio-heading">
-                      Every published and open-source project
-                    </h2>
-                    <p>
-                      Automatically discovered from GitHub, with product
-                      metadata layered on top.
-                    </p>
-                  </div>
-                  <div
-                    class="category-summary"
-                    aria-label="Projects by category"
-                  >
-                    {Object.entries(categoryCounts).map(([category, count]) => (
-                      <span>
-                        <strong>{count}</strong> {category}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div class="portfolio-toolbar" aria-label="Project filters">
-                  <div class="portfolio-search">
-                    <label class="sr-only" for="project-search">
-                      Search projects
-                    </label>
-                    <SearchField
-                      id="project-search"
-                      autocomplete="off"
-                      data-project-search
-                      placeholder="Search projects…"
-                    />
-                  </div>
-                  <div class="portfolio-selects">
-                    <label class="sr-only" for="project-category">
-                      Filter by category
-                    </label>
-                    <NativeSelect
-                      id="project-category"
-                      data-project-category
-                      options={[
-                        { label: 'All categories', value: 'all' },
-                        { label: 'Apps', value: 'app' },
-                        { label: 'Content', value: 'content' },
-                        { label: 'Libraries', value: 'library' },
-                        { label: 'Tools', value: 'tool' },
-                      ]}
-                      size="sm"
-                    />
-                    <label class="sr-only" for="project-status">
-                      Filter by status
-                    </label>
-                    <NativeSelect
-                      id="project-status"
-                      data-project-status
-                      options={[
-                        { label: 'All statuses', value: 'all' },
-                        { label: 'Active', value: 'active' },
-                        { label: 'Maintained', value: 'maintained' },
-                        { label: 'Paused', value: 'paused' },
-                        { label: 'Archived', value: 'archived' },
-                      ]}
-                      size="sm"
-                    />
-                    <label class="sr-only" for="project-sort">
-                      Sort projects
-                    </label>
-                    <NativeSelect
-                      id="project-sort"
-                      data-project-sort
-                      options={[
-                        { label: 'Most relevant', value: 'relevance' },
-                        { label: 'Most downloads', value: 'downloads' },
-                        { label: 'Most stars', value: 'stars' },
-                        { label: 'Recently updated', value: 'updated' },
-                        { label: 'Name', value: 'name' },
-                      ]}
-                      size="sm"
-                    />
-                    <Button
-                      data-project-clear
-                      size="sm"
-                      type="button"
-                      variant="ghost"
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                  <span
-                    aria-live="polite"
-                    class="portfolio-result-count"
-                    data-project-result-count
-                  >
-                    {dashboard.projects.length} projects
-                  </span>
-                </div>
-
-                <Table
-                  aria-label="Project catalog. Scroll horizontally to see all columns."
-                  role="region"
-                  tabindex="0"
-                >
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">Project</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Reach</th>
-                        <th scope="col">Maintenance</th>
-                        <th scope="col">Health</th>
-                        <th scope="col">Last push</th>
-                        <th scope="col">
-                          <span class="sr-only">Open</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody data-project-rows>
-                      {dashboard.projects.map((project) => (
-                        <tr
-                          data-project-category={project.category}
-                          data-project-downloads={project.npmDownloads30d}
-                          data-project-name={project.name.toLocaleLowerCase()}
-                          data-project-relevance={project.relevanceScore}
-                          data-project-stars={project.stars}
-                          data-project-status={project.status}
-                          data-project-updated={
-                            project.pushedAt ? Date.parse(project.pushedAt) : 0
-                          }
-                        >
-                          <td>
-                            <div class="project-cell">
-                              <span class="project-icon">
-                                <Icon
-                                  aria-hidden="true"
-                                  name={getCategoryIcon(project.category)}
-                                />
-                              </span>
-                              <span>
-                                <strong>
-                                  <a
-                                    class="project-link"
-                                    href={`/projects/${project.slug}/?range=${dashboard.range}`}
-                                  >
-                                    {project.name}
-                                  </a>
-                                </strong>
-                                <small>
-                                  {project.description ?? project.slug}
-                                </small>
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <StatusBadge status={project.status} />
-                          </td>
-                          <td>
-                            <strong>
-                              {formatNumber(project.npmDownloads30d)}
-                            </strong>
-                            <small>
-                              npm / 30d · relevance {project.relevanceScore}
-                            </small>
-                          </td>
-                          <td>
-                            <strong>{project.openIssues} issues</strong>
-                            <small>
-                              {project.stars} stars · {project.forks} forks
-                            </small>
-                          </td>
-                          <td>
-                            <span
-                              class={`health-label health-label--${project.healthStatus}`}
-                            >
-                              <span class="health-dot" />
-                              {project.healthStatus}
-                            </span>
-                            <small>
-                              {formatDuration(project.responseTimeMs)}
-                            </small>
-                          </td>
-                          <td>
-                            <strong>
-                              {formatRelativeDate(project.pushedAt)}
-                            </strong>
-                            <small>{formatDate(project.pushedAt)}</small>
-                          </td>
-                          <td>
-                            <ButtonLink
-                              ariaLabel={`View ${project.name} dashboard`}
-                              href={`/projects/${project.slug}/?range=${dashboard.range}`}
-                              shape="icon"
-                              variant="ghost"
-                            >
-                              <Icon aria-hidden="true" name="arrow-right" />
-                            </ButtonLink>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </Table>
-                <Card
-                  class="portfolio-filter-empty"
-                  data-project-filter-empty
-                  hidden
-                >
-                  <Empty>
-                    <Icon aria-hidden="true" name="search-x" />
-                    <p>No projects match those filters.</p>
-                    <Button data-project-clear type="button" variant="outline">
-                      Clear filters
-                    </Button>
-                  </Empty>
-                </Card>
-              </section>
-            </>
-          )
+                </section>
+              </>
+            )
         }
 
         <PrivateProjects />
@@ -647,9 +651,9 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
         <span>Observatory is private by design.</span>
         <span>
           Last successful sync {
-            dashboard.sync.completedAt
-              ? formatDate(dashboard.sync.completedAt)
-              : 'not run'
+            dashboard.sync.completedAt ?
+              formatDate(dashboard.sync.completedAt) :
+              'not run'
           }
         </span>
       </footer>
@@ -658,109 +662,131 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
 </AppLayout>
 
 <script>
-  const search = document.querySelector<HTMLInputElement>(
-    '[data-project-search]',
-  )
-  const category = document.querySelector<HTMLSelectElement>(
-    '[data-project-category]',
-  )
-  const status = document.querySelector<HTMLSelectElement>(
-    '[data-project-status]',
-  )
-  const sort = document.querySelector<HTMLSelectElement>('[data-project-sort]')
-  const rowsContainer = document.querySelector<HTMLTableSectionElement>(
-    '[data-project-rows]',
-  )
-  const resultCount = document.querySelector<HTMLElement>(
-    '[data-project-result-count]',
-  )
-  const empty = document.querySelector<HTMLElement>(
-    '[data-project-filter-empty]',
-  )
-  const table = rowsContainer?.closest<HTMLElement>('[role="region"]')
-  const rows = rowsContainer
-    ? [...rowsContainer.querySelectorAll<HTMLTableRowElement>('tr')]
-    : []
+const search = document.querySelector<HTMLInputElement>(
+  '[data-project-search]'
+)
 
-  const numericSortValue = (
-    row: HTMLTableRowElement,
-    selectedSort: string,
-  ): number => {
-    switch (selectedSort) {
-      case 'downloads':
-        return Number(row.dataset.projectDownloads ?? 0)
-      case 'stars':
-        return Number(row.dataset.projectStars ?? 0)
-      case 'updated':
-        return Number(row.dataset.projectUpdated ?? 0)
-      default:
-        return Number(row.dataset.projectRelevance ?? 0)
-    }
+const category = document.querySelector<HTMLSelectElement>(
+  '[data-project-category]'
+)
+
+const status = document.querySelector<HTMLSelectElement>(
+  '[data-project-status]'
+)
+
+const sort = document.querySelector<HTMLSelectElement>('[data-project-sort]')
+
+const rowsContainer = document.querySelector<HTMLTableSectionElement>(
+  '[data-project-rows]'
+)
+
+const resultCount = document.querySelector<HTMLElement>(
+  '[data-project-result-count]'
+)
+
+const empty = document.querySelector<HTMLElement>(
+  '[data-project-filter-empty]'
+)
+
+const table = rowsContainer?.closest<HTMLElement>('[role="region"]')
+
+const rows = rowsContainer ?
+  [...rowsContainer.querySelectorAll<HTMLTableRowElement>('tr')] :
+  []
+
+const numericSortValue = (
+  row: HTMLTableRowElement,
+  selectedSort: string
+): number => {
+  switch (selectedSort) {
+    case 'downloads':
+      return Number(row.dataset.projectDownloads ?? 0)
+
+    case 'stars':
+      return Number(row.dataset.projectStars ?? 0)
+
+    case 'updated':
+      return Number(row.dataset.projectUpdated ?? 0)
+
+    default:
+      return Number(row.dataset.projectRelevance ?? 0)
   }
+}
 
-  const updateProjects = () => {
-    const query = search?.value.trim().toLocaleLowerCase() ?? ''
-    const selectedCategory = category?.value ?? 'all'
-    const selectedStatus = status?.value ?? 'all'
-    const selectedSort = sort?.value ?? 'relevance'
+const updateProjects = () => {
+  const query = search?.value.trim().toLocaleLowerCase() ?? ''
+  const selectedCategory = category?.value ?? 'all'
+  const selectedStatus = status?.value ?? 'all'
+  const selectedSort = sort?.value ?? 'relevance'
 
-    rows.sort((left, right) => {
-      if (selectedSort === 'name')
-        return (left.dataset.projectName ?? '').localeCompare(
-          right.dataset.projectName ?? '',
-        )
-
-      return (
-        numericSortValue(right, selectedSort) -
-        numericSortValue(left, selectedSort)
+  rows.sort((left, right) => {
+    if (selectedSort === 'name')
+      return (left.dataset.projectName ?? '').localeCompare(
+        right.dataset.projectName ?? ''
       )
-    })
 
-    let visibleCount = 0
+    return (
+      numericSortValue(right, selectedSort) -
+      numericSortValue(left, selectedSort)
+    )
+  })
 
-    for (const row of rows) {
-      const matchesQuery =
-        query.length === 0 ||
-        row.textContent?.toLocaleLowerCase().includes(query) === true
-      const matchesCategory =
-        selectedCategory === 'all' ||
-        row.dataset.projectCategory === selectedCategory
-      const matchesStatus =
-        selectedStatus === 'all' || row.dataset.projectStatus === selectedStatus
-      const isVisible = matchesQuery && matchesCategory && matchesStatus
+  let visibleCount = 0
 
-      row.hidden = !isVisible
+  for (const row of rows) {
+    const matchesQuery =
+      query.length === 0 ||
+      row.textContent?.toLocaleLowerCase().includes(query) === true
 
-      if (isVisible) visibleCount += 1
+    const matchesCategory =
+      selectedCategory === 'all' ||
+      row.dataset.projectCategory === selectedCategory
 
-      rowsContainer?.append(row)
-    }
+    const matchesStatus =
+      selectedStatus === 'all' || row.dataset.projectStatus === selectedStatus
 
-    if (resultCount)
-      resultCount.textContent = `${visibleCount} project${
-        visibleCount === 1 ? '' : 's'
-      }`
+    const isVisible = matchesQuery && matchesCategory && matchesStatus
 
-    table?.toggleAttribute('hidden', visibleCount === 0)
-    empty?.toggleAttribute('hidden', visibleCount > 0)
+    row.hidden = !isVisible
+
+    if (isVisible) visibleCount += 1
+
+    rowsContainer?.append(row)
   }
 
-  search?.addEventListener('input', updateProjects)
-  category?.addEventListener('change', updateProjects)
-  status?.addEventListener('change', updateProjects)
-  sort?.addEventListener('change', updateProjects)
+  if (resultCount)
+    resultCount.textContent = `${visibleCount} project${
+      visibleCount === 1 ? '' : 's'
+    }`
 
-  for (const clear of document.querySelectorAll<HTMLButtonElement>(
-    '[data-project-clear]',
-  )) {
-    clear.addEventListener('click', () => {
-      if (search) search.value = ''
-      if (category) category.value = 'all'
-      if (status) status.value = 'all'
-      if (sort) sort.value = 'relevance'
+  table?.toggleAttribute('hidden', visibleCount === 0)
 
-      updateProjects()
-      search?.focus()
-    })
-  }
+  empty?.toggleAttribute('hidden', visibleCount > 0)
+}
+
+search?.addEventListener('input', updateProjects)
+
+category?.addEventListener('change', updateProjects)
+
+status?.addEventListener('change', updateProjects)
+
+sort?.addEventListener('change', updateProjects)
+
+for (const clear of document.querySelectorAll<HTMLButtonElement>(
+  '[data-project-clear]'
+)) {
+  clear.addEventListener('click', () => {
+    if (search) search.value = ''
+
+    if (category) category.value = 'all'
+
+    if (status) status.value = 'all'
+
+    if (sort) sort.value = 'relevance'
+
+    updateProjects()
+
+    search?.focus()
+  })
+}
 </script>

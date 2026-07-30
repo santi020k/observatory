@@ -4,7 +4,7 @@ import Icon from '@santi020k/lumen-astro/components/Icon'
 import Sidebar from '@santi020k/lumen-astro/components/Sidebar'
 import type {
   AnalyticsRange,
-  ProjectSettings,
+  ProjectSettings
 } from '@santi020k/observatory-api-types'
 
 import Brand from './Brand.astro'
@@ -22,14 +22,14 @@ interface Props {
 const { projects, range = '30d' } = Astro.props
 
 const orderedProjects = [...projects].sort(
-  (left, right) => Number(right.pinned) - Number(left.pinned),
+  (left, right) => Number(right.pinned) - Number(left.pinned)
 )
 
 const currentPath = Astro.url.pathname
 const currentSlug = /^\/projects\/([^/]+)/.exec(currentPath)?.[1]
 
 const getCategoryIcon = (
-  category: SidebarProject['category'],
+  category: SidebarProject['category']
 ): 'blocks' | 'layout-dashboard' | 'notebook-tabs' | 'wrench' => {
   if (category === 'app') return 'layout-dashboard'
 
@@ -79,39 +79,41 @@ const getCategoryIcon = (
       </div>
 
       {
-        orderedProjects.length > 0 ? (
-          <ul>
-            {orderedProjects.map((project) => (
-              <li>
-                <a
-                  aria-current={
-                    currentSlug === project.slug ? 'page' : undefined
-                  }
-                  class="sidebar-link"
-                  href={`/projects/${project.slug}/?range=${range}`}
-                >
-                  <span class="sidebar-link__icon">
-                    <Icon
-                      aria-hidden="true"
-                      name={getCategoryIcon(project.category)}
-                    />
-                  </span>
-                  <span>
-                    <strong>
-                      {project.name}
-                      {project.pinned && (
-                        <Icon aria-label="Pinned project" name="pin" />
-                      )}
-                    </strong>
-                    <small>{project.category}</small>
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p class="sidebar-empty">Sync projects to populate this list.</p>
-        )
+        orderedProjects.length > 0 ?
+          (
+            <ul>
+              {orderedProjects.map(project => (
+                <li>
+                  <a
+                    aria-current={
+                      currentSlug === project.slug ? 'page' : undefined
+                    }
+                    class="sidebar-link"
+                    href={`/projects/${project.slug}/?range=${range}`}
+                  >
+                    <span class="sidebar-link__icon">
+                      <Icon
+                        aria-hidden="true"
+                        name={getCategoryIcon(project.category)}
+                      />
+                    </span>
+                    <span>
+                      <strong>
+                        {project.name}
+                        {project.pinned && (
+                          <Icon aria-label="Pinned project" name="pin" />
+                        )}
+                      </strong>
+                      <small>{project.category}</small>
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) :
+          (
+            <p class="sidebar-empty">Sync projects to populate this list.</p>
+          )
       }
     </div>
   </nav>
@@ -143,4 +145,6 @@ const getCategoryIcon = (
   class="sidebar-backdrop"
   data-sidebar-close
   tabindex="-1"
-  type="button"></button>
+  type="button"
+>
+</button>
