@@ -91,60 +91,73 @@ const apiUrl = getBrowserApiUrl()
   const alert = document.querySelector<HTMLElement>('[data-form-alert]')
   const apiUrl = form?.dataset.apiUrl ?? '/api'
 
+  const setSubmitting = (
+    button: HTMLButtonElement | null,
+    buttonLabel: HTMLElement | null | undefined,
+    submitting: boolean
+  ) => {
+    if (button) {
+      button.disabled = submitting
+
+      button.toggleAttribute('aria-busy', submitting)
+
+      if (buttonLabel)
+        buttonLabel.textContent =
+          submitting ? 'Sending…' : 'Send verification code'
+    }
+  }
+
+  const displayError = (error: unknown) => {
+    if (!alert) return
+
+    alert.hidden = false
+
+    alert.textContent =
+      error instanceof Error ? error.message : 'Could not send the code.'
+  }
+
+  const requestCode = async (email: string) => {
+    const response = await fetch(`${apiUrl}/auth/request-code`, {
+      body: JSON.stringify({ email }),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST'
+    })
+
+    const result = await response.json()
+
+    if (!response.ok)
+      throw new Error(result.error?.message ?? 'Could not send the code.')
+
+    const query = new URLSearchParams({ email })
+
+    if (result.developmentCode) query.set('devCode', result.developmentCode)
+
+    window.location.assign(`/verify/?${query.toString()}`)
+  }
+
   form?.addEventListener('submit', async event => {
     event.preventDefault()
 
     const button = form.querySelector('button')
-    const formData = new FormData(form)
-    const email = String(formData.get('email') ?? '')
 
     const buttonLabel = button?.querySelector<HTMLElement>(
       '[data-submit-label]'
-  )
+    )
 
-    if (button) {
-      button.disabled = true
+    const formData = new FormData(form)
+    const email = String(formData.get('email') ?? '')
 
-      button.setAttribute('aria-busy', 'true')
-
-      if (buttonLabel) buttonLabel.textContent = 'Sending…'
-    }
+    setSubmitting(button, buttonLabel, true)
 
     if (alert) alert.hidden = true
 
     try {
-      const response = await fetch(`${apiUrl}/auth/request-code`, {
-        body: JSON.stringify({ email }),
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST'
-      })
-
-      const result = await response.json()
-
-      if (!response.ok)
-        throw new Error(result.error?.message ?? 'Could not send the code.')
-
-      const query = new URLSearchParams({ email })
-
-      if (result.developmentCode) query.set('devCode', result.developmentCode)
-
-      window.location.assign(`/verify/?${query.toString()}`)
+      await requestCode(email)
     } catch (error) {
-      if (alert) {
-        alert.hidden = false
+      displayError(error)
 
-        alert.textContent =
-          error instanceof Error ? error.message : 'Could not send the code.'
-      }
-
-      if (button) {
-        button.disabled = false
-
-        button.removeAttribute('aria-busy')
-
-        if (buttonLabel) buttonLabel.textContent = 'Send verification code'
-      }
+      setSubmitting(button, buttonLabel, false)
     }
   })
   </script>

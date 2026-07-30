@@ -2,7 +2,6 @@
 import AppHeader from '@/components/AppHeader.astro'
 import AppSidebar from '@/components/AppSidebar.astro'
 import MetricCard from '@/components/MetricCard.astro'
-import PrivateProjects from '@/components/PrivateProjects.astro'
 import RangePicker from '@/components/RangePicker.astro'
 import StatusBadge from '@/components/StatusBadge.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
@@ -644,7 +643,6 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
             )
         }
 
-        <PrivateProjects />
       </main>
 
       <footer class="app-footer">
@@ -713,55 +711,87 @@ const numericSortValue = (
   }
 }
 
-const updateProjects = () => {
-  const query = search?.value.trim().toLocaleLowerCase() ?? ''
-  const selectedCategory = category?.value ?? 'all'
-  const selectedStatus = status?.value ?? 'all'
-  const selectedSort = sort?.value ?? 'relevance'
-
-  rows.sort((left, right) => {
-    if (selectedSort === 'name')
-      return (left.dataset.projectName ?? '').localeCompare(
-        right.dataset.projectName ?? ''
-      )
-
-    return (
-      numericSortValue(right, selectedSort) -
-      numericSortValue(left, selectedSort)
+const compareProjectRows = (
+  left: HTMLTableRowElement,
+  right: HTMLTableRowElement,
+  selectedSort: string
+): number => {
+  if (selectedSort === 'name')
+    return (left.dataset.projectName ?? '').localeCompare(
+      right.dataset.projectName ?? ''
     )
-  })
 
-  let visibleCount = 0
+  return (
+    numericSortValue(right, selectedSort) -
+    numericSortValue(left, selectedSort)
+  )
+}
 
-  for (const row of rows) {
-    const matchesQuery =
-      query.length === 0 ||
-      row.textContent?.toLocaleLowerCase().includes(query) === true
+const rowMatchesFilters = (
+  row: HTMLTableRowElement,
+  query: string,
+  selectedCategory: string,
+  selectedStatus: string
+): boolean => {
+  const matchesQuery =
+    query.length === 0 ||
+    row.textContent?.toLocaleLowerCase().includes(query) === true
 
-    const matchesCategory =
-      selectedCategory === 'all' ||
-      row.dataset.projectCategory === selectedCategory
+  const matchesCategory =
+    selectedCategory === 'all' ||
+    row.dataset.projectCategory === selectedCategory
 
-    const matchesStatus =
-      selectedStatus === 'all' || row.dataset.projectStatus === selectedStatus
+  const matchesStatus =
+    selectedStatus === 'all' || row.dataset.projectStatus === selectedStatus
 
-    const isVisible = matchesQuery && matchesCategory && matchesStatus
+  return matchesQuery && matchesCategory && matchesStatus
+}
 
-    row.hidden = !isVisible
+const formatProjectCount = (count: number): string => `${count} project${count === 1 ? '' : 's'}`
 
-    if (isVisible) visibleCount += 1
+const readFilterValue = (
+  control: HTMLInputElement | HTMLSelectElement | null,
+  fallback: string
+): string => control?.value ?? fallback
 
-    rowsContainer?.append(row)
-  }
+const applyRowVisibility = (
+  row: HTMLTableRowElement,
+  isVisible: boolean
+) => {
+  row.hidden = !isVisible
 
-  if (resultCount)
-    resultCount.textContent = `${visibleCount} project${
-      visibleCount === 1 ? '' : 's'
-    }`
+  rowsContainer?.append(row)
+}
+
+const updateFilterSummary = (visibleCount: number) => {
+  if (resultCount) resultCount.textContent = formatProjectCount(visibleCount)
 
   table?.toggleAttribute('hidden', visibleCount === 0)
 
   empty?.toggleAttribute('hidden', visibleCount > 0)
+}
+
+const updateProjects = () => {
+  const query = readFilterValue(search, '').trim().toLocaleLowerCase()
+  const selectedCategory = readFilterValue(category, 'all')
+  const selectedStatus = readFilterValue(status, 'all')
+  const selectedSort = readFilterValue(sort, 'relevance')
+
+  rows.sort((left, right) => compareProjectRows(left, right, selectedSort))
+
+  let visibleCount = 0
+
+  for (const row of rows) {
+    const isVisible = rowMatchesFilters(
+      row, query, selectedCategory, selectedStatus
+    )
+
+    if (isVisible) visibleCount += 1
+
+    applyRowVisibility(row, isVisible)
+  }
+
+  updateFilterSummary(visibleCount)
 }
 
 search?.addEventListener('input', updateProjects)

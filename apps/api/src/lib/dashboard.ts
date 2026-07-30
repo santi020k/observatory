@@ -12,6 +12,7 @@ import {
   createDb,
   getLatestSuccessfulSyncRun,
   getLatestSyncRun,
+  getNpmDownloadsSince,
   getProjectPreferences,
   getPublicSnapshotsSince,
   getSnapshotsForSyncRun
@@ -22,6 +23,9 @@ import type { Bindings } from '../env'
 import { buildWebsiteAnalytics } from './cloudflare'
 
 type Snapshot = Awaited<ReturnType<typeof getSnapshotsForSyncRun>>[number]
+type NpmDownloadSnapshot = Awaited<
+  ReturnType<typeof getNpmDownloadsSince>
+>[number]
 
 type ProjectPreference = Pick<
   ProjectMetric,
@@ -47,6 +51,12 @@ const getRangeMilliseconds = (range: AnalyticsRange): number => {
   if (range === '30d') return 30 * 24 * 60 * 60 * 1_000
 
   if (range === '90d') return 90 * 24 * 60 * 60 * 1_000
+
+  if (range === 'ytd') {
+    const now = new Date()
+
+    return Date.now() - Date.UTC(now.getUTCFullYear(), 0, 1)
+  }
 
   if (range === '1y') return 365 * 24 * 60 * 60 * 1_000
 
@@ -128,7 +138,7 @@ const getBucketStart = (timestamp: number, range: AnalyticsRange): number => {
       break
 
     case '90d':
-      bucketMilliseconds = 3 * 24 * 60 * 60 * 1_000
+      bucketMilliseconds = 7 * 24 * 60 * 60 * 1_000
 
       break
 
@@ -178,34 +188,161 @@ const buildHistory = (rows: Snapshot[], range: AnalyticsRange) => {
     })
 }
 
-const getPeriodSummary = (
-  history: ReturnType<typeof buildHistory>,
-  rows: Snapshot[]
-) => {
+const buildRawHistory = (rows: Snapshot[]) => {
+  const snapshotsByCollection = new Map<number, Snapshot[]>()
+
+  for (const row of rows) {
+    const snapshots = snapshotsByCollection.get(row.collectedAt) ?? []
+
+    snapshots.push(row)
+
+    snapshotsByCollection.set(row.collectedAt, snapshots)
+  }
+
+  return [...snapshotsByCollection.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([collectedAt, snapshots]) => ({
+      collectedAt: new Date(collectedAt).toISOString(),
+      githubViews14d: sumNullable(
+        snapshots.map(snapshot => snapshot.githubViews14d)
+      ),
+      npmDownloads30d: snapshots.reduce(
+        (total, snapshot) => total + snapshot.npmDownloads30d, 0
+      ),
+      openIssues: snapshots.reduce(
+        (total, snapshot) => total + snapshot.openIssues, 0
+      ),
+      stars: snapshots.reduce(
+        (total, snapshot) => total + snapshot.stars, 0
+      )
+    }))
+}
+
+const getHistoryChange = <T>(
+  first: T | undefined,
+  last: T | undefined,
+  select: (value: T) => number
+): number => first && last ? select(last) - select(first) : 0
+
+const getPeriodSummary = (rows: Snapshot[]) => {
+  const history = buildRawHistory(rows)
   const first = history[0]
   const last = history[history.length - 1]
 
-  const collectedAt = [...new Set(rows.map(row => row.collectedAt))].sort(
-    (left, right) => left - right
-  )
+  return {
+    availableFrom: first?.collectedAt ?? null,
+    availableTo: last?.collectedAt ?? null,
+    downloadVelocityChange: getHistoryChange(
+      first, last, value => value.npmDownloads30d
+    ),
+    issueChange: getHistoryChange(first, last, value => value.openIssues),
+    starsGained: getHistoryChange(first, last, value => value.stars),
+    syncs: history.length
+  }
+}
 
-  const availableFrom = collectedAt[0]
-  const availableTo = collectedAt[collectedAt.length - 1]
+type NpmBucket = 'day' | 'month' | 'week' | 'year'
+
+const getNpmBucketStart = (
+  timestamp: number,
+  bucket: NpmBucket
+): number => {
+  const date = new Date(timestamp)
+  const year = date.getUTCFullYear()
+  const month = date.getUTCMonth()
+  const day = date.getUTCDate()
+
+  if (bucket === 'year') return Date.UTC(year, 0, 1)
+
+  if (bucket === 'month') return Date.UTC(year, month, 1)
+
+  if (bucket === 'week') {
+    const mondayOffset = (date.getUTCDay() + 6) % 7
+
+    return Date.UTC(year, month, day - mondayOffset)
+  }
+
+  return Date.UTC(year, month, day)
+}
+
+const aggregateNpmDownloads = (
+  rows: readonly NpmDownloadSnapshot[],
+  bucket: NpmBucket
+) => {
+  const downloadsByPeriod = new Map<number, number>()
+
+  for (const row of rows) {
+    const periodStart = getNpmBucketStart(row.periodStart, bucket)
+
+    downloadsByPeriod.set(
+      periodStart, (downloadsByPeriod.get(periodStart) ?? 0) + row.downloads
+    )
+  }
+
+  return [...downloadsByPeriod.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([periodStart, downloads]) => ({
+      downloads,
+      periodStart: new Date(periodStart).toISOString()
+    }))
+}
+
+export const buildNpmAnalytics = (
+  rows: readonly NpmDownloadSnapshot[]
+) => {
+  const sortedRows = [...rows].sort(
+    (left, right) => left.periodStart - right.periodStart
+  )
+  const downloadsByPackage = new Map<
+    string,
+    { downloads: number, packageName: string, slug: string }
+  >()
+
+  for (const row of sortedRows) {
+    const key = `${row.slug}\0${row.packageName}`
+    const current = downloadsByPackage.get(key)
+
+    downloadsByPackage.set(key, {
+      downloads: (current?.downloads ?? 0) + row.downloads,
+      packageName: row.packageName,
+      slug: row.slug
+    })
+  }
+
+  const packages = [...downloadsByPackage.values()].sort(
+    (left, right) => right.downloads - left.downloads ||
+      left.packageName.localeCompare(right.packageName)
+  )
 
   return {
     availableFrom:
-      availableFrom === undefined ?
-        null :
-        new Date(availableFrom).toISOString(),
+      sortedRows[0] ?
+        new Date(sortedRows[0].periodStart).toISOString() :
+        null,
     availableTo:
-      availableTo === undefined ? null : new Date(availableTo).toISOString(),
-    downloadVelocityChange:
-      first && last ? last.npmDownloads30d - first.npmDownloads30d : 0,
-    issueChange: first && last ? last.openIssues - first.openIssues : 0,
-    starsGained: first && last ? last.stars - first.stars : 0,
-    syncs: collectedAt.length
+      sortedRows.at(-1) ?
+        new Date(sortedRows.at(-1)?.periodStart ?? 0).toISOString() :
+        null,
+    daily: aggregateNpmDownloads(sortedRows, 'day'),
+    monthly: aggregateNpmDownloads(sortedRows, 'month'),
+    packages,
+    totalDownloads: packages.reduce(
+      (total, packageDownloads) => total + packageDownloads.downloads, 0
+    ),
+    weekly: aggregateNpmDownloads(sortedRows, 'week'),
+    yearly: aggregateNpmDownloads(sortedRows, 'year')
   }
 }
+
+const toSyncState = (
+  sync: Awaited<ReturnType<typeof getLatestSyncRun>>,
+  latestSuccessfulSync: Awaited<ReturnType<typeof getLatestSuccessfulSyncRun>>
+) => ({
+  completedAt: latestSuccessfulSync?.completedAt ?
+    new Date(latestSuccessfulSync.completedAt).toISOString() :
+    null,
+  status: sync?.status ?? 'idle'
+})
 
 const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
   const database = createDb(env.DB)
@@ -236,11 +373,13 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
 
   const isEnabled = (slug: string) => preferencesBySlug.get(slug)?.enabled !== false
 
-  const [latestRows, historyRows] = await Promise.all([
+  const since = Date.now() - getRangeMilliseconds(range)
+  const [latestRows, historyRows, npmDownloadRows] = await Promise.all([
     latestSuccessfulSync ?
       getSnapshotsForSyncRun(database, latestSuccessfulSync.id) :
       Promise.resolve([]),
-    getPublicSnapshotsSince(database, Date.now() - getRangeMilliseconds(range))
+    getPublicSnapshotsSince(database, since),
+    getNpmDownloadsSince(database, since)
   ])
 
   return {
@@ -249,6 +388,7 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
     isEnabled,
     latestRows,
     latestSuccessfulSync,
+    npmDownloadRows: npmDownloadRows.filter(row => isEnabled(row.slug)),
     sync
   }
 }
@@ -263,6 +403,7 @@ export const buildDashboard = async (
     isEnabled,
     latestRows,
     latestSuccessfulSync,
+    npmDownloadRows,
     sync
   } = await getDashboardRows(env, range)
 
@@ -276,7 +417,8 @@ export const buildDashboard = async (
   return dashboardSchema.parse({
     generatedAt: new Date().toISOString(),
     history,
-    period: getPeriodSummary(history, historyRows),
+    npmAnalytics: buildNpmAnalytics(npmDownloadRows),
+    period: getPeriodSummary(historyRows),
     projects,
     range,
     summary: {
@@ -296,12 +438,7 @@ export const buildDashboard = async (
       ),
       publicProjects: projects.length
     },
-    sync: {
-      completedAt: latestSuccessfulSync?.completedAt ?
-        new Date(latestSuccessfulSync.completedAt).toISOString() :
-        null,
-      status: sync?.status ?? 'idle'
-    }
+    sync: toSyncState(sync, latestSuccessfulSync)
   })
 }
 
@@ -310,8 +447,14 @@ export const buildProjectDashboard = async (
   slug: string,
   range: AnalyticsRange = '30d'
 ): Promise<ProjectDashboard | null> => {
-  const { getPreference, historyRows, isEnabled, latestRows } =
-    await getDashboardRows(env, range)
+  const {
+    getPreference,
+    historyRows,
+    isEnabled,
+    latestRows,
+    latestSuccessfulSync,
+    sync
+  } = await getDashboardRows(env, range)
 
   const row = latestRows.find(candidate => candidate.slug === slug)
 
@@ -335,9 +478,10 @@ export const buildProjectDashboard = async (
   return projectDashboardSchema.parse({
     generatedAt: new Date().toISOString(),
     history,
-    period: getPeriodSummary(history, projectHistoryRows),
+    period: getPeriodSummary(projectHistoryRows),
     project: toProjectMetric(row, preference),
     range,
+    sync: toSyncState(sync, latestSuccessfulSync),
     websiteAnalytics
   })
 }
@@ -347,8 +491,9 @@ export const buildProjectSettings = async (
 ): Promise<ProjectSettings> => {
   const database = createDb(env.DB)
 
-  const [latestSuccessfulSync, preferences] = await Promise.all([
+  const [latestSuccessfulSync, sync, preferences] = await Promise.all([
     getLatestSuccessfulSyncRun(database),
+    getLatestSyncRun(database),
     getProjectPreferences(database)
   ])
 
@@ -385,6 +530,7 @@ export const buildProjectSettings = async (
   })
 
   return projectSettingsSchema.parse({
-    projects: projects.sort(compareProjectRelevance)
+    projects: projects.sort(compareProjectRelevance),
+    sync: toSyncState(sync, latestSuccessfulSync)
   })
 }

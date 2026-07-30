@@ -268,7 +268,7 @@ describe('dashboard snapshot selection', () => {
     dateSpy.mockRestore()
   })
 
-  test('keeps the latest snapshot in each chart bucket and reports raw syncs', async () => {
+  test('keeps the latest chart snapshot while measuring every raw sync', async () => {
     const first = Date.UTC(2026, 6, 28, 1)
     const firstLatest = Date.UTC(2026, 6, 28, 23)
     const last = Date.UTC(2026, 6, 29, 12)
@@ -312,9 +312,70 @@ describe('dashboard snapshot selection', () => {
     expect(dashboard.period).toMatchObject({
       availableFrom: new Date(first).toISOString(),
       availableTo: new Date(last).toISOString(),
-      downloadVelocityChange: 10,
-      starsGained: 2,
+      downloadVelocityChange: 20,
+      starsGained: 3,
       syncs: 3
     })
+  })
+
+  test('does not let long-range chart buckets erase real growth', async () => {
+    const first = Date.UTC(2026, 6, 1)
+    const last = Date.UTC(2026, 6, 29)
+
+    mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([websiteSnapshot])
+    mocks.getPublicSnapshotsSince.mockResolvedValue([
+      {
+        ...websiteSnapshot,
+        collectedAt: first,
+        id: 'first',
+        npmDownloads30d: 10,
+        openIssues: 8,
+        stars: 1
+      },
+      {
+        ...websiteSnapshot,
+        collectedAt: last,
+        id: 'last',
+        npmDownloads30d: 30,
+        openIssues: 3,
+        stars: 4
+      }
+    ])
+
+    const dashboard = await buildDashboard(environment, '5y')
+
+    expect(dashboard.history).toHaveLength(1)
+    expect(dashboard.period).toMatchObject({
+      downloadVelocityChange: 20,
+      issueChange: -5,
+      starsGained: 3,
+      syncs: 2
+    })
+  })
+
+  test('uses weekly chart buckets for the 90-day range', async () => {
+    const week = 7 * 24 * 60 * 60 * 1_000
+    const bucketStart = Math.floor(Date.UTC(2026, 6, 1) / week) * week
+    const first = bucketStart + 24 * 60 * 60 * 1_000
+    const threeDaysLater = first + 3 * 24 * 60 * 60 * 1_000
+
+    mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([websiteSnapshot])
+    mocks.getPublicSnapshotsSince.mockResolvedValue([
+      { ...websiteSnapshot, collectedAt: first, id: 'first' },
+      {
+        ...websiteSnapshot,
+        collectedAt: threeDaysLater,
+        id: 'three-days-later'
+      }
+    ])
+
+    const dashboard = await buildDashboard(environment, '90d')
+
+    expect(dashboard.history).toHaveLength(1)
+    expect(dashboard.period.syncs).toBe(2)
   })
 })

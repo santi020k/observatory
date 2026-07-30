@@ -47,7 +47,7 @@ const [response, settingsResponse] = await Promise.all([
 
 if (response.status === 401) return Astro.redirect('/login/')
 
-if (response.status === 404) return Astro.redirect('/dashboard/')
+if (response.status === 404) return Astro.redirect('/404/')
 
 if (
   !response.ok ||
@@ -130,8 +130,10 @@ const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${
     <div class="app-workspace">
       <AppHeader
         apiUrl={apiUrl}
-        lastSync={formatRelativeDate(dashboard.generatedAt)}
-        syncStatus="succeeded"
+        lastSync={dashboard.sync.completedAt ?
+          formatRelativeDate(dashboard.sync.completedAt) :
+          'awaiting first sync'}
+        syncStatus={dashboard.sync.status}
       />
 
       <main class="dashboard project-dashboard" id="main-content">

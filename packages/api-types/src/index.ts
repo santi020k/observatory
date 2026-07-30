@@ -45,7 +45,14 @@ export const projectMetricSchema = z.object({
   websiteAnalyticsEnabled: z.boolean()
 })
 
-export const analyticsRangeSchema = z.enum(['5d', '30d', '90d', '1y', '5y'])
+export const analyticsRangeSchema = z.enum([
+  '5d',
+  '30d',
+  '90d',
+  'ytd',
+  '1y',
+  '5y'
+])
 
 export const historyPointSchema = z.object({
   collectedAt: z.string().trim(),
@@ -64,9 +71,37 @@ export const periodSummarySchema = z.object({
   syncs: z.int().nonnegative()
 })
 
+export const syncStateSchema = z.object({
+  completedAt: z.string().trim().nullable(),
+  status: z.enum(['failed', 'idle', 'running', 'succeeded'])
+})
+
+export const npmDownloadPointSchema = z.object({
+  downloads: z.int().nonnegative(),
+  periodStart: z.string().trim()
+})
+
+export const npmPackageDownloadsSchema = z.object({
+  downloads: z.int().nonnegative(),
+  packageName: z.string().trim(),
+  slug: z.string().trim()
+})
+
+export const npmAnalyticsSchema = z.object({
+  availableFrom: z.string().trim().nullable(),
+  availableTo: z.string().trim().nullable(),
+  daily: z.array(npmDownloadPointSchema),
+  monthly: z.array(npmDownloadPointSchema),
+  packages: z.array(npmPackageDownloadsSchema),
+  totalDownloads: z.int().nonnegative(),
+  weekly: z.array(npmDownloadPointSchema),
+  yearly: z.array(npmDownloadPointSchema)
+})
+
 export const dashboardSchema = z.object({
   generatedAt: z.string().trim(),
   history: z.array(historyPointSchema),
+  npmAnalytics: npmAnalyticsSchema,
   period: periodSummarySchema,
   projects: z.array(projectMetricSchema),
   range: analyticsRangeSchema,
@@ -78,10 +113,7 @@ export const dashboardSchema = z.object({
     openIssues: z.int().nonnegative(),
     publicProjects: z.int().nonnegative()
   }),
-  sync: z.object({
-    completedAt: z.string().trim().nullable(),
-    status: z.enum(['failed', 'idle', 'running', 'succeeded'])
-  })
+  sync: syncStateSchema
 })
 
 export const projectSettingSchema = z.object({
@@ -98,7 +130,8 @@ export const projectSettingSchema = z.object({
 })
 
 export const projectSettingsSchema = z.object({
-  projects: z.array(projectSettingSchema)
+  projects: z.array(projectSettingSchema),
+  sync: syncStateSchema
 })
 
 export const updateProjectSettingSchema = z
@@ -143,6 +176,7 @@ export const projectDashboardSchema = z.object({
   period: periodSummarySchema,
   project: projectMetricSchema,
   range: analyticsRangeSchema,
+  sync: syncStateSchema,
   websiteAnalytics: websiteAnalyticsSiteSchema.nullable()
 })
 

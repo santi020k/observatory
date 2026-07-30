@@ -21,6 +21,12 @@ export const analyticsRangeMeta = {
     label: '90 days',
     longLabel: 'last 90 days'
   },
+  ytd: {
+    bucketLabel: 'Weekly',
+    days: 0,
+    label: 'Year to date',
+    longLabel: 'year to date'
+  },
   '1y': {
     bucketLabel: 'Weekly',
     days: 365,
@@ -47,6 +53,7 @@ export const analyticsRangeOptions = [
   { label: analyticsRangeMeta['5d'].label, value: '5d' },
   { label: analyticsRangeMeta['30d'].label, value: '30d' },
   { label: analyticsRangeMeta['90d'].label, value: '90d' },
+  { label: analyticsRangeMeta.ytd.label, value: 'ytd' },
   { label: analyticsRangeMeta['1y'].label, value: '1y' },
   { label: analyticsRangeMeta['5y'].label, value: '5y' }
 ] as const satisfies readonly {
@@ -64,6 +71,13 @@ const getRangeDays = (range: AnalyticsRange): number => {
 
     case '90d':
       return analyticsRangeMeta['90d'].days
+
+    case 'ytd': {
+      const now = new Date()
+      const start = Date.UTC(now.getUTCFullYear(), 0, 1)
+
+      return Math.max(1, Math.ceil((Date.now() - start) / dayMilliseconds))
+    }
 
     case '1y':
       return analyticsRangeMeta['1y'].days
@@ -101,5 +115,5 @@ export const formatHistoryLabel = (
   day: 'numeric',
   ...(range === '5d' ? { hour: 'numeric' } : {}),
   month: 'short',
-  ...(range === '5y' ? { year: '2-digit' } : {})
+  ...(range === '5y' || range === 'ytd' ? { year: '2-digit' } : {})
 }).format(new Date(value))

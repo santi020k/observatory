@@ -1,8 +1,9 @@
-import { and, desc, eq, gt, gte, isNull, lt, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, isNull, lt, max, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 
 import {
   authCodes,
+  npmDownloadSnapshots,
   projectPreferences,
   projectSnapshots,
   sessions,
@@ -52,6 +53,15 @@ export interface WebsiteAnalyticsWrite {
   sampleInterval: number
   slug: string
   visits: number
+}
+
+export interface NpmDownloadWrite {
+  collectedAt: number
+  downloads: number
+  id: string
+  packageName: string
+  periodStart: number
+  slug: string
 }
 
 export interface ProjectPreferenceWrite {
@@ -195,6 +205,45 @@ export const insertSnapshots = async (
     })
   }
 }
+
+export const upsertNpmDownloads = async (
+  db: ObservatoryDb,
+  snapshots: readonly NpmDownloadWrite[]
+): Promise<void> => {
+  for (const snapshot of snapshots) {
+    await db
+      .insert(npmDownloadSnapshots)
+      .values(snapshot)
+      .onConflictDoUpdate({
+        set: {
+          collectedAt: snapshot.collectedAt,
+          downloads: snapshot.downloads,
+          slug: snapshot.slug
+        },
+        target: [
+          npmDownloadSnapshots.packageName,
+          npmDownloadSnapshots.periodStart
+        ]
+      })
+  }
+}
+
+export const getLatestNpmDownloadDates = async (db: ObservatoryDb) => db
+  .select({
+    packageName: npmDownloadSnapshots.packageName,
+    periodStart: max(npmDownloadSnapshots.periodStart)
+  })
+  .from(npmDownloadSnapshots)
+  .groupBy(npmDownloadSnapshots.packageName)
+
+export const getNpmDownloadsSince = async (
+  db: ObservatoryDb,
+  since: number
+) => db
+  .select()
+  .from(npmDownloadSnapshots)
+  .where(gte(npmDownloadSnapshots.periodStart, since))
+  .orderBy(npmDownloadSnapshots.periodStart)
 
 export const getSnapshotsForSyncRun = async (
   db: ObservatoryDb,

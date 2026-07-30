@@ -11,7 +11,7 @@ import {
 describe('analytics range contracts', () => {
   test('supports short, medium, and long persisted history windows', () => {
     expect(
-      ['5d', '30d', '90d', '1y', '5y'].every(
+      ['5d', '30d', '90d', 'ytd', '1y', '5y'].every(
         range => analyticsRangeSchema.safeParse(range).success
       )
     ).toBe(true)

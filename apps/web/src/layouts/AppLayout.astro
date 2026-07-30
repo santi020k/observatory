@@ -105,6 +105,7 @@ const themeCss = `
         theme = readStoredTheme()
 
         localStorage.setItem('lumen-theme', theme)
+
         applyStoredPreferences(root)
       } catch {
         // Storage may be unavailable; retain Observatory's defaults.

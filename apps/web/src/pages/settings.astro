@@ -4,6 +4,7 @@ import AppSidebar from '@/components/AppSidebar.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
 import { getBrowserApiUrl, getProjectSettings } from '@/lib/api'
+import { formatRelativeDate } from '@/lib/format'
 
 import Accordion from '@santi020k/lumen-astro/components/Accordion'
 import Badge from '@santi020k/lumen-astro/components/Badge'
@@ -12,6 +13,7 @@ import Card from '@santi020k/lumen-astro/components/Card'
 import Empty from '@santi020k/lumen-astro/components/Empty'
 import Icon from '@santi020k/lumen-astro/components/Icon'
 import NativeSelect from '@santi020k/lumen-astro/components/NativeSelect'
+import SearchField from '@santi020k/lumen-astro/components/SearchField'
 import Switch from '@santi020k/lumen-astro/components/Switch'
 import Tabs from '@santi020k/lumen-astro/components/Tabs'
 
@@ -53,8 +55,10 @@ const getCategoryIcon = (
     <div class="app-workspace">
       <AppHeader
         apiUrl={apiUrl}
-        lastSync="after the latest sync"
-        syncStatus="succeeded"
+        lastSync={settings.sync.completedAt ?
+          formatRelativeDate(settings.sync.completedAt) :
+          'awaiting first sync'}
+        syncStatus={settings.sync.status}
       />
 
       <main class="dashboard settings-dashboard" id="main-content">
@@ -162,9 +166,40 @@ const getCategoryIcon = (
                         All changes saved
                       </span>
                     </div>
+                    <div
+                      class="project-settings-filters"
+                      aria-label="Filter project settings"
+                      role="search"
+                    >
+                      <SearchField
+                        aria-label="Search project settings"
+                        data-project-settings-search
+                        placeholder="Search projects"
+                      />
+                      <NativeSelect
+                        aria-label="Filter by inclusion"
+                        data-project-settings-scope
+                        options={[
+                          { label: 'All projects', value: 'all' },
+                          { label: 'Included', value: 'included' },
+                          { label: 'Excluded', value: 'excluded' }
+                        ]}
+                        size="sm"
+                      />
+                      <span
+                        class="project-settings-result"
+                        aria-live="polite"
+                        data-project-settings-result
+                      >
+                        {settings.projects.length} projects
+                      </span>
+                    </div>
                     <Accordion class="project-settings-list" variant="flush">
                       {settings.projects.map((project, index) => (
                         <details
+                          data-enabled={String(project.enabled)}
+                          data-project-name={project.name.toLocaleLowerCase()}
+                          data-project-settings-item
                           id={`project-${project.slug}`}
                           open={index === 0}
                         >
@@ -354,6 +389,11 @@ const getCategoryIcon = (
                         </details>
                       ))}
                     </Accordion>
+                    <Empty data-project-settings-empty hidden>
+                      <Icon aria-hidden="true" name="search-x" />
+                      <h3>No matching projects</h3>
+                      <p>Try another name or inclusion filter.</p>
+                    </Empty>
                   </Card>
                 )
             }
@@ -550,45 +590,58 @@ const localSaveState = document.querySelector<HTMLElement>(
   '[data-local-save-state]'
 )
 
+const readPreferenceControls = (): BrowserPreferences => ({
+  density:
+    document.querySelector<HTMLSelectElement>(
+      '[data-preference="density"]'
+    )?.value === 'compact' ?
+      'compact' :
+      'comfortable',
+  reduceMotion:
+    document.querySelector<HTMLInputElement>(
+      '[data-preference="reduceMotion"]'
+    )?.checked ?? false,
+  showDetails:
+    document.querySelector<HTMLInputElement>(
+      '[data-preference="showDetails"]'
+    )?.checked ?? true
+})
+
+const saveBrowserPreferences = (preferences: BrowserPreferences): boolean => {
+  try {
+    localStorage.setItem(preferenceKey, JSON.stringify(preferences))
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+const announcePreferenceSave = (saved: boolean) => {
+  if (!localSaveState) return
+
+  if (!saved) {
+    localSaveState.textContent = 'Browser storage is unavailable'
+
+    return
+  }
+
+  localSaveState.textContent = 'Saved just now'
+
+  window.setTimeout(() => {
+    localSaveState.textContent = 'Saved in this browser'
+  }, 1_600)
+}
+
 for (const control of document.querySelectorAll<
     HTMLInputElement | HTMLSelectElement
 >('[data-preference]')) {
   control.addEventListener('change', () => {
-    browserPreferences = {
-      density:
-          document.querySelector<HTMLSelectElement>(
-            '[data-preference="density"]'
-          )?.value === 'compact' ?
-            'compact' :
-            'comfortable',
-      reduceMotion:
-          document.querySelector<HTMLInputElement>(
-            '[data-preference="reduceMotion"]'
-          )?.checked ?? false,
-      showDetails:
-          document.querySelector<HTMLInputElement>(
-            '[data-preference="showDetails"]'
-          )?.checked ?? true
-    }
-
-    try {
-      localStorage.setItem(preferenceKey, JSON.stringify(browserPreferences))
-    } catch {
-      if (localSaveState)
-        localSaveState.textContent = 'Browser storage is unavailable'
-    }
+    browserPreferences = readPreferenceControls()
 
     applyPreferences(browserPreferences)
 
-    if (localSaveState) {
-      if (localSaveState.textContent !== 'Browser storage is unavailable')
-        localSaveState.textContent = 'Saved just now'
-
-      window.setTimeout(() => {
-        if (localSaveState.textContent !== 'Browser storage is unavailable')
-          localSaveState.textContent = 'Saved in this browser'
-      }, 1_600)
-    }
+    announcePreferenceSave(saveBrowserPreferences(browserPreferences))
   })
 }
 
@@ -632,6 +685,74 @@ const projectControls = document.querySelectorAll<
     HTMLInputElement | HTMLSelectElement
 >('[data-project-control]')
 
+const projectSearch = document.querySelector<HTMLInputElement>(
+  '[data-project-settings-search]'
+)
+
+const projectScope = document.querySelector<HTMLSelectElement>(
+  '[data-project-settings-scope]'
+)
+
+const projectItems = [
+  ...document.querySelectorAll<HTMLDetailsElement>(
+    '[data-project-settings-item]'
+  )
+]
+
+const projectResult = document.querySelector<HTMLElement>(
+  '[data-project-settings-result]'
+)
+
+const projectFilterEmpty = document.querySelector<HTMLElement>(
+  '[data-project-settings-empty]'
+)
+
+const matchesProjectScope = (
+  item: HTMLDetailsElement,
+  scope: string
+): boolean => scope === 'all' ||
+  (scope === 'included' && item.dataset.enabled === 'true') ||
+  (scope === 'excluded' && item.dataset.enabled === 'false')
+
+const updateProjectItemVisibility = (
+  item: HTMLDetailsElement,
+  query: string,
+  scope: string
+): boolean => {
+  const matchesQuery =
+    query.length === 0 ||
+    item.dataset.projectName?.includes(query) === true
+
+  const visible = matchesQuery && matchesProjectScope(item, scope)
+
+  item.hidden = !visible
+
+  return visible
+}
+
+const updateProjectFilterSummary = (visible: number) => {
+  if (projectResult)
+    projectResult.textContent =
+      `${visible} project${visible === 1 ? '' : 's'}`
+
+  projectFilterEmpty?.toggleAttribute('hidden', visible > 0)
+}
+
+const updateProjectFilters = () => {
+  const query = projectSearch?.value.trim().toLocaleLowerCase() ?? ''
+  const scope = projectScope?.value ?? 'all'
+
+  const visible = projectItems.filter(
+    item => updateProjectItemVisibility(item, query, scope)
+  ).length
+
+  updateProjectFilterSummary(visible)
+}
+
+projectSearch?.addEventListener('input', updateProjectFilters)
+
+projectScope?.addEventListener('change', updateProjectFilters)
+
 const updateCount = () => {
   const enabled = [...inclusionToggles].filter(
     toggle => toggle.checked
@@ -654,6 +775,14 @@ const updateProjectState = (slug: string | undefined, enabled: boolean) => {
   state.textContent = enabled ? 'Included' : 'Excluded'
 
   state.dataset.enabled = String(enabled)
+
+  const item = state.closest<HTMLDetailsElement>(
+    '[data-project-settings-item]'
+  )
+
+  if (item) item.dataset.enabled = String(enabled)
+
+  updateProjectFilters()
 }
 
 const updatePinnedState = (slug: string | undefined, pinned: boolean) => {
@@ -695,6 +824,68 @@ const setControlValue = (
   control.value = value
 }
 
+const getControlValue = (
+  control: HTMLInputElement | HTMLSelectElement
+): boolean | string => control instanceof HTMLInputElement ? control.checked : control.value
+
+const getSavedControlValue = (
+  control: HTMLInputElement | HTMLSelectElement
+): string => control.dataset.savedValue ??
+  (control instanceof HTMLInputElement ?
+    String(!control.checked) :
+    control.value)
+
+const applyOptimisticProjectState = (
+  field: string,
+  slug: string,
+  value: boolean | string
+) => {
+  if (field === 'enabled') {
+    updateCount()
+
+    updateProjectState(slug, Boolean(value))
+  }
+
+  if (field === 'pinned') updatePinnedState(slug, Boolean(value))
+}
+
+const restoreProjectState = (
+  control: HTMLInputElement | HTMLSelectElement,
+  field: string,
+  slug: string,
+  savedValue: string
+) => {
+  setControlValue(control, savedValue)
+
+  if (field === 'enabled') {
+    updateCount()
+
+    updateProjectState(slug, savedValue === 'true')
+  }
+
+  if (field === 'pinned') updatePinnedState(slug, savedValue === 'true')
+}
+
+const persistProjectSetting = async (
+  field: string,
+  slug: string,
+  value: boolean | string
+) => {
+  const response = await fetch(`${apiUrl}/settings/projects`, {
+    body: JSON.stringify({
+      [field]: value,
+      slug
+    }),
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST'
+  })
+
+  if (!response.ok) throw new Error('Save failed')
+
+  if (field === 'enabled' || field === 'pinned') await updateSidebar()
+}
+
 for (const control of projectControls) {
   control.addEventListener('change', async () => {
     const field = control.dataset.projectSetting
@@ -702,57 +893,23 @@ for (const control of projectControls) {
 
     if (!field || !slug) return
 
-    const savedValue =
-      control.dataset.savedValue ??
-      (control instanceof HTMLInputElement ?
-        String(!control.checked) :
-        control.value)
-
-    const value =
-      control instanceof HTMLInputElement ? control.checked : control.value
+    const savedValue = getSavedControlValue(control)
+    const value = getControlValue(control)
 
     control.disabled = true
 
     if (saveState) saveState.textContent = 'Saving…'
 
-    if (field === 'enabled') {
-      updateCount()
-
-      updateProjectState(slug, Boolean(value))
-    }
-
-    if (field === 'pinned') updatePinnedState(slug, Boolean(value))
+    applyOptimisticProjectState(field, slug, value)
 
     try {
-      const response = await fetch(`${apiUrl}/settings/projects`, {
-        body: JSON.stringify({
-          [field]: value,
-          slug
-        }),
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST'
-      })
-
-      if (!response.ok) throw new Error('Save failed')
+      await persistProjectSetting(field, slug, value)
 
       control.dataset.savedValue = String(value)
 
       if (saveState) saveState.textContent = 'All changes saved'
-
-      if (field === 'enabled' || field === 'pinned') {
-        await updateSidebar()
-      }
     } catch {
-      setControlValue(control, savedValue)
-
-      if (field === 'enabled') {
-        updateCount()
-
-        updateProjectState(slug, savedValue === 'true')
-      }
-
-      if (field === 'pinned') updatePinnedState(slug, savedValue === 'true')
+      restoreProjectState(control, field, slug, savedValue)
 
       if (saveState) saveState.textContent = 'Could not save — try again'
     } finally {

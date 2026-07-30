@@ -144,13 +144,12 @@ sidebarTrigger?.addEventListener('click', () => {
 for (const closeButton of sidebarCloseButtons)
   closeButton.addEventListener('click', () => closeSidebar(true))
 
+const shouldTrapSidebarFocus = (event: KeyboardEvent): boolean => event.key === 'Tab' &&
+  mobileSidebarQuery.matches &&
+  sidebar?.classList.contains('is-open') === true
+
 const trapSidebarFocus = (event: KeyboardEvent) => {
-  if (
-    event.key !== 'Tab' ||
-    !mobileSidebarQuery.matches ||
-    !sidebar?.classList.contains('is-open')
-  )
-    return
+  if (!shouldTrapSidebarFocus(event) || !sidebar) return
 
   const focusable = [
     ...sidebar.querySelectorAll<HTMLElement>(

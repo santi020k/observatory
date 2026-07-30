@@ -3,22 +3,22 @@ import { defineConfig } from 'astro/config'
 
 export default defineConfig({
   adapter: cloudflare({
-    imageService: 'compile',
+    imageService: 'compile'
   }),
   output: 'server',
   security: {
-    checkOrigin: true,
+    checkOrigin: true
   },
   server: {
     host: true,
-    port: 4321,
+    port: 4321
   },
   vite: {
     ssr: {
       optimizeDeps: {
         ignoreOutdatedRequests: true,
-        include: ['zod'],
-      },
-    },
-  },
+        include: ['zod']
+      }
+    }
+  }
 })

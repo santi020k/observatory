@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
   authCodes,
+  npmDownloadSnapshots,
   projectPreferences,
   projectSnapshots,
   sessions,
@@ -18,11 +19,19 @@ describe('observatory database schema', () => {
 
     expect(getTableName(projectSnapshots)).toBe('project_snapshots')
 
+    expect(getTableName(npmDownloadSnapshots)).toBe('npm_download_snapshots')
+
     expect(getTableName(syncRuns)).toBe('sync_runs')
 
     expect(getTableName(websiteAnalyticsSnapshots)).toBe(
       'website_analytics_snapshots'
     )
+  })
+
+  test('stores exact npm downloads separately from rolling project metrics', () => {
+    expect(npmDownloadSnapshots.packageName.name).toBe('package_name')
+
+    expect(npmDownloadSnapshots.periodStart.name).toBe('period_start')
   })
 
   test('stores visibility on every project snapshot', () => {

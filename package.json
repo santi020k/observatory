@@ -19,8 +19,8 @@
     "doctor": "pnpm --filter @santi020k/observatory-web doctor",
     "lint": "pnpm run lint:repo && turbo run lint",
     "lint:fix": "pnpm run lint:repo:fix && turbo run lint:fix",
-    "lint:repo": "eslint eslint.config.ts scripts --cache --no-warn-ignored --max-warnings=0",
-    "lint:repo:fix": "eslint eslint.config.ts scripts --cache --fix --no-warn-ignored --max-warnings=0",
+    "lint:repo": "eslint . --cache --no-warn-ignored --max-warnings=0",
+    "lint:repo:fix": "eslint . --cache --fix --no-warn-ignored --max-warnings=0",
     "setup:github": "node scripts/setup-github-token.mjs",
     "setup:local": "node scripts/setup-local.mjs",
     "test": "turbo run test",
@@ -30,8 +30,8 @@
     "pre-push": "pnpm run verify"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.2.1",
-    "@commitlint/config-conventional": "^21.2.0",
+    "@commitlint/cli": "catalog:",
+    "@commitlint/config-conventional": "catalog:",
     "@santi020k/commitprompt": "catalog:",
     "@santi020k/eslint-config-astro": "catalog:",
     "@santi020k/eslint-config-basic": "catalog:",
@@ -41,11 +41,11 @@
     "@santi020k/eslint-config-libraries": "catalog:",
     "@santi020k/eslint-config-testing": "catalog:",
     "@santi020k/eslint-config-tools": "catalog:",
-    "eslint": "^10.7.0",
-    "husky": "^9.1.7",
-    "prettier": "^3.9.5",
-    "prettier-plugin-astro": "^0.14.1",
-    "turbo": "^2.10.6",
-    "typescript": "^6.0.3"
+    "eslint": "catalog:",
+    "husky": "catalog:",
+    "prettier": "catalog:",
+    "prettier-plugin-astro": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
   }
 }

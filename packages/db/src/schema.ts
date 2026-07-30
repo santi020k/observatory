@@ -72,6 +72,25 @@ export const projectSnapshots = sqliteTable(
   ]
 )
 
+export const npmDownloadSnapshots = sqliteTable(
+  'npm_download_snapshots', {
+    collectedAt: integer('collected_at').notNull(),
+    downloads: integer('downloads').notNull().default(0),
+    id: text('id').primaryKey(),
+    packageName: text('package_name').notNull(),
+    periodStart: integer('period_start').notNull(),
+    slug: text('slug').notNull()
+  }, table => [
+    index('npm_download_snapshots_period_idx').on(table.periodStart),
+    index('npm_download_snapshots_slug_period_idx').on(
+      table.slug, table.periodStart
+    ),
+    uniqueIndex('npm_download_snapshots_package_period_idx').on(
+      table.packageName, table.periodStart
+    )
+  ]
+)
+
 export const projectPreferences = sqliteTable('project_preferences', {
   attentionMode: text('attention_mode').notNull().default('all'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),

@@ -1,0 +1,30 @@
+---
+import AppLayout from '@/layouts/AppLayout.astro'
+
+import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
+import Card from '@santi020k/lumen-astro/components/Card'
+import Icon from '@santi020k/lumen-astro/components/Icon'
+---
+
+<AppLayout
+  description="The requested Observatory page could not be found."
+  title="Page not found · Observatory"
+>
+  <main class="error-page" id="main-content">
+    <Card as="section" class="error-card" aria-labelledby="not-found-title">
+      <span class="error-card__icon">
+        <Icon aria-hidden="true" name="telescope" />
+      </span>
+      <span class="eyebrow">Lost signal</span>
+      <h1 id="not-found-title">That page is outside this Observatory.</h1>
+      <p>
+        The project may be excluded from analysis, or the address may no longer
+        exist.
+      </p>
+      <ButtonLink href="/dashboard/">
+        <Icon aria-hidden="true" name="arrow-left" />
+        Return to overview
+      </ButtonLink>
+    </Card>
+  </main>
+</AppLayout>

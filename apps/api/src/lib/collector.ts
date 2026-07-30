@@ -294,10 +294,10 @@ const inferStatus = (repository: GithubRepository): ProjectStatus => {
 }
 
 interface CollectedRepositoryData {
-  clones: number
+  clones: number | null
   packageMetrics: PackageMetrics
   pullRequestsCount: number
-  views: number
+  views: number | null
   websiteHealth: WebsiteHealth
 }
 
