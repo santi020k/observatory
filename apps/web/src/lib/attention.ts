@@ -9,7 +9,7 @@ const staleAfterMilliseconds = 120 * 24 * 60 * 60 * 1_000
 
 export const needsAttention = (
   project: AttentionProject,
-  now = Date.now(),
+  now = Date.now()
 ): boolean => {
   if (project.attentionMode === 'off') return false
 

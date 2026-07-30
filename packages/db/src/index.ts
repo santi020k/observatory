@@ -7,7 +7,7 @@ import {
   projectSnapshots,
   sessions,
   syncRuns,
-  websiteAnalyticsSnapshots,
+  websiteAnalyticsSnapshots
 } from './schema'
 
 export * from './schema'
@@ -65,7 +65,7 @@ export const createDb = (client: D1Database) => drizzle(client)
 
 export const insertAuthCode = async (
   db: ObservatoryDb,
-  values: typeof authCodes.$inferInsert,
+  values: typeof authCodes.$inferInsert
 ): Promise<void> => {
   await db.insert(authCodes).values(values)
 }
@@ -73,7 +73,7 @@ export const insertAuthCode = async (
 export const countRecentAuthCodes = async (
   db: ObservatoryDb,
   email: string,
-  since: number,
+  since: number
 ): Promise<number> => {
   const result = await db
     .select({ count: sql<number>`count(*)` })
@@ -86,40 +86,36 @@ export const countRecentAuthCodes = async (
 export const findLatestUsableCode = async (
   db: ObservatoryDb,
   email: string,
-  now: number,
-) =>
-  db
-    .select()
-    .from(authCodes)
-    .where(
-      and(
-        eq(authCodes.email, email),
-        isNull(authCodes.usedAt),
-        gt(authCodes.expiresAt, now),
-        lt(authCodes.attempts, 5),
-      ),
+  now: number
+) => db
+  .select()
+  .from(authCodes)
+  .where(
+    and(
+      eq(authCodes.email, email), isNull(authCodes.usedAt), gt(authCodes.expiresAt, now), lt(authCodes.attempts, 5)
     )
-    .orderBy(desc(authCodes.createdAt))
-    .limit(1)
-    .then((rows) => rows[0] ?? null)
+  )
+  .orderBy(desc(authCodes.createdAt))
+  .limit(1)
+  .then(rows => rows[0] ?? null)
 
 export const recordCodeAttempt = async (
   db: ObservatoryDb,
   id: string,
-  usedAt?: number,
+  usedAt?: number
 ): Promise<void> => {
   await db
     .update(authCodes)
     .set({
       attempts: sql`${authCodes.attempts} + 1`,
-      ...(usedAt === undefined ? {} : { usedAt }),
+      ...(usedAt === undefined ? {} : { usedAt })
     })
     .where(eq(authCodes.id, id))
 }
 
 export const insertSession = async (
   db: ObservatoryDb,
-  values: typeof sessions.$inferInsert,
+  values: typeof sessions.$inferInsert
 ): Promise<void> => {
   await db.insert(sessions).values(values)
 }
@@ -127,25 +123,24 @@ export const insertSession = async (
 export const findSession = async (
   db: ObservatoryDb,
   tokenHash: string,
-  now: number,
-) =>
-  db
-    .select()
-    .from(sessions)
-    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, now)))
-    .limit(1)
-    .then((rows) => rows[0] ?? null)
+  now: number
+) => db
+  .select()
+  .from(sessions)
+  .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, now)))
+  .limit(1)
+  .then(rows => rows[0] ?? null)
 
 export const deleteSession = async (
   db: ObservatoryDb,
-  tokenHash: string,
+  tokenHash: string
 ): Promise<void> => {
   await db.delete(sessions).where(eq(sessions.tokenHash, tokenHash))
 }
 
 export const cleanupExpiredAuth = async (
   db: ObservatoryDb,
-  now: number,
+  now: number
 ): Promise<void> => {
   await db.delete(authCodes).where(lt(authCodes.expiresAt, now))
 
@@ -155,13 +150,13 @@ export const cleanupExpiredAuth = async (
 export const startSyncRun = async (
   db: ObservatoryDb,
   id: string,
-  startedAt: number,
+  startedAt: number
 ): Promise<void> => {
   await db.insert(syncRuns).values({
     id,
     projectCount: 0,
     startedAt,
-    status: 'running',
+    status: 'running'
   })
 }
 
@@ -173,7 +168,7 @@ export const completeSyncRun = async (
     errorMessage?: string
     projectCount: number
     status: string
-  },
+  }
 ): Promise<void> => {
   await db
     .update(syncRuns)
@@ -181,14 +176,14 @@ export const completeSyncRun = async (
       completedAt: values.completedAt,
       errorMessage: values.errorMessage ?? null,
       projectCount: values.projectCount,
-      status: values.status,
+      status: values.status
     })
     .where(eq(syncRuns.id, id))
 }
 
 export const insertSnapshots = async (
   db: ObservatoryDb,
-  snapshots: readonly SnapshotWrite[],
+  snapshots: readonly SnapshotWrite[]
 ): Promise<void> => {
   // D1 enforces a low bound-variable limit per statement. One snapshot has 24
   // columns, so single-row writes remain safely below the limit at any catalog size.
@@ -196,75 +191,68 @@ export const insertSnapshots = async (
     await db.insert(projectSnapshots).values({
       ...snapshot,
       npmPackages: JSON.stringify(snapshot.npmPackages),
-      topics: JSON.stringify(snapshot.topics),
+      topics: JSON.stringify(snapshot.topics)
     })
   }
 }
 
 export const getSnapshotsForSyncRun = async (
   db: ObservatoryDb,
-  syncRunId: string,
-) =>
-  db
-    .select()
-    .from(projectSnapshots)
-    .where(
-      and(
-        eq(projectSnapshots.visibility, 'public'),
-        eq(projectSnapshots.syncRunId, syncRunId),
-      ),
+  syncRunId: string
+) => db
+  .select()
+  .from(projectSnapshots)
+  .where(
+    and(
+      eq(projectSnapshots.visibility, 'public'), eq(projectSnapshots.syncRunId, syncRunId)
     )
-    .orderBy(desc(projectSnapshots.pushedAt))
+  )
+  .orderBy(desc(projectSnapshots.pushedAt))
 
 export const getPublicSnapshotsSince = async (
   db: ObservatoryDb,
-  since: number,
-) =>
-  db
-    .select()
-    .from(projectSnapshots)
-    .where(
-      and(
-        eq(projectSnapshots.visibility, 'public'),
-        gte(projectSnapshots.collectedAt, since),
-      ),
+  since: number
+) => db
+  .select()
+  .from(projectSnapshots)
+  .where(
+    and(
+      eq(projectSnapshots.visibility, 'public'), gte(projectSnapshots.collectedAt, since)
     )
-    .orderBy(projectSnapshots.collectedAt)
+  )
+  .orderBy(projectSnapshots.collectedAt)
 
-export const getProjectPreferences = async (db: ObservatoryDb) =>
-  db.select().from(projectPreferences)
+export const getProjectPreferences = async (db: ObservatoryDb) => db.select().from(projectPreferences)
 
 export const setProjectPreference = async (
   db: ObservatoryDb,
   slug: string,
   values: ProjectPreferenceWrite,
-  updatedAt: number,
+  updatedAt: number
 ): Promise<void> => {
   await db
     .insert(projectPreferences)
     .values({ ...values, slug, updatedAt })
     .onConflictDoUpdate({
       set: { ...values, updatedAt },
-      target: projectPreferences.slug,
+      target: projectPreferences.slug
     })
 }
 
-export const getLatestSyncRun = async (db: ObservatoryDb) =>
-  db
-    .select()
-    .from(syncRuns)
-    .orderBy(desc(syncRuns.startedAt))
-    .limit(1)
-    .then((rows) => rows[0] ?? null)
+export const getLatestSyncRun = async (db: ObservatoryDb) => db
+  .select()
+  .from(syncRuns)
+  .orderBy(desc(syncRuns.startedAt))
+  .limit(1)
+  .then(rows => rows[0] ?? null)
 
-export const getLatestSuccessfulSyncRun = async (db: ObservatoryDb) =>
-  db
-    .select()
-    .from(syncRuns)
-    .where(eq(syncRuns.status, 'succeeded'))
-    .orderBy(desc(syncRuns.startedAt))
-    .limit(1)
-    .then((rows) => rows[0] ?? null)
+export const getLatestSuccessfulSyncRun = async (db: ObservatoryDb) => db
+  .select()
+  .from(syncRuns)
+  .where(eq(syncRuns.status, 'succeeded'))
+  .orderBy(desc(syncRuns.startedAt))
+  .limit(1)
+  .then(rows => rows[0] ?? null)
 
 export const getAnalyticsWebsites = async (db: ObservatoryDb) => {
   const latestSync = await getLatestSuccessfulSyncRun(db)
@@ -273,17 +261,17 @@ export const getAnalyticsWebsites = async (db: ObservatoryDb) => {
 
   const [rows, preferences] = await Promise.all([
     getSnapshotsForSyncRun(db, latestSync.id),
-    getProjectPreferences(db),
+    getProjectPreferences(db)
   ])
 
   const analyticsEnabledBySlug = new Map(
-    preferences.map((preference) => [
+    preferences.map(preference => [
       preference.slug,
-      preference.websiteAnalyticsEnabled,
-    ]),
+      preference.websiteAnalyticsEnabled
+    ])
   )
 
-  return rows.flatMap((row) => {
+  return rows.flatMap(row => {
     if (!row.websiteUrl || analyticsEnabledBySlug.get(row.slug) === false)
       return []
 
@@ -297,7 +285,7 @@ export const getAnalyticsWebsites = async (db: ObservatoryDb) => {
 
 export const upsertWebsiteAnalytics = async (
   db: ObservatoryDb,
-  snapshots: readonly WebsiteAnalyticsWrite[],
+  snapshots: readonly WebsiteAnalyticsWrite[]
 ): Promise<void> => {
   for (const snapshot of snapshots) {
     await db
@@ -310,22 +298,21 @@ export const upsertWebsiteAnalytics = async (
           pageViews: snapshot.pageViews,
           periodEnd: snapshot.periodEnd,
           sampleInterval: snapshot.sampleInterval,
-          visits: snapshot.visits,
+          visits: snapshot.visits
         },
         target: [
           websiteAnalyticsSnapshots.slug,
-          websiteAnalyticsSnapshots.periodStart,
-        ],
+          websiteAnalyticsSnapshots.periodStart
+        ]
       })
   }
 }
 
 export const getWebsiteAnalyticsSince = async (
   db: ObservatoryDb,
-  since: number,
-) =>
-  db
-    .select()
-    .from(websiteAnalyticsSnapshots)
-    .where(gte(websiteAnalyticsSnapshots.periodStart, since))
-    .orderBy(websiteAnalyticsSnapshots.periodStart)
+  since: number
+) => db
+  .select()
+  .from(websiteAnalyticsSnapshots)
+  .where(gte(websiteAnalyticsSnapshots.periodStart, since))
+  .orderBy(websiteAnalyticsSnapshots.periodStart)

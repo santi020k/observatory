@@ -1,26 +1,34 @@
 import type { SnapshotWrite } from '@santi020k/observatory-db'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { collectorInternals } from './collector'
+
+const githubField = {
+  forksCount: 'forks_count',
+  htmlUrl: 'html_url',
+  openIssuesCount: 'open_issues_count',
+  pushedAt: 'pushed_at',
+  stargazersCount: 'stargazers_count'
+} as const
 
 const repository = (name: string, fork = false) => ({
   archived: false,
   description: null,
   fork,
-  'forks_count': 0,
+  [githubField.forksCount]: 0,
   homepage: null,
-  'html_url': `https://github.com/santi020k/${name}`,
+  [githubField.htmlUrl]: `https://github.com/santi020k/${name}`,
   name,
-  'open_issues_count': 0,
+  [githubField.openIssuesCount]: 0,
   private: false,
-  'pushed_at': '2026-07-25T00:00:00Z',
-  'stargazers_count': 0,
-  topics: [],
+  [githubField.pushedAt]: '2026-07-25T00:00:00Z',
+  [githubField.stargazersCount]: 0,
+  topics: []
 })
 
 const snapshot = (
   slug: string,
-  values: Partial<SnapshotWrite> = {},
+  values: Partial<SnapshotWrite> = {}
 ): SnapshotWrite => ({
   archived: false,
   category: 'library',
@@ -47,7 +55,7 @@ const snapshot = (
   topics: [],
   visibility: 'public',
   websiteUrl: null,
-  ...values,
+  ...values
 })
 
 const requestUrl = (input: string | URL | Request): string => {
@@ -63,10 +71,8 @@ afterEach(() => {
 })
 
 describe('public project collection', () => {
-  it('paginates GitHub repository discovery and excludes forks', async () => {
-    const firstPage = Array.from({ length: 100 }, (_, index) =>
-      repository(`project-${index}`, index === 0),
-    )
+  test('paginates GitHub repository discovery and excludes forks', async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => repository(`project-${index}`, index === 0))
 
     const secondPage = [repository('project-100')]
 
@@ -89,41 +95,34 @@ describe('public project collection', () => {
 
     expect(projects).toHaveLength(100)
 
-    expect(projects.some((project) => project.name === 'project-0')).toBe(false)
+    expect(projects.some(project => project.name === 'project-0')).toBe(false)
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('fails repository discovery on an upstream HTTP error', async () => {
+  test('fails repository discovery on an upstream HTTP error', async () => {
     vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        Promise.resolve(new Response(null, { status: 503 })),
-      ),
+      'fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 503 })))
     )
 
     await expect(
-      collectorInternals.collectGithubRepositories(),
+      collectorInternals.collectGithubRepositories()
     ).rejects.toThrow('Provider request failed with 503')
   })
 
-  it('does not replace package metrics with zeros on provider failure', async () => {
+  test('does not replace package metrics with zeros on provider failure', async () => {
     vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        Promise.resolve(new Response(null, { status: 429 })),
-      ),
+      'fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 429 })))
     )
 
     await expect(
-      collectorInternals.collectPackageMetrics(['@santi020k/lumen']),
+      collectorInternals.collectPackageMetrics(['@santi020k/lumen'])
     ).rejects.toThrow('Provider request failed with 429')
   })
 
-  it('uses zero downloads when npm has package metadata but no download history', async () => {
+  test('uses zero downloads when npm has package metadata but no download history', async () => {
     vi.stubGlobal(
-      'fetch',
-      vi.fn((input: string | URL | Request) => {
+      'fetch', vi.fn((input: string | URL | Request) => {
         const url = requestUrl(input)
 
         if (url.includes('api.npmjs.org/downloads')) {
@@ -131,23 +130,22 @@ describe('public project collection', () => {
         }
 
         return Promise.resolve(
-          Response.json({ 'dist-tags': { latest: '0.1.0' } }),
+          Response.json({ 'dist-tags': { latest: '0.1.0' } })
         )
-      }),
+      })
     )
 
     await expect(
-      collectorInternals.collectPackageMetrics(['@santi020k/lumen-astro']),
+      collectorInternals.collectPackageMetrics(['@santi020k/lumen-astro'])
     ).resolves.toEqual({
       downloads: 0,
-      latestVersion: '0.1.0',
+      latestVersion: '0.1.0'
     })
   })
 
-  it('still fails when the package itself is missing from the npm registry', async () => {
+  test('still fails when the package itself is missing from the npm registry', async () => {
     vi.stubGlobal(
-      'fetch',
-      vi.fn((input: string | URL | Request) => {
+      'fetch', vi.fn((input: string | URL | Request) => {
         const url = requestUrl(input)
 
         if (url.includes('api.npmjs.org/downloads')) {
@@ -155,15 +153,15 @@ describe('public project collection', () => {
         }
 
         return Promise.resolve(new Response(null, { status: 404 }))
-      }),
+      })
     )
 
     await expect(
-      collectorInternals.collectPackageMetrics(['missing-package']),
+      collectorInternals.collectPackageMetrics(['missing-package'])
     ).rejects.toThrow('Provider request failed with 404')
   })
 
-  it('falls back to a small GET when a website rejects HEAD requests', async () => {
+  test('falls back to a small GET when a website rejects HEAD requests', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(null, { status: 405 }))
@@ -172,36 +170,32 @@ describe('public project collection', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
-      collectorInternals.checkWebsite('https://example.com'),
+      collectorInternals.checkWebsite('https://example.com')
     ).resolves.toMatchObject({ status: 'healthy' })
 
     expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'https://example.com',
-      expect.objectContaining({ headers: { Range: 'bytes=0-0' } }),
+      2, 'https://example.com', expect.objectContaining({ headers: { Range: 'bytes=0-0' } })
     )
   })
 
-  it('weights npm downloads more heavily than website page views', () => {
+  test('weights npm downloads more heavily than website page views', () => {
     const projects = [
       snapshot('package', { npmDownloads30d: 1_000 }),
-      snapshot('website'),
+      snapshot('website')
     ]
 
     const pageViews = new Map([['website', 10_000]])
 
     const scored = collectorInternals.scoreSnapshotsByRelevance(
-      projects,
-      pageViews,
-      Date.parse('2026-07-25T00:00:00Z'),
+      projects, pageViews, Date.parse('2026-07-25T00:00:00Z')
     )
 
     expect(scored.find(({ slug }) => slug === 'package')?.relevanceScore).toBe(
-      54,
+      54
     )
 
     expect(scored.find(({ slug }) => slug === 'website')?.relevanceScore).toBe(
-      24,
+      24
     )
   })
 })

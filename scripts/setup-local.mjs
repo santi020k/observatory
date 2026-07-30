@@ -33,4 +33,4 @@ if (!existsSync(apiEnvironmentPath)) {
   )
 }
 
-console.log('Local environment files are ready.')
+process.stdout.write('Local environment files are ready.\n')

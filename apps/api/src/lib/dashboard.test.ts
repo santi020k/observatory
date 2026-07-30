@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import type { Bindings } from '../env'
 
@@ -9,21 +9,21 @@ const mocks = vi.hoisted(() => ({
   getLatestSyncRun: vi.fn(),
   getProjectPreferences: vi.fn(),
   getPublicSnapshotsSince: vi.fn(),
-  getSnapshotsForSyncRun: vi.fn(),
+  getSnapshotsForSyncRun: vi.fn()
 }))
 
 vi.mock('./cloudflare', () => ({
-  buildWebsiteAnalytics: mocks.buildWebsiteAnalytics,
+  buildWebsiteAnalytics: mocks.buildWebsiteAnalytics
 }))
 
-vi.mock('@santi020k/observatory-db', async (importOriginal) => ({
+vi.mock('@santi020k/observatory-db', async importOriginal => ({
   ...(await importOriginal()),
   createDb: mocks.createDb,
   getLatestSuccessfulSyncRun: mocks.getLatestSuccessfulSyncRun,
   getLatestSyncRun: mocks.getLatestSyncRun,
   getProjectPreferences: mocks.getProjectPreferences,
   getPublicSnapshotsSince: mocks.getPublicSnapshotsSince,
-  getSnapshotsForSyncRun: mocks.getSnapshotsForSyncRun,
+  getSnapshotsForSyncRun: mocks.getSnapshotsForSyncRun
 }))
 
 const { buildDashboard, buildProjectDashboard, buildProjectSettings } =
@@ -35,7 +35,7 @@ const environment = {
   DB: {} as D1Database,
   ENVIRONMENT: 'test',
   MAIL_FROM: 'Observatory <observatory@example.com>',
-  OWNER_EMAIL: 'owner@example.com',
+  OWNER_EMAIL: 'owner@example.com'
 } satisfies Bindings
 
 const websiteSnapshot = {
@@ -63,14 +63,14 @@ const websiteSnapshot = {
   syncRunId: 'successful-run',
   topics: '[]',
   visibility: 'public',
-  websiteUrl: 'https://santi.dev',
+  websiteUrl: 'https://santi.dev'
 }
 
 const successfulSync = {
   completedAt: 1_500,
   id: 'successful-run',
   startedAt: 1_000,
-  status: 'succeeded',
+  status: 'succeeded'
 }
 
 beforeEach(() => {
@@ -85,12 +85,12 @@ beforeEach(() => {
   mocks.buildWebsiteAnalytics.mockResolvedValue({
     generatedAt: new Date(0).toISOString(),
     range: '30d',
-    sites: [],
+    sites: []
   })
 })
 
 describe('project website analytics', () => {
-  it('matches Cloudflare analytics to the project slug', async () => {
+  test('matches Cloudflare analytics to the project slug', async () => {
     mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
 
     mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
@@ -107,15 +107,15 @@ describe('project website analytics', () => {
               pageViews: 14,
               periodStart: '2026-07-25T00:00:00.000Z',
               sampleInterval: 1,
-              visits: 9,
-            },
+              visits: 9
+            }
           ],
           hostname: 'santi.dev',
           pageViews: 14,
           slug: 'website',
-          visits: 9,
-        },
-      ],
+          visits: 9
+        }
+      ]
     })
 
     const dashboard = await buildProjectDashboard(environment, 'website')
@@ -123,11 +123,11 @@ describe('project website analytics', () => {
     expect(dashboard?.websiteAnalytics).toMatchObject({
       hostname: 'santi.dev',
       pageViews: 14,
-      visits: 9,
+      visits: 9
     })
   })
 
-  it('does not return website analytics when collection is disabled', async () => {
+  test('does not return website analytics when collection is disabled', async () => {
     mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
 
     mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
@@ -141,8 +141,8 @@ describe('project website analytics', () => {
         pinned: false,
         slug: 'website',
         updatedAt: 2_000,
-        websiteAnalyticsEnabled: false,
-      },
+        websiteAnalyticsEnabled: false
+      }
     ])
 
     const dashboard = await buildProjectDashboard(environment, 'website')
@@ -154,7 +154,7 @@ describe('project website analytics', () => {
 })
 
 describe('project preferences', () => {
-  it('pins projects and exposes attention preferences to dashboards', async () => {
+  test('pins projects and exposes attention preferences to dashboards', async () => {
     mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
 
     mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
@@ -167,8 +167,8 @@ describe('project preferences', () => {
         name: 'Pinned project',
         relevanceScore: 10,
         slug: 'pinned',
-        websiteUrl: null,
-      },
+        websiteUrl: null
+      }
     ])
 
     mocks.getProjectPreferences.mockResolvedValue([
@@ -178,8 +178,8 @@ describe('project preferences', () => {
         pinned: true,
         slug: 'pinned',
         updatedAt: 2_000,
-        websiteAnalyticsEnabled: true,
-      },
+        websiteAnalyticsEnabled: true
+      }
     ])
 
     const dashboard = await buildDashboard(environment)
@@ -187,11 +187,11 @@ describe('project preferences', () => {
     expect(dashboard.projects[0]).toMatchObject({
       attentionMode: 'off',
       name: 'Pinned project',
-      pinned: true,
+      pinned: true
     })
   })
 
-  it('returns every persisted control in project settings', async () => {
+  test('returns every persisted control in project settings', async () => {
     mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
 
     mocks.getSnapshotsForSyncRun.mockResolvedValue([websiteSnapshot])
@@ -203,8 +203,8 @@ describe('project preferences', () => {
         pinned: true,
         slug: 'website',
         updatedAt: 2_000,
-        websiteAnalyticsEnabled: false,
-      },
+        websiteAnalyticsEnabled: false
+      }
     ])
 
     const settings = await buildProjectSettings(environment)
@@ -214,41 +214,40 @@ describe('project preferences', () => {
       enabled: true,
       hasWebsite: true,
       pinned: true,
-      websiteAnalyticsEnabled: false,
+      websiteAnalyticsEnabled: false
     })
   })
 })
 
 describe('dashboard snapshot selection', () => {
-  it('reads one completed run consistently while reporting the latest failure', async () => {
+  test('reads one completed run consistently while reporting the latest failure', async () => {
     mocks.getLatestSyncRun.mockResolvedValue({
       completedAt: 3_000,
       id: 'failed-run',
       startedAt: 2_000,
-      status: 'failed',
+      status: 'failed'
     })
 
     mocks.getLatestSuccessfulSyncRun.mockResolvedValue({
       completedAt: 1_500,
       id: 'successful-run',
       startedAt: 1_000,
-      status: 'succeeded',
+      status: 'succeeded'
     })
 
     const dashboard = await buildDashboard(environment)
 
     expect(mocks.getSnapshotsForSyncRun).toHaveBeenCalledWith(
-      expect.anything(),
-      'successful-run',
+      expect.anything(), 'successful-run'
     )
 
     expect(dashboard.sync).toEqual({
       completedAt: new Date(1_500).toISOString(),
-      status: 'failed',
+      status: 'failed'
     })
   })
 
-  it('queries genuinely different persisted windows for each range', async () => {
+  test('queries genuinely different persisted windows for each range', async () => {
     const now = Date.UTC(2026, 6, 30)
     const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(now)
 
@@ -259,21 +258,17 @@ describe('dashboard snapshot selection', () => {
     await buildDashboard(environment, '30d')
 
     expect(mocks.getPublicSnapshotsSince).toHaveBeenNthCalledWith(
-      1,
-      expect.anything(),
-      now - 5 * 24 * 60 * 60 * 1_000,
+      1, expect.anything(), now - 5 * 24 * 60 * 60 * 1_000
     )
 
     expect(mocks.getPublicSnapshotsSince).toHaveBeenNthCalledWith(
-      2,
-      expect.anything(),
-      now - 30 * 24 * 60 * 60 * 1_000,
+      2, expect.anything(), now - 30 * 24 * 60 * 60 * 1_000
     )
 
     dateSpy.mockRestore()
   })
 
-  it('keeps the latest snapshot in each chart bucket and reports raw syncs', async () => {
+  test('keeps the latest snapshot in each chart bucket and reports raw syncs', async () => {
     const first = Date.UTC(2026, 6, 28, 1)
     const firstLatest = Date.UTC(2026, 6, 28, 23)
     const last = Date.UTC(2026, 6, 29, 12)
@@ -282,7 +277,7 @@ describe('dashboard snapshot selection', () => {
       collectedAt: last,
       id: 'last',
       npmDownloads30d: 30,
-      stars: 4,
+      stars: 4
     }
 
     mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
@@ -294,16 +289,16 @@ describe('dashboard snapshot selection', () => {
         collectedAt: first,
         id: 'first',
         npmDownloads30d: 10,
-        stars: 1,
+        stars: 1
       },
       {
         ...websiteSnapshot,
         collectedAt: firstLatest,
         id: 'first-latest',
         npmDownloads30d: 20,
-        stars: 2,
+        stars: 2
       },
-      lastSnapshot,
+      lastSnapshot
     ])
 
     const dashboard = await buildDashboard(environment, '30d')
@@ -311,7 +306,7 @@ describe('dashboard snapshot selection', () => {
     expect(dashboard.history).toHaveLength(2)
     expect(dashboard.history[0]).toMatchObject({
       npmDownloads30d: 20,
-      stars: 2,
+      stars: 2
     })
 
     expect(dashboard.period).toMatchObject({
@@ -319,7 +314,7 @@ describe('dashboard snapshot selection', () => {
       availableTo: new Date(last).toISOString(),
       downloadVelocityChange: 10,
       starsGained: 2,
-      syncs: 3,
+      syncs: 3
     })
   })
 })

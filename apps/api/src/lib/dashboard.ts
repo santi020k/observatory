@@ -6,7 +6,7 @@ import {
   projectDashboardSchema,
   type ProjectMetric,
   type ProjectSettings,
-  projectSettingsSchema,
+  projectSettingsSchema
 } from '@santi020k/observatory-api-types'
 import {
   createDb,
@@ -14,7 +14,7 @@ import {
   getLatestSyncRun,
   getProjectPreferences,
   getPublicSnapshotsSince,
-  getSnapshotsForSyncRun,
+  getSnapshotsForSyncRun
 } from '@santi020k/observatory-db'
 
 import type { Bindings } from '../env'
@@ -31,14 +31,13 @@ type ProjectPreference = Pick<
 const defaultProjectPreference: ProjectPreference = {
   attentionMode: 'all',
   pinned: false,
-  websiteAnalyticsEnabled: true,
+  websiteAnalyticsEnabled: true
 }
 
 const compareProjectRelevance = (
-  left: { name: string; pinned?: boolean; relevanceScore: number },
-  right: { name: string; pinned?: boolean; relevanceScore: number },
-): number =>
-  Number(right.pinned ?? false) - Number(left.pinned ?? false) ||
+  left: { name: string, pinned?: boolean, relevanceScore: number },
+  right: { name: string, pinned?: boolean, relevanceScore: number }
+): number => Number(right.pinned ?? false) - Number(left.pinned ?? false) ||
   right.relevanceScore - left.relevanceScore ||
   left.name.localeCompare(right.name)
 
@@ -59,9 +58,9 @@ const parseStringArray = (value: string): string[] => {
     const parsed: unknown = JSON.parse(value)
 
     return Array.isArray(parsed) &&
-      parsed.every((item) => typeof item === 'string')
-      ? parsed
-      : []
+      parsed.every(item => typeof item === 'string') ?
+      parsed :
+      []
   } catch {
     return []
   }
@@ -69,7 +68,7 @@ const parseStringArray = (value: string): string[] => {
 
 const toProjectMetric = (
   row: Snapshot,
-  preference: ProjectPreference,
+  preference: ProjectPreference
 ): ProjectMetric => ({
   attentionMode: preference.attentionMode,
   archived: row.archived,
@@ -91,21 +90,21 @@ const toProjectMetric = (
   sources: {
     github: row.repositoryUrl,
     npm: parseStringArray(row.npmPackages),
-    website: row.websiteUrl,
+    website: row.websiteUrl
   },
   stars: row.stars,
   status: row.status as ProjectMetric['status'],
   topics: parseStringArray(row.topics),
   visibility: row.visibility as ProjectMetric['visibility'],
-  websiteAnalyticsEnabled: preference.websiteAnalyticsEnabled,
+  websiteAnalyticsEnabled: preference.websiteAnalyticsEnabled
 })
 
 const sumNullable = (values: readonly (number | null)[]): number | null => {
   const available = values.filter((value): value is number => value !== null)
 
-  return available.length > 0
-    ? available.reduce((total, value) => total + value, 0)
-    : null
+  return available.length > 0 ?
+    available.reduce((total, value) => total + value, 0) :
+    null
 }
 
 const getBucketStart = (timestamp: number, range: AnalyticsRange): number => {
@@ -120,13 +119,19 @@ const getBucketStart = (timestamp: number, range: AnalyticsRange): number => {
   switch (range) {
     case '5d':
       bucketMilliseconds = 6 * 60 * 60 * 1_000
+
       break
+
     case '30d':
       bucketMilliseconds = 24 * 60 * 60 * 1_000
+
       break
+
     case '90d':
       bucketMilliseconds = 3 * 24 * 60 * 60 * 1_000
+
       break
+
     default:
       bucketMilliseconds = 7 * 24 * 60 * 60 * 1_000
   }
@@ -156,50 +161,49 @@ const buildHistory = (rows: Snapshot[], range: AnalyticsRange) => {
       return {
         collectedAt: new Date(
           Math.max(
-            bucketStart,
-            ...snapshots.map((snapshot) => snapshot.collectedAt),
-          ),
+            bucketStart, ...snapshots.map(snapshot => snapshot.collectedAt)
+          )
         ).toISOString(),
         githubViews14d: sumNullable(
-          snapshots.map((snapshot) => snapshot.githubViews14d),
+          snapshots.map(snapshot => snapshot.githubViews14d)
         ),
         npmDownloads30d: snapshots.reduce(
-          (total, snapshot) => total + snapshot.npmDownloads30d,
-          0,
+          (total, snapshot) => total + snapshot.npmDownloads30d, 0
         ),
         openIssues: snapshots.reduce(
-          (total, snapshot) => total + snapshot.openIssues,
-          0,
+          (total, snapshot) => total + snapshot.openIssues, 0
         ),
-        stars: snapshots.reduce((total, snapshot) => total + snapshot.stars, 0),
+        stars: snapshots.reduce((total, snapshot) => total + snapshot.stars, 0)
       }
     })
 }
 
 const getPeriodSummary = (
   history: ReturnType<typeof buildHistory>,
-  rows: Snapshot[],
+  rows: Snapshot[]
 ) => {
   const first = history[0]
   const last = history[history.length - 1]
-  const collectedAt = [...new Set(rows.map((row) => row.collectedAt))].sort(
-    (left, right) => left - right,
+
+  const collectedAt = [...new Set(rows.map(row => row.collectedAt))].sort(
+    (left, right) => left - right
   )
+
   const availableFrom = collectedAt[0]
   const availableTo = collectedAt[collectedAt.length - 1]
 
   return {
     availableFrom:
-      availableFrom === undefined
-        ? null
-        : new Date(availableFrom).toISOString(),
+      availableFrom === undefined ?
+        null :
+        new Date(availableFrom).toISOString(),
     availableTo:
       availableTo === undefined ? null : new Date(availableTo).toISOString(),
     downloadVelocityChange:
       first && last ? last.npmDownloads30d - first.npmDownloads30d : 0,
     issueChange: first && last ? last.openIssues - first.openIssues : 0,
     starsGained: first && last ? last.stars - first.stars : 0,
-    syncs: collectedAt.length,
+    syncs: collectedAt.length
   }
 }
 
@@ -209,11 +213,11 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
   const [sync, latestSuccessfulSync, preferences] = await Promise.all([
     getLatestSyncRun(database),
     getLatestSuccessfulSyncRun(database),
-    getProjectPreferences(database),
+    getProjectPreferences(database)
   ])
 
   const preferencesBySlug = new Map(
-    preferences.map((preference) => [preference.slug, preference]),
+    preferences.map(preference => [preference.slug, preference])
   )
 
   const getPreference = (slug: string) => {
@@ -222,37 +226,36 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
     return {
       attentionMode:
         preference?.attentionMode === 'health' ||
-        preference?.attentionMode === 'off'
-          ? preference.attentionMode
-          : 'all',
+        preference?.attentionMode === 'off' ?
+          preference.attentionMode :
+          'all',
       pinned: preference?.pinned ?? false,
-      websiteAnalyticsEnabled: preference?.websiteAnalyticsEnabled ?? true,
+      websiteAnalyticsEnabled: preference?.websiteAnalyticsEnabled ?? true
     } satisfies ProjectPreference
   }
 
-  const isEnabled = (slug: string) =>
-    preferencesBySlug.get(slug)?.enabled !== false
+  const isEnabled = (slug: string) => preferencesBySlug.get(slug)?.enabled !== false
 
   const [latestRows, historyRows] = await Promise.all([
-    latestSuccessfulSync
-      ? getSnapshotsForSyncRun(database, latestSuccessfulSync.id)
-      : Promise.resolve([]),
-    getPublicSnapshotsSince(database, Date.now() - getRangeMilliseconds(range)),
+    latestSuccessfulSync ?
+      getSnapshotsForSyncRun(database, latestSuccessfulSync.id) :
+      Promise.resolve([]),
+    getPublicSnapshotsSince(database, Date.now() - getRangeMilliseconds(range))
   ])
 
   return {
-    historyRows: historyRows.filter((row) => isEnabled(row.slug)),
+    historyRows: historyRows.filter(row => isEnabled(row.slug)),
     getPreference,
     isEnabled,
     latestRows,
     latestSuccessfulSync,
-    sync,
+    sync
   }
 }
 
 export const buildDashboard = async (
   env: Bindings,
-  range: AnalyticsRange = '30d',
+  range: AnalyticsRange = '30d'
 ): Promise<Dashboard> => {
   const {
     getPreference,
@@ -260,12 +263,12 @@ export const buildDashboard = async (
     isEnabled,
     latestRows,
     latestSuccessfulSync,
-    sync,
+    sync
   } = await getDashboardRows(env, range)
 
   const projects = latestRows
-    .filter((row) => isEnabled(row.slug))
-    .map((row) => toProjectMetric(row, getPreference(row.slug)))
+    .filter(row => isEnabled(row.slug))
+    .map(row => toProjectMetric(row, getPreference(row.slug)))
     .sort(compareProjectRelevance)
 
   const history = buildHistory(historyRows, range)
@@ -277,58 +280,57 @@ export const buildDashboard = async (
     projects,
     range,
     summary: {
-      activeProjects: projects.filter((project) => project.status === 'active')
+      activeProjects: projects.filter(project => project.status === 'active')
         .length,
       githubClones14d: sumNullable(
-        projects.map((project) => project.githubClones14d),
+        projects.map(project => project.githubClones14d)
       ),
       githubViews14d: sumNullable(
-        projects.map((project) => project.githubViews14d),
+        projects.map(project => project.githubViews14d)
       ),
       npmDownloads30d: projects.reduce(
-        (total, project) => total + project.npmDownloads30d,
-        0,
+        (total, project) => total + project.npmDownloads30d, 0
       ),
       openIssues: projects.reduce(
-        (total, project) => total + project.openIssues,
-        0,
+        (total, project) => total + project.openIssues, 0
       ),
-      publicProjects: projects.length,
+      publicProjects: projects.length
     },
     sync: {
-      completedAt: latestSuccessfulSync?.completedAt
-        ? new Date(latestSuccessfulSync.completedAt).toISOString()
-        : null,
-      status: sync?.status ?? 'idle',
-    },
+      completedAt: latestSuccessfulSync?.completedAt ?
+        new Date(latestSuccessfulSync.completedAt).toISOString() :
+        null,
+      status: sync?.status ?? 'idle'
+    }
   })
 }
 
 export const buildProjectDashboard = async (
   env: Bindings,
   slug: string,
-  range: AnalyticsRange = '30d',
+  range: AnalyticsRange = '30d'
 ): Promise<ProjectDashboard | null> => {
   const { getPreference, historyRows, isEnabled, latestRows } =
     await getDashboardRows(env, range)
 
-  const row = latestRows.find((candidate) => candidate.slug === slug)
+  const row = latestRows.find(candidate => candidate.slug === slug)
 
   if (!row || !isEnabled(slug)) return null
 
   const preference = getPreference(slug)
 
   const projectHistoryRows = historyRows.filter(
-    (snapshot) => snapshot.slug === slug,
+    snapshot => snapshot.slug === slug
   )
+
   const history = buildHistory(projectHistoryRows, range)
 
   const websiteAnalytics =
-    row.websiteUrl && preference.websiteAnalyticsEnabled
-      ? ((await buildWebsiteAnalytics(env, range)).sites.find(
-          (site) => site.slug === slug,
-        ) ?? null)
-      : null
+    row.websiteUrl && preference.websiteAnalyticsEnabled ?
+      ((await buildWebsiteAnalytics(env, range)).sites.find(
+        site => site.slug === slug
+      ) ?? null) :
+      null
 
   return projectDashboardSchema.parse({
     generatedAt: new Date().toISOString(),
@@ -336,47 +338,53 @@ export const buildProjectDashboard = async (
     period: getPeriodSummary(history, projectHistoryRows),
     project: toProjectMetric(row, preference),
     range,
-    websiteAnalytics,
+    websiteAnalytics
   })
 }
 
 export const buildProjectSettings = async (
-  env: Bindings,
+  env: Bindings
 ): Promise<ProjectSettings> => {
   const database = createDb(env.DB)
 
   const [latestSuccessfulSync, preferences] = await Promise.all([
     getLatestSuccessfulSyncRun(database),
-    getProjectPreferences(database),
+    getProjectPreferences(database)
   ])
 
-  const rows = latestSuccessfulSync
-    ? await getSnapshotsForSyncRun(database, latestSuccessfulSync.id)
-    : []
+  const rows = latestSuccessfulSync ?
+    await getSnapshotsForSyncRun(database, latestSuccessfulSync.id) :
+    []
 
   const preferencesBySlug = new Map(
-    preferences.map((preference) => [preference.slug, preference]),
+    preferences.map(preference => [preference.slug, preference])
   )
 
+  const projects = rows.map(row => {
+    const preference = preferencesBySlug.get(row.slug)
+
+    const attentionMode =
+      preference?.attentionMode === 'health' ||
+      preference?.attentionMode === 'off' ?
+        preference.attentionMode :
+        defaultProjectPreference.attentionMode
+
+    return {
+      attentionMode,
+      category: row.category,
+      enabled: preference?.enabled !== false,
+      hasWebsite: row.websiteUrl !== null,
+      name: row.name,
+      pinned: preference?.pinned ?? false,
+      relevanceScore: row.relevanceScore,
+      slug: row.slug,
+      status: row.status as ProjectSettings['projects'][number]['status'],
+      websiteAnalyticsEnabled:
+          preference?.websiteAnalyticsEnabled ?? true
+    }
+  })
+
   return projectSettingsSchema.parse({
-    projects: rows
-      .map((row) => ({
-        attentionMode:
-          preferencesBySlug.get(row.slug)?.attentionMode === 'health' ||
-          preferencesBySlug.get(row.slug)?.attentionMode === 'off'
-            ? preferencesBySlug.get(row.slug)?.attentionMode
-            : defaultProjectPreference.attentionMode,
-        category: row.category,
-        enabled: preferencesBySlug.get(row.slug)?.enabled !== false,
-        hasWebsite: row.websiteUrl !== null,
-        name: row.name,
-        pinned: preferencesBySlug.get(row.slug)?.pinned ?? false,
-        relevanceScore: row.relevanceScore,
-        slug: row.slug,
-        status: row.status as ProjectSettings['projects'][number]['status'],
-        websiteAnalyticsEnabled:
-          preferencesBySlug.get(row.slug)?.websiteAnalyticsEnabled ?? true,
-      }))
-      .sort(compareProjectRelevance),
+    projects: projects.sort(compareProjectRelevance)
   })
 }

@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, test } from 'vitest'
 
 import { aggregateWebsiteAnalytics } from './website-analytics'
 
 describe('website analytics chart aggregation', () => {
-  it('combines hourly values into six-hour points for the 5-day range', () => {
+  test('combines hourly values into six-hour points for the 5-day range', () => {
     expect(
       aggregateWebsiteAnalytics(
         [
@@ -11,28 +11,27 @@ describe('website analytics chart aggregation', () => {
             pageViews: 7,
             periodStart: '2026-07-24T08:00:00.000Z',
             sampleInterval: 1,
-            visits: 4,
+            visits: 4
           },
           {
             pageViews: 5,
             periodStart: '2026-07-24T11:00:00.000Z',
             sampleInterval: 1,
-            visits: 3,
-          },
-        ],
-        '5d',
-      ),
+            visits: 3
+          }
+        ], '5d'
+      )
     ).toEqual([
       {
         pageViews: 12,
         periodStart: '2026-07-24T06:00:00.000Z',
         sampleInterval: 1,
-        visits: 7,
-      },
+        visits: 7
+      }
     ])
   })
 
-  it('combines hourly values into daily points for the 30-day range', () => {
+  test('combines hourly values into daily points for the 30-day range', () => {
     expect(
       aggregateWebsiteAnalytics(
         [
@@ -40,44 +39,42 @@ describe('website analytics chart aggregation', () => {
             pageViews: 7,
             periodStart: '2026-07-24T08:00:00.000Z',
             sampleInterval: 1,
-            visits: 4,
+            visits: 4
           },
           {
             pageViews: 5,
             periodStart: '2026-07-24T18:00:00.000Z',
             sampleInterval: 2,
-            visits: 3,
-          },
-        ],
-        '30d',
-      ),
+            visits: 3
+          }
+        ], '30d'
+      )
     ).toEqual([
       {
         pageViews: 12,
         periodStart: '2026-07-24T00:00:00.000Z',
         sampleInterval: 2,
-        visits: 7,
-      },
+        visits: 7
+      }
     ])
   })
 
-  it('combines values into monthly points for longer ranges', () => {
+  test('combines values into monthly points for longer ranges', () => {
     const points = aggregateWebsiteAnalytics(
       [
         {
           pageViews: 10,
           periodStart: '2026-06-04T00:00:00.000Z',
           sampleInterval: 1,
-          visits: 6,
+          visits: 6
         },
         {
           pageViews: 20,
           periodStart: '2026-06-20T00:00:00.000Z',
           sampleInterval: 1,
-          visits: 12,
-        },
-      ],
-      '1y',
+          visits: 12
+        }
+      ], '1y'
     )
 
     expect(points).toHaveLength(1)
@@ -85,27 +82,26 @@ describe('website analytics chart aggregation', () => {
     expect(points[0]).toMatchObject({
       pageViews: 30,
       periodStart: '2026-06-01T00:00:00.000Z',
-      visits: 18,
+      visits: 18
     })
   })
 
-  it('combines values into weekly points for the 90-day range', () => {
+  test('combines values into weekly points for the 90-day range', () => {
     const points = aggregateWebsiteAnalytics(
       [
         {
           pageViews: 10,
           periodStart: '2026-07-06T00:00:00.000Z',
           sampleInterval: 1,
-          visits: 6,
+          visits: 6
         },
         {
           pageViews: 20,
           periodStart: '2026-07-11T00:00:00.000Z',
           sampleInterval: 1,
-          visits: 12,
-        },
-      ],
-      '90d',
+          visits: 12
+        }
+      ], '90d'
     )
 
     expect(points).toHaveLength(1)
@@ -113,7 +109,7 @@ describe('website analytics chart aggregation', () => {
     expect(points[0]).toMatchObject({
       pageViews: 30,
       periodStart: '2026-07-05T00:00:00.000Z',
-      visits: 18,
+      visits: 18
     })
   })
 })

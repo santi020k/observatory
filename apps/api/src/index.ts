@@ -1,6 +1,6 @@
 import {
   analyticsRangeSchema,
-  updateProjectSettingSchema,
+  updateProjectSettingSchema
 } from '@santi020k/observatory-api-types'
 import { createDb, setProjectPreference } from '@santi020k/observatory-db'
 import { Hono } from 'hono'
@@ -11,13 +11,13 @@ import { secureHeaders } from 'hono/secure-headers'
 import { cleanupAuth, requireAuth } from './lib/auth'
 import {
   buildWebsiteAnalytics,
-  syncCloudflareAnalytics,
+  syncCloudflareAnalytics
 } from './lib/cloudflare'
 import { syncProjects } from './lib/collector'
 import {
   buildDashboard,
   buildProjectDashboard,
-  buildProjectSettings,
+  buildProjectSettings
 } from './lib/dashboard'
 import { authRoutes } from './routes/auth'
 import type { Bindings, WorkerEnv } from './env'
@@ -28,13 +28,23 @@ app.use(logger())
 
 app.use(secureHeaders())
 
+const readCorsOrigin = (environment: unknown): string | null => {
+  if (
+    typeof environment !== 'object' ||
+    environment === null ||
+    !('CORS_ORIGIN' in environment) ||
+    typeof environment.CORS_ORIGIN !== 'string'
+  ) {
+    return null
+  }
+
+  return environment.CORS_ORIGIN
+}
+
 app.use('*', async (context, next) => {
   const method = context.req.method
   const origin = context.req.header('Origin')
-
-  const allowedOrigins = context.env.CORS_ORIGIN.split(',').map((value) =>
-    value.trim(),
-  )
+  const allowedOrigins = context.env.CORS_ORIGIN.split(',').map(value => value.trim())
 
   if (
     !['GET', 'HEAD', 'OPTIONS'].includes(method) &&
@@ -45,69 +55,62 @@ app.use('*', async (context, next) => {
       {
         error: {
           code: 'INVALID_ORIGIN',
-          message: 'Request origin is not allowed.',
-        },
-      },
-      403,
+          message: 'Request origin is not allowed.'
+        }
+      }, 403
     )
   }
 
   await next()
 })
 
-app.use('*', async (context, next) =>
-  cors({
-    allowHeaders: ['Content-Type'],
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
-    credentials: true,
-    origin: context.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
-  })(context, next),
-)
+app.use('*', cors({
+  allowHeaders: ['Content-Type'],
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true,
+  origin: (origin, context) => {
+    const allowedOrigins = readCorsOrigin(context.env)
+      ?.split(',')
+      .map(allowedOrigin => allowedOrigin.trim()) ?? []
 
-app.get('/health', (context) =>
-  context.json({
-    service: 'observatory-api',
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-  }),
-)
+    return allowedOrigins.includes(origin) ? origin : null
+  }
+}))
+
+app.get('/health', context => context.json({
+  service: 'observatory-api',
+  status: 'ok',
+  timestamp: new Date().toISOString()
+}))
 
 app.route('/auth', authRoutes)
 
-const readRange = (value: string | undefined) =>
-  analyticsRangeSchema.catch('30d').parse(value)
+const readRange = (value: string | undefined) => analyticsRangeSchema.catch('30d').parse(value)
 
-app.get('/dashboard', requireAuth, async (context) =>
-  context.json(
-    await buildDashboard(context.env, readRange(context.req.query('range'))),
-  ),
-)
+app.get('/dashboard', requireAuth, async context => context.json(
+  await buildDashboard(context.env, readRange(context.req.query('range')))
+))
 
-app.get('/projects/:slug', requireAuth, async (context) => {
+app.get('/projects/:slug', requireAuth, async context => {
   const dashboard = await buildProjectDashboard(
-    context.env,
-    context.req.param('slug'),
-    readRange(context.req.query('range')),
+    context.env, context.req.param('slug'), readRange(context.req.query('range'))
   )
 
-  return dashboard
-    ? context.json(dashboard)
-    : context.json(
-        {
-          error: {
-            code: 'PROJECT_NOT_FOUND',
-            message: 'Project not found or disabled.',
-          },
-        },
-        404,
-      )
+  return dashboard ?
+    context.json(dashboard) :
+    context.json(
+      {
+        error: {
+          code: 'PROJECT_NOT_FOUND',
+          message: 'Project not found or disabled.'
+        }
+      }, 404
+    )
 })
 
-app.get('/settings/projects', requireAuth, async (context) =>
-  context.json(await buildProjectSettings(context.env)),
-)
+app.get('/settings/projects', requireAuth, async context => context.json(await buildProjectSettings(context.env)))
 
-app.post('/settings/projects', requireAuth, async (context) => {
+app.post('/settings/projects', requireAuth, async context => {
   const input = updateProjectSettingSchema.safeParse(await context.req.json())
 
   if (!input.success)
@@ -115,10 +118,9 @@ app.post('/settings/projects', requireAuth, async (context) => {
       {
         error: {
           code: 'INVALID_PROJECT_SETTING',
-          message: 'A project slug and at least one setting are required.',
-        },
-      },
-      400,
+          message: 'A project slug and at least one setting are required.'
+        }
+      }, 400
     )
 
   const { attentionMode, enabled, pinned, slug, websiteAnalyticsEnabled } =
@@ -128,60 +130,50 @@ app.post('/settings/projects', requireAuth, async (context) => {
     ...(attentionMode === undefined ? {} : { attentionMode }),
     ...(enabled === undefined ? {} : { enabled }),
     ...(pinned === undefined ? {} : { pinned }),
-    ...(websiteAnalyticsEnabled === undefined
-      ? {}
-      : { websiteAnalyticsEnabled }),
+    ...(websiteAnalyticsEnabled === undefined ?
+      {} :
+      { websiteAnalyticsEnabled })
   }
 
   await setProjectPreference(
-    createDb(context.env.DB),
-    slug,
-    settings,
-    Date.now(),
+    createDb(context.env.DB), slug, settings, Date.now()
   )
 
   return context.json({ updated: true })
 })
 
-app.post('/sync', requireAuth, async (context) => {
+app.post('/sync', requireAuth, async context => {
   const count = await syncProjects(context.env)
 
   return context.json({ count, status: 'succeeded' })
 })
 
-app.get('/analytics/websites', requireAuth, async (context) =>
-  context.json(
-    await buildWebsiteAnalytics(
-      context.env,
-      readRange(context.req.query('range')),
-    ),
-  ),
-)
+app.get('/analytics/websites', requireAuth, async context => context.json(
+  await buildWebsiteAnalytics(
+    context.env, readRange(context.req.query('range'))
+  )
+))
 
-app.post('/sync/cloudflare', requireAuth, async (context) => {
+app.post('/sync/cloudflare', requireAuth, async context => {
   const count = await syncCloudflareAnalytics(context.env)
 
   return context.json({ count, status: 'succeeded' })
 })
 
-app.notFound((context) =>
-  context.json(
-    { error: { code: 'NOT_FOUND', message: 'Route not found.' } },
-    404,
-  ),
-)
+app.notFound(context => context.json(
+  { error: { code: 'NOT_FOUND', message: 'Route not found.' } }, 404
+))
 
 app.onError((error, context) => {
-  console.error(error)
+  reportError(error)
 
   return context.json(
     {
       error: {
         code: 'INTERNAL_ERROR',
-        message: 'The request could not be completed.',
-      },
-    },
-    500,
+        message: 'The request could not be completed.'
+      }
+    }, 500
   )
 })
 
@@ -189,21 +181,21 @@ export default {
   fetch: (
     request: Request,
     env: Bindings,
-    executionContext: ExecutionContext,
+    executionContext: ExecutionContext
   ) => app.fetch(request, env, executionContext),
   scheduled: (
     _controller: ScheduledController,
     env: Bindings,
-    executionContext: ExecutionContext,
+    executionContext: ExecutionContext
   ) => {
     executionContext.waitUntil(
       (async () => {
         await Promise.all([
           syncProjects(env),
           syncCloudflareAnalytics(env),
-          cleanupAuth(env),
+          cleanupAuth(env)
         ])
-      })(),
+      })()
     )
-  },
+  }
 }

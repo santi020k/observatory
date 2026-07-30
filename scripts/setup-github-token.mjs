@@ -35,4 +35,4 @@ writeFileSync(apiEnvironmentPath, nextEnvironment, { mode: 0o600 })
 
 chmodSync(apiEnvironmentPath, 0o600)
 
-console.log('Local GitHub access is configured for Observatory.')
+process.stdout.write('Local GitHub access is configured for Observatory.\n')

@@ -1,14 +1,14 @@
 import {
   type AnalyticsRange,
   type WebsiteAnalytics,
-  websiteAnalyticsSchema,
+  websiteAnalyticsSchema
 } from '@santi020k/observatory-api-types'
 import {
   createDb,
   getAnalyticsWebsites,
   getWebsiteAnalyticsSince,
   upsertWebsiteAnalytics,
-  type WebsiteAnalyticsWrite,
+  type WebsiteAnalyticsWrite
 } from '@santi020k/observatory-db'
 
 import type { Bindings } from '../env'
@@ -79,7 +79,7 @@ const buildQuery = (websites: readonly AnalyticsWebsite[]): string => {
           sum {
             visits
           }
-        }`,
+        }`
     )
     .join('\n')
 
@@ -103,14 +103,14 @@ const fetchCloudflareAnalytics = async (
   apiToken: string,
   websites: readonly AnalyticsWebsite[],
   start: number,
-  end: number,
+  end: number
 ): Promise<WebsiteAnalyticsWrite[]> => {
   if (websites.length === 0) return []
 
   const variables: Record<string, string> = {
     accountTag: accountId,
     end: new Date(end).toISOString(),
-    start: new Date(start).toISOString(),
+    start: new Date(start).toISOString()
   }
 
   for (const [index, website] of websites.entries()) {
@@ -121,20 +121,20 @@ const fetchCloudflareAnalytics = async (
     body: JSON.stringify({ query: buildQuery(websites), variables }),
     headers: {
       Authorization: `Bearer ${apiToken}`,
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json'
     },
     method: 'POST',
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(10_000)
   })
 
   if (!response.ok) {
     throw new Error(
-      `Cloudflare Analytics request failed with ${response.status}`,
+      `Cloudflare Analytics request failed with ${response.status}`
     )
   }
 
   const result = await response.json<CloudflareGraphqlResponse>()
-  const errors = result.errors?.map((error) => error.message).join('; ')
+  const errors = result.errors?.map(error => error.message).join('; ')
 
   if (errors) throw new Error(`Cloudflare Analytics query failed: ${errors}`)
 
@@ -146,31 +146,29 @@ const fetchCloudflareAnalytics = async (
 
   const collectedAt = Date.now()
 
-  return websites.flatMap((website, index) =>
-    (account[`site${index}`] ?? []).map((row) => {
-      const periodStart = Date.parse(row.dimensions.datetimeHour)
+  return websites.flatMap((website, index) => (account[`site${index}`] ?? []).map(row => {
+    const periodStart = Date.parse(row.dimensions.datetimeHour)
 
-      if (!Number.isFinite(periodStart)) {
-        throw new Error('Cloudflare Analytics returned an invalid time bucket')
-      }
+    if (!Number.isFinite(periodStart)) {
+      throw new Error('Cloudflare Analytics returned an invalid time bucket')
+    }
 
-      return {
-        collectedAt,
-        hostname: website.hostname,
-        id: crypto.randomUUID(),
-        pageViews: Math.max(0, Math.round(row.count)),
-        periodEnd: periodStart + hourMilliseconds,
-        periodStart,
-        sampleInterval: Math.max(1, row.avg.sampleInterval),
-        slug: website.slug,
-        visits: Math.max(0, Math.round(row.sum.visits)),
-      }
-    }),
-  )
+    return {
+      collectedAt,
+      hostname: website.hostname,
+      id: crypto.randomUUID(),
+      pageViews: Math.max(0, Math.round(row.count)),
+      periodEnd: periodStart + hourMilliseconds,
+      periodStart,
+      sampleInterval: Math.max(1, row.avg.sampleInterval),
+      slug: website.slug,
+      visits: Math.max(0, Math.round(row.sum.visits))
+    }
+  }))
 }
 
 export const syncCloudflareAnalytics = async (
-  env: Bindings,
+  env: Bindings
 ): Promise<number> => {
   const accountId = env.CLOUDFLARE_ACCOUNT_ID
   const apiToken = env.CLOUDFLARE_API_TOKEN
@@ -179,7 +177,7 @@ export const syncCloudflareAnalytics = async (
 
   if (!accountId || !apiToken) {
     throw new Error(
-      'Cloudflare Analytics requires both CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN',
+      'Cloudflare Analytics requires both CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN'
     )
   }
 
@@ -191,12 +189,8 @@ export const syncCloudflareAnalytics = async (
   for (let index = 0; index < websites.length; index += websitesPerRequest) {
     snapshots.push(
       ...(await fetchCloudflareAnalytics(
-        accountId,
-        apiToken,
-        websites.slice(index, index + websitesPerRequest),
-        end - collectionWindowMilliseconds,
-        end,
-      )),
+        accountId, apiToken, websites.slice(index, index + websitesPerRequest), end - collectionWindowMilliseconds, end
+      ))
     )
   }
 
@@ -207,11 +201,10 @@ export const syncCloudflareAnalytics = async (
 
 export const buildWebsiteAnalytics = async (
   env: Bindings,
-  range: AnalyticsRange = '30d',
+  range: AnalyticsRange = '30d'
 ): Promise<WebsiteAnalytics> => {
   const rows = await getWebsiteAnalyticsSince(
-    createDb(env.DB),
-    Date.now() - getRangeMilliseconds(range),
+    createDb(env.DB), Date.now() - getRangeMilliseconds(range)
   )
 
   const rowsBySlug = new Map<string, typeof rows>()
@@ -225,27 +218,27 @@ export const buildWebsiteAnalytics = async (
     const hostname = firstRow?.hostname ?? ''
 
     return {
-      history: siteRows.map((row) => ({
+      history: siteRows.map(row => ({
         pageViews: row.pageViews,
         periodStart: new Date(row.periodStart).toISOString(),
         sampleInterval: row.sampleInterval,
-        visits: row.visits,
+        visits: row.visits
       })),
       hostname,
       pageViews: siteRows.reduce((total, row) => total + row.pageViews, 0),
       slug,
-      visits: siteRows.reduce((total, row) => total + row.visits, 0),
+      visits: siteRows.reduce((total, row) => total + row.visits, 0)
     }
   })
 
   return websiteAnalyticsSchema.parse({
     generatedAt: new Date().toISOString(),
     range,
-    sites,
+    sites
   })
 }
 
 export const cloudflareInternals = {
   buildQuery,
-  fetchCloudflareAnalytics,
+  fetchCloudflareAnalytics
 }

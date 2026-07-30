@@ -4,7 +4,7 @@ import {
   real,
   sqliteTable,
   text,
-  uniqueIndex,
+  uniqueIndex
 } from 'drizzle-orm/sqlite-core'
 
 export const authCodes = sqliteTable('auth_codes', {
@@ -14,7 +14,7 @@ export const authCodes = sqliteTable('auth_codes', {
   email: text('email').notNull(),
   expiresAt: integer('expires_at').notNull(),
   id: text('id').primaryKey(),
-  usedAt: integer('used_at'),
+  usedAt: integer('used_at')
 })
 
 export const sessions = sqliteTable('sessions', {
@@ -23,7 +23,7 @@ export const sessions = sqliteTable('sessions', {
   expiresAt: integer('expires_at').notNull(),
   id: text('id').primaryKey(),
   lastSeenAt: integer('last_seen_at').notNull(),
-  tokenHash: text('token_hash').notNull().unique(),
+  tokenHash: text('token_hash').notNull().unique()
 })
 
 export const syncRuns = sqliteTable('sync_runs', {
@@ -32,12 +32,11 @@ export const syncRuns = sqliteTable('sync_runs', {
   id: text('id').primaryKey(),
   projectCount: integer('project_count').notNull().default(0),
   startedAt: integer('started_at').notNull(),
-  status: text('status').notNull(),
+  status: text('status').notNull()
 })
 
 export const projectSnapshots = sqliteTable(
-  'project_snapshots',
-  {
+  'project_snapshots', {
     archived: integer('archived', { mode: 'boolean' }).notNull(),
     category: text('category').notNull(),
     collectedAt: integer('collected_at').notNull(),
@@ -62,18 +61,15 @@ export const projectSnapshots = sqliteTable(
     syncRunId: text('sync_run_id').references(() => syncRuns.id),
     topics: text('topics').notNull().default('[]'),
     visibility: text('visibility').notNull().default('public'),
-    websiteUrl: text('website_url'),
-  },
-  (table) => [
+    websiteUrl: text('website_url')
+  }, table => [
     index('project_snapshots_visibility_collected_idx').on(
-      table.visibility,
-      table.collectedAt,
+      table.visibility, table.collectedAt
     ),
     index('project_snapshots_slug_collected_idx').on(
-      table.slug,
-      table.collectedAt,
-    ),
-  ],
+      table.slug, table.collectedAt
+    )
+  ]
 )
 
 export const projectPreferences = sqliteTable('project_preferences', {
@@ -83,15 +79,14 @@ export const projectPreferences = sqliteTable('project_preferences', {
   slug: text('slug').primaryKey(),
   updatedAt: integer('updated_at').notNull(),
   websiteAnalyticsEnabled: integer('website_analytics_enabled', {
-    mode: 'boolean',
+    mode: 'boolean'
   })
     .notNull()
-    .default(true),
+    .default(true)
 })
 
 export const websiteAnalyticsSnapshots = sqliteTable(
-  'website_analytics_snapshots',
-  {
+  'website_analytics_snapshots', {
     collectedAt: integer('collected_at').notNull(),
     hostname: text('hostname').notNull(),
     id: text('id').primaryKey(),
@@ -100,13 +95,11 @@ export const websiteAnalyticsSnapshots = sqliteTable(
     periodStart: integer('period_start').notNull(),
     sampleInterval: real('sample_interval').notNull().default(1),
     slug: text('slug').notNull(),
-    visits: integer('visits').notNull().default(0),
-  },
-  (table) => [
+    visits: integer('visits').notNull().default(0)
+  }, table => [
     index('website_analytics_period_idx').on(table.periodStart),
     uniqueIndex('website_analytics_slug_period_idx').on(
-      table.slug,
-      table.periodStart,
-    ),
-  ],
+      table.slug, table.periodStart
+    )
+  ]
 )

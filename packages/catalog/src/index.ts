@@ -18,31 +18,31 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
       npmPackages: [
         '@santi020k/astro-doctor',
         '@santi020k/eslint-plugin-astro-doctor',
-        '@santi020k/oxlint-config-astro-doctor',
+        '@santi020k/oxlint-config-astro-doctor'
       ],
-      status: 'active',
+      status: 'active'
     },
     'dep-beacon': {
       category: 'tool',
       displayName: 'Dep Beacon',
       npmPackages: ['@santi020k/dep-beacon-core'],
-      status: 'active',
+      status: 'active'
     },
     difftale: {
       category: 'tool',
       displayName: 'Difftale',
-      status: 'active',
+      status: 'active'
     },
     'eslint-config-basic': {
       category: 'library',
       displayName: 'ESLint Config Basic',
       npmPackages: ['@santi020k/eslint-config-basic'],
-      status: 'active',
+      status: 'active'
     },
     'homebrew-tap': {
       category: 'tool',
       displayName: 'Homebrew Tap',
-      status: 'maintained',
+      status: 'maintained'
     },
     lumen: {
       category: 'library',
@@ -52,38 +52,37 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
         '@santi020k/lumen-astro',
         '@santi020k/lumen-core',
         '@santi020k/lumen-elements',
-        '@santi020k/lumen-react',
+        '@santi020k/lumen-react'
       ],
-      status: 'active',
+      status: 'active'
     },
     'santi020k-theme': {
       category: 'library',
       displayName: 'Santi020k Theme',
       npmPackages: [
         '@santi020k/theme',
-        '@santi020k/theme-core',
+        '@santi020k/theme-core'
       ],
-      status: 'active',
+      status: 'active'
     },
     website: {
       category: 'content',
       displayName: 'Personal Website',
-      status: 'active',
+      status: 'active'
     },
     'workspace-organizer': {
       category: 'app',
       displayName: 'Workspace Organizer',
-      status: 'active',
-    },
-  } satisfies Record<string, CatalogOverride>),
+      status: 'active'
+    }
+  } satisfies Record<string, CatalogOverride>)
 )
 
 export const getCatalogOverride = (
-  repository: string,
+  repository: string
 ): CatalogOverride | undefined => catalogOverrides.get(repository)
 
-export const titleFromSlug = (slug: string): string =>
-  slug
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
+export const titleFromSlug = (slug: string): string => slug
+  .split('-')
+  .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+  .join(' ')

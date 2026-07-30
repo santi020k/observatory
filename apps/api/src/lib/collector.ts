@@ -3,7 +3,7 @@ import {
   githubOwner,
   type ProjectCategory,
   type ProjectStatus,
-  titleFromSlug,
+  titleFromSlug
 } from '@santi020k/observatory-catalog'
 import {
   completeSyncRun,
@@ -11,7 +11,7 @@ import {
   getWebsiteAnalyticsSince,
   insertSnapshots,
   type SnapshotWrite,
-  startSyncRun,
+  startSyncRun
 } from '@santi020k/observatory-db'
 
 import type { Bindings } from '../env'
@@ -40,6 +40,11 @@ interface PackageMetrics {
   latestVersion: string | null
 }
 
+interface WebsiteHealth {
+  responseTimeMs: number | null
+  status: 'degraded' | 'healthy' | 'unknown'
+}
+
 const dayMilliseconds = 24 * 60 * 60 * 1_000
 const relevanceWindowMilliseconds = 30 * dayMilliseconds
 
@@ -50,11 +55,13 @@ const relevanceWeights = {
   npmDownloads: 0.5,
   recency: 0.04,
   stars: 0.06,
-  websitePageViews: 0.2,
+  websitePageViews: 0.2
 } as const
 
-const normalizeSignal = (value: number, maximum: number): number =>
-  maximum > 0 ? Math.log1p(value) / Math.log1p(maximum) : 0
+const normalizeSignal = (
+  value: number,
+  maximum: number
+): number => maximum > 0 ? Math.log1p(value) / Math.log1p(maximum) : 0
 
 const getRecencySignal = (pushedAt: string | null, now: number): number => {
   if (!pushedAt) return 0
@@ -71,41 +78,40 @@ const getRecencySignal = (pushedAt: string | null, now: number): number => {
 const scoreSnapshotsByRelevance = (
   snapshots: readonly SnapshotWrite[],
   websitePageViewsBySlug: ReadonlyMap<string, number>,
-  now: number,
+  now: number
 ): SnapshotWrite[] => {
-  const maximum = (select: (snapshot: SnapshotWrite) => number): number =>
-    Math.max(0, ...snapshots.map(select))
+  const maximum = (select: (snapshot: SnapshotWrite) => number): number => Math.max(0, ...snapshots.map(select))
 
   const maxima = {
-    forks: maximum((snapshot) => snapshot.forks),
-    githubClones: maximum((snapshot) => snapshot.githubClones14d ?? 0),
-    githubViews: maximum((snapshot) => snapshot.githubViews14d ?? 0),
-    npmDownloads: maximum((snapshot) => snapshot.npmDownloads30d),
-    stars: maximum((snapshot) => snapshot.stars),
+    forks: maximum(snapshot => snapshot.forks),
+    githubClones: maximum(snapshot => snapshot.githubClones14d ?? 0),
+    githubViews: maximum(snapshot => snapshot.githubViews14d ?? 0),
+    npmDownloads: maximum(snapshot => snapshot.npmDownloads30d),
+    stars: maximum(snapshot => snapshot.stars),
     websitePageViews: maximum(
-      (snapshot) => websitePageViewsBySlug.get(snapshot.slug) ?? 0,
-    ),
+      snapshot => websitePageViewsBySlug.get(snapshot.slug) ?? 0
+    )
   }
 
-  return snapshots.map((snapshot) => {
+  return snapshots.map(snapshot => {
     const websitePageViews = websitePageViewsBySlug.get(snapshot.slug) ?? 0
 
     const score =
       normalizeSignal(snapshot.npmDownloads30d, maxima.npmDownloads) *
-        relevanceWeights.npmDownloads +
+      relevanceWeights.npmDownloads +
       normalizeSignal(websitePageViews, maxima.websitePageViews) *
-        relevanceWeights.websitePageViews +
+      relevanceWeights.websitePageViews +
       normalizeSignal(snapshot.githubViews14d ?? 0, maxima.githubViews) *
-        relevanceWeights.githubViews +
+      relevanceWeights.githubViews +
       normalizeSignal(snapshot.githubClones14d ?? 0, maxima.githubClones) *
-        relevanceWeights.githubClones +
+      relevanceWeights.githubClones +
       normalizeSignal(snapshot.stars, maxima.stars) * relevanceWeights.stars +
       normalizeSignal(snapshot.forks, maxima.forks) * relevanceWeights.forks +
       getRecencySignal(snapshot.pushedAt, now) * relevanceWeights.recency
 
     return {
       ...snapshot,
-      relevanceScore: Math.round(score * 100),
+      relevanceScore: Math.round(score * 100)
     }
   })
 }
@@ -113,7 +119,7 @@ const scoreSnapshotsByRelevance = (
 class ProviderRequestError extends Error {
   constructor(
     readonly status: number,
-    readonly url: string,
+    readonly url: string
   ) {
     super(`Provider request failed with ${status}: ${url}`)
 
@@ -125,16 +131,16 @@ const githubHeaders = (token?: string): HeadersInit => ({
   Accept: 'application/vnd.github+json',
   'User-Agent': 'santi-observatory',
   'X-GitHub-Api-Version': '2022-11-28',
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  ...(token ? { Authorization: `Bearer ${token}` } : {})
 })
 
 const fetchJson = async <Result>(
   url: string,
-  headers?: HeadersInit,
+  headers?: HeadersInit
 ): Promise<Result> => {
   const response = await fetch(url, {
     ...(headers ? { headers } : {}),
-    signal: AbortSignal.timeout(8_000),
+    signal: AbortSignal.timeout(8_000)
   })
 
   if (!response.ok) {
@@ -145,7 +151,7 @@ const fetchJson = async <Result>(
 }
 
 const collectGithubRepositories = async (
-  token?: string,
+  token?: string
 ): Promise<GithubRepository[]> => {
   const repositories: GithubRepository[] = []
   let page = 1
@@ -153,8 +159,7 @@ const collectGithubRepositories = async (
 
   do {
     pageRepositories = await fetchJson<GithubRepository[]>(
-      `https://api.github.com/users/${githubOwner}/repos?per_page=100&sort=updated&page=${page}`,
-      githubHeaders(token),
+      `https://api.github.com/users/${githubOwner}/repos?per_page=100&sort=updated&page=${page}`, githubHeaders(token)
     )
 
     repositories.push(...pageRepositories)
@@ -162,20 +167,19 @@ const collectGithubRepositories = async (
     page += 1
   } while (pageRepositories.length === 100)
 
-  return repositories.filter((repository) => !repository.fork)
+  return repositories.filter(repository => !repository.fork)
 }
 
 const collectTraffic = async (
   repository: string,
   metric: 'clones' | 'views',
-  token?: string,
+  token?: string
 ): Promise<number | null> => {
   if (!token) return null
 
   try {
     const traffic = await fetchJson<GithubTraffic>(
-      `https://api.github.com/repos/${githubOwner}/${repository}/traffic/${metric}`,
-      githubHeaders(token),
+      `https://api.github.com/repos/${githubOwner}/${repository}/traffic/${metric}`, githubHeaders(token)
     )
 
     return traffic.count
@@ -188,12 +192,11 @@ const collectTraffic = async (
 
 const collectOpenPullRequestsCount = async (
   repository: string,
-  token?: string,
+  token?: string
 ): Promise<number> => {
   try {
     const pulls = await fetchJson<unknown[]>(
-      `https://api.github.com/repos/${githubOwner}/${repository}/pulls?state=open&per_page=100`,
-      githubHeaders(token),
+      `https://api.github.com/repos/${githubOwner}/${repository}/pulls?state=open&per_page=100`, githubHeaders(token)
     )
 
     return pulls.length
@@ -203,15 +206,15 @@ const collectOpenPullRequestsCount = async (
 }
 
 const collectPackageMetrics = async (
-  packageNames: readonly string[],
+  packageNames: readonly string[]
 ): Promise<PackageMetrics> => {
   const metrics = await Promise.all(
-    packageNames.map(async (packageName) => {
+    packageNames.map(async packageName => {
       const encoded = encodeURIComponent(packageName)
 
       const [downloads, registry] = await Promise.all([
         fetchJson<{ downloads: number }>(
-          `https://api.npmjs.org/downloads/point/last-month/${encoded}`,
+          `https://api.npmjs.org/downloads/point/last-month/${encoded}`
         ).catch((error: unknown) => {
           if (error instanceof ProviderRequestError && error.status === 404) {
             return { downloads: 0 }
@@ -220,30 +223,27 @@ const collectPackageMetrics = async (
           throw error
         }),
         fetchJson<{ 'dist-tags'?: { latest?: string } }>(
-          `https://registry.npmjs.org/${encoded}`,
-        ),
+          `https://registry.npmjs.org/${encoded}`
+        )
       ])
 
       return {
         downloads: downloads.downloads,
-        latestVersion: registry['dist-tags']?.latest ?? null,
+        latestVersion: registry['dist-tags']?.latest ?? null
       }
-    }),
+    })
   )
 
   return {
     downloads: metrics.reduce((total, metric) => total + metric.downloads, 0),
     latestVersion:
-      metrics.find((metric) => metric.latestVersion)?.latestVersion ?? null,
+      metrics.find(metric => metric.latestVersion)?.latestVersion ?? null
   }
 }
 
 const checkWebsite = async (
-  website: string | null,
-): Promise<{
-  responseTimeMs: number | null
-  status: 'degraded' | 'healthy' | 'unknown'
-}> => {
+  website: string | null
+): Promise<WebsiteHealth> => {
   if (!website) return { responseTimeMs: null, status: 'unknown' }
 
   const startedAt = Date.now()
@@ -252,20 +252,20 @@ const checkWebsite = async (
     let response = await fetch(website, {
       method: 'HEAD',
       redirect: 'follow',
-      signal: AbortSignal.timeout(6_000),
+      signal: AbortSignal.timeout(6_000)
     })
 
     if (response.status === 405 || response.status === 501) {
       response = await fetch(website, {
         headers: { Range: 'bytes=0-0' },
         redirect: 'follow',
-        signal: AbortSignal.timeout(6_000),
+        signal: AbortSignal.timeout(6_000)
       })
     }
 
     return {
       responseTimeMs: Date.now() - startedAt,
-      status: response.ok ? 'healthy' : 'degraded',
+      status: response.ok ? 'healthy' : 'degraded'
     }
   } catch {
     return { responseTimeMs: null, status: 'degraded' }
@@ -293,26 +293,42 @@ const inferStatus = (repository: GithubRepository): ProjectStatus => {
   return 'active'
 }
 
-const collectRepository = async (
+interface CollectedRepositoryData {
+  clones: number
+  packageMetrics: PackageMetrics
+  pullRequestsCount: number
+  views: number
+  websiteHealth: WebsiteHealth
+}
+
+const getSnapshotCategory = (
+  repository: GithubRepository
+): ProjectCategory => getCatalogOverride(repository.name)?.category ?? inferCategory(repository)
+
+const getSnapshotName = (repository: GithubRepository): string => getCatalogOverride(repository.name)?.displayName ??
+  titleFromSlug(repository.name)
+
+const getSnapshotPackages = (
+  repository: GithubRepository
+): readonly string[] => getCatalogOverride(repository.name)?.npmPackages ?? []
+
+const getSnapshotStatus = (
+  repository: GithubRepository
+): ProjectStatus => getCatalogOverride(repository.name)?.status ??
+  inferStatus(repository)
+
+const toSnapshot = (
   repository: GithubRepository,
-  env: Bindings,
   collectedAt: number,
   syncRunId: string,
-): Promise<SnapshotWrite> => {
-  const override = getCatalogOverride(repository.name)
-  const packages = override?.npmPackages ?? []
-
-  const [packageMetrics, websiteHealth, views, clones, pullRequestsCount] = await Promise.all([
-    collectPackageMetrics(packages),
-    checkWebsite(repository.homepage),
-    collectTraffic(repository.name, 'views', env.GITHUB_TOKEN),
-    collectTraffic(repository.name, 'clones', env.GITHUB_TOKEN),
-    collectOpenPullRequestsCount(repository.name, env.GITHUB_TOKEN),
-  ])
+  collected: CollectedRepositoryData
+): SnapshotWrite => {
+  const { clones, packageMetrics, pullRequestsCount, views, websiteHealth } =
+    collected
 
   return {
     archived: repository.archived,
-    category: override?.category ?? inferCategory(repository),
+    category: getSnapshotCategory(repository),
     collectedAt,
     description: repository.description,
     forks: repository.forks_count,
@@ -321,9 +337,9 @@ const collectRepository = async (
     healthStatus: websiteHealth.status,
     id: crypto.randomUUID(),
     latestVersion: packageMetrics.latestVersion,
-    name: override?.displayName ?? titleFromSlug(repository.name),
+    name: getSnapshotName(repository),
     npmDownloads30d: packageMetrics.downloads,
-    npmPackages: packages,
+    npmPackages: getSnapshotPackages(repository),
     openIssues: Math.max(0, repository.open_issues_count - pullRequestsCount),
     pushedAt: repository.pushed_at,
     relevanceScore: 0,
@@ -331,12 +347,38 @@ const collectRepository = async (
     responseTimeMs: websiteHealth.responseTimeMs,
     slug: repository.name,
     stars: repository.stargazers_count,
-    status: override?.status ?? inferStatus(repository),
+    status: getSnapshotStatus(repository),
     syncRunId,
     topics: repository.topics,
     visibility: repository.private ? 'private' : 'public',
-    websiteUrl: repository.homepage || null,
+    websiteUrl: repository.homepage || null
   }
+}
+
+const collectRepository = async (
+  repository: GithubRepository,
+  env: Bindings,
+  collectedAt: number,
+  syncRunId: string
+): Promise<SnapshotWrite> => {
+  const packages = getCatalogOverride(repository.name)?.npmPackages ?? []
+
+  const [packageMetrics, websiteHealth, views, clones, pullRequestsCount] =
+    await Promise.all([
+      collectPackageMetrics(packages),
+      checkWebsite(repository.homepage),
+      collectTraffic(repository.name, 'views', env.GITHUB_TOKEN),
+      collectTraffic(repository.name, 'clones', env.GITHUB_TOKEN),
+      collectOpenPullRequestsCount(repository.name, env.GITHUB_TOKEN)
+    ])
+
+  return toSnapshot(repository, collectedAt, syncRunId, {
+    clones,
+    packageMetrics,
+    pullRequestsCount,
+    views,
+    websiteHealth
+  })
 }
 
 export const syncProjects = async (env: Bindings): Promise<number> => {
@@ -350,30 +392,24 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
     const [repositories, websiteAnalytics] = await Promise.all([
       collectGithubRepositories(env.GITHUB_TOKEN),
       getWebsiteAnalyticsSince(
-        database,
-        startedAt - relevanceWindowMilliseconds,
-      ),
+        database, startedAt - relevanceWindowMilliseconds
+      )
     ])
 
     const websitePageViewsBySlug = new Map<string, number>()
 
     for (const row of websiteAnalytics) {
       websitePageViewsBySlug.set(
-        row.slug,
-        (websitePageViewsBySlug.get(row.slug) ?? 0) + row.pageViews,
+        row.slug, (websitePageViewsBySlug.get(row.slug) ?? 0) + row.pageViews
       )
     }
 
     const collectedSnapshots = await Promise.all(
-      repositories.map((repository) =>
-        collectRepository(repository, env, startedAt, runId),
-      ),
+      repositories.map(repository => collectRepository(repository, env, startedAt, runId))
     )
 
     const snapshots = scoreSnapshotsByRelevance(
-      collectedSnapshots,
-      websitePageViewsBySlug,
-      startedAt,
+      collectedSnapshots, websitePageViewsBySlug, startedAt
     )
 
     await insertSnapshots(database, snapshots)
@@ -381,7 +417,7 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
     await completeSyncRun(database, runId, {
       completedAt: Date.now(),
       projectCount: snapshots.length,
-      status: 'succeeded',
+      status: 'succeeded'
     })
 
     return snapshots.length
@@ -391,7 +427,7 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
       errorMessage:
         error instanceof Error ? error.message : 'Unknown sync error',
       projectCount: 0,
-      status: 'failed',
+      status: 'failed'
     })
 
     throw error
@@ -402,5 +438,5 @@ export const collectorInternals = {
   checkWebsite,
   collectGithubRepositories,
   collectPackageMetrics,
-  scoreSnapshotsByRelevance,
+  scoreSnapshotsByRelevance
 }

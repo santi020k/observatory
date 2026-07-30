@@ -1,11 +1,11 @@
 import type {
   AnalyticsRange,
-  WebsiteAnalyticsPoint,
+  WebsiteAnalyticsPoint
 } from '@santi020k/observatory-api-types'
 
 const getBucketStart = (
   periodStart: string,
-  range: AnalyticsRange,
+  range: AnalyticsRange
 ): number | null => {
   const date = new Date(periodStart)
 
@@ -16,19 +16,27 @@ const getBucketStart = (
   switch (range) {
     case '5d':
       date.setUTCHours(Math.floor(date.getUTCHours() / 6) * 6)
+
       break
+
     case '30d':
       date.setUTCHours(0)
+
       break
+
     case '90d': {
       const day = date.getUTCDay()
 
       date.setUTCDate(date.getUTCDate() - day)
+
       date.setUTCHours(0)
+
       break
     }
+
     default:
       date.setUTCDate(1)
+
       date.setUTCHours(0)
   }
 
@@ -37,7 +45,7 @@ const getBucketStart = (
 
 export const aggregateWebsiteAnalytics = (
   history: readonly WebsiteAnalyticsPoint[],
-  range: AnalyticsRange,
+  range: AnalyticsRange
 ): WebsiteAnalyticsPoint[] => {
   const buckets = new Map<number, WebsiteAnalyticsPoint>()
 
@@ -52,10 +60,9 @@ export const aggregateWebsiteAnalytics = (
       pageViews: (current?.pageViews ?? 0) + point.pageViews,
       periodStart: new Date(bucketStart).toISOString(),
       sampleInterval: Math.max(
-        current?.sampleInterval ?? 1,
-        point.sampleInterval,
+        current?.sampleInterval ?? 1, point.sampleInterval
       ),
-      visits: (current?.visits ?? 0) + point.visits,
+      visits: (current?.visits ?? 0) + point.visits
     })
   }
 

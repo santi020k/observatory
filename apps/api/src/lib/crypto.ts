@@ -1,20 +1,15 @@
 const encoder = new TextEncoder()
 
-const toHex = (bytes: ArrayBuffer): string =>
-  [...new Uint8Array(bytes)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
+const toHex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)]
+  .map(byte => byte.toString(16).padStart(2, '0'))
+  .join('')
 
 export const hashValue = async (
   secret: string,
-  value: string,
+  value: string
 ): Promise<string> => {
   const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { hash: 'SHA-256', name: 'HMAC' },
-    false,
-    ['sign'],
+    'raw', encoder.encode(secret), { hash: 'SHA-256', name: 'HMAC' }, false, ['sign']
   )
 
   const digest = await crypto.subtle.sign('HMAC', key, encoder.encode(value))

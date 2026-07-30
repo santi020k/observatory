@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { hashValue } from './lib/crypto'
 
@@ -9,21 +9,21 @@ const mocks = vi.hoisted(() => ({
   insertAuthCode: vi.fn(),
   insertSession: vi.fn(),
   recordCodeAttempt: vi.fn(),
-  sendLoginCode: vi.fn(),
+  sendLoginCode: vi.fn()
 }))
 
-vi.mock('@santi020k/observatory-db', async (importOriginal) => ({
+vi.mock('@santi020k/observatory-db', async importOriginal => ({
   ...(await importOriginal()),
   countRecentAuthCodes: mocks.countRecentAuthCodes,
   createDb: mocks.createDb,
   findLatestUsableCode: mocks.findLatestUsableCode,
   insertAuthCode: mocks.insertAuthCode,
   insertSession: mocks.insertSession,
-  recordCodeAttempt: mocks.recordCodeAttempt,
+  recordCodeAttempt: mocks.recordCodeAttempt
 }))
 
 vi.mock('./lib/email', () => ({
-  sendLoginCode: mocks.sendLoginCode,
+  sendLoginCode: mocks.sendLoginCode
 }))
 
 const { app } = await import('./index')
@@ -34,7 +34,7 @@ const environment = {
   DB: {},
   ENVIRONMENT: 'production',
   MAIL_FROM: 'Observatory <observatory@example.com>',
-  OWNER_EMAIL: 'owner@example.com',
+  OWNER_EMAIL: 'owner@example.com'
 }
 
 beforeEach(() => {
@@ -46,24 +46,22 @@ beforeEach(() => {
 })
 
 describe('owner authentication flow', () => {
-  it('stores a hashed code and returns the generic request response', async () => {
+  test('stores a hashed code and returns the generic request response', async () => {
     const response = await app.request(
-      '/auth/request-code',
-      {
+      '/auth/request-code', {
         body: JSON.stringify({ email: ' OWNER@example.com ' }),
         headers: {
           'Content-Type': 'application/json',
-          Origin: 'https://observatory.example',
+          Origin: 'https://observatory.example'
         },
-        method: 'POST',
-      },
-      environment,
+        method: 'POST'
+      }, environment
     )
 
     expect(response.status).toBe(202)
 
     await expect(response.json()).resolves.toEqual({
-      message: 'If this address is authorized, a verification code is on its way.',
+      message: 'If this address is authorized, a verification code is on its way.'
     })
 
     expect(mocks.insertAuthCode).toHaveBeenCalledOnce()
@@ -85,44 +83,39 @@ describe('owner authentication flow', () => {
     expect(storedCode.email).toBe('owner@example.com')
   })
 
-  it('consumes a valid code and issues an HttpOnly production session', async () => {
+  test('consumes a valid code and issues an HttpOnly production session', async () => {
     const code = '123456'
 
     const codeHash = await hashValue(
-      environment.AUTH_SECRET,
-      `owner@example.com:${code}`,
+      environment.AUTH_SECRET, `owner@example.com:${code}`
     )
 
     mocks.findLatestUsableCode.mockResolvedValue({
       codeHash,
-      id: 'code-id',
+      id: 'code-id'
     })
 
     const response = await app.request(
-      '/auth/verify-code',
-      {
+      '/auth/verify-code', {
         body: JSON.stringify({ code, email: 'owner@example.com' }),
         headers: {
           'Content-Type': 'application/json',
-          Origin: 'https://observatory.example',
+          Origin: 'https://observatory.example'
         },
-        method: 'POST',
-      },
-      environment,
+        method: 'POST'
+      }, environment
     )
 
     expect(response.status).toBe(200)
 
     expect(mocks.recordCodeAttempt).toHaveBeenCalledWith(
-      expect.anything(),
-      'code-id',
-      expect.any(Number),
+      expect.anything(), 'code-id', expect.any(Number)
     )
 
     expect(mocks.insertSession).toHaveBeenCalledOnce()
 
     expect(response.headers.get('set-cookie')).toMatch(
-      /^__Host-observatory_session=.*HttpOnly.*Secure.*SameSite=Lax/,
+      /^__Host-observatory_session=.*HttpOnly.*Secure.*SameSite=Lax/
     )
   })
 })

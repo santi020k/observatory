@@ -1,20 +1,20 @@
 import * as z from 'zod'
 
 export const requestCodeSchema = z.object({
-  email: z.string().trim().toLowerCase().pipe(z.email()),
+  email: z.string().trim().toLowerCase().pipe(z.email())
 })
 
 export const verifyCodeSchema = requestCodeSchema.extend({
   code: z
     .string()
     .trim()
-    .regex(/^\d{6}$/),
+    .regex(/^\d{6}$/)
 })
 
 export const projectSourceSchema = z.object({
   github: z.string().trim(),
   npm: z.array(z.string().trim()).default([]),
-  website: z.url().nullable(),
+  website: z.url().nullable()
 })
 
 export const projectAttentionModeSchema = z.enum(['all', 'health', 'off'])
@@ -42,7 +42,7 @@ export const projectMetricSchema = z.object({
   status: z.enum(['active', 'archived', 'maintained', 'paused']),
   topics: z.array(z.string().trim()),
   visibility: z.enum(['private', 'public']),
-  websiteAnalyticsEnabled: z.boolean(),
+  websiteAnalyticsEnabled: z.boolean()
 })
 
 export const analyticsRangeSchema = z.enum(['5d', '30d', '90d', '1y', '5y'])
@@ -52,7 +52,7 @@ export const historyPointSchema = z.object({
   githubViews14d: z.int().nonnegative().nullable(),
   npmDownloads30d: z.int().nonnegative(),
   openIssues: z.int().nonnegative(),
-  stars: z.int().nonnegative(),
+  stars: z.int().nonnegative()
 })
 
 export const periodSummarySchema = z.object({
@@ -61,7 +61,7 @@ export const periodSummarySchema = z.object({
   downloadVelocityChange: z.int(),
   issueChange: z.int(),
   starsGained: z.int(),
-  syncs: z.int().nonnegative(),
+  syncs: z.int().nonnegative()
 })
 
 export const dashboardSchema = z.object({
@@ -76,12 +76,12 @@ export const dashboardSchema = z.object({
     githubViews14d: z.int().nonnegative().nullable(),
     npmDownloads30d: z.int().nonnegative(),
     openIssues: z.int().nonnegative(),
-    publicProjects: z.int().nonnegative(),
+    publicProjects: z.int().nonnegative()
   }),
   sync: z.object({
     completedAt: z.string().trim().nullable(),
-    status: z.enum(['failed', 'idle', 'running', 'succeeded']),
-  }),
+    status: z.enum(['failed', 'idle', 'running', 'succeeded'])
+  })
 })
 
 export const projectSettingSchema = z.object({
@@ -94,11 +94,11 @@ export const projectSettingSchema = z.object({
   relevanceScore: projectMetricSchema.shape.relevanceScore,
   slug: z.string().trim(),
   status: projectMetricSchema.shape.status,
-  websiteAnalyticsEnabled: z.boolean(),
+  websiteAnalyticsEnabled: z.boolean()
 })
 
 export const projectSettingsSchema = z.object({
-  projects: z.array(projectSettingSchema),
+  projects: z.array(projectSettingSchema)
 })
 
 export const updateProjectSettingSchema = z
@@ -107,22 +107,20 @@ export const updateProjectSettingSchema = z
     enabled: z.boolean().optional(),
     pinned: z.boolean().optional(),
     slug: z.string().trim().min(1),
-    websiteAnalyticsEnabled: z.boolean().optional(),
+    websiteAnalyticsEnabled: z.boolean().optional()
   })
   .refine(
-    ({ attentionMode, enabled, pinned, websiteAnalyticsEnabled }) =>
-      attentionMode !== undefined ||
+    ({ attentionMode, enabled, pinned, websiteAnalyticsEnabled }) => attentionMode !== undefined ||
       enabled !== undefined ||
       pinned !== undefined ||
-      websiteAnalyticsEnabled !== undefined,
-    { error: 'At least one project setting is required.' },
+      websiteAnalyticsEnabled !== undefined, { error: 'At least one project setting is required.' }
   )
 
 export const websiteAnalyticsPointSchema = z.object({
   pageViews: z.int().nonnegative(),
   periodStart: z.string().trim(),
   sampleInterval: z.number().positive(),
-  visits: z.int().nonnegative(),
+  visits: z.int().nonnegative()
 })
 
 export const websiteAnalyticsSiteSchema = z.object({
@@ -130,13 +128,13 @@ export const websiteAnalyticsSiteSchema = z.object({
   hostname: z.string().trim(),
   pageViews: z.int().nonnegative(),
   slug: z.string().trim(),
-  visits: z.int().nonnegative(),
+  visits: z.int().nonnegative()
 })
 
 export const websiteAnalyticsSchema = z.object({
   generatedAt: z.string().trim(),
   range: analyticsRangeSchema,
-  sites: z.array(websiteAnalyticsSiteSchema),
+  sites: z.array(websiteAnalyticsSiteSchema)
 })
 
 export const projectDashboardSchema = z.object({
@@ -145,7 +143,7 @@ export const projectDashboardSchema = z.object({
   period: periodSummarySchema,
   project: projectMetricSchema,
   range: analyticsRangeSchema,
-  websiteAnalytics: websiteAnalyticsSiteSchema.nullable(),
+  websiteAnalytics: websiteAnalyticsSiteSchema.nullable()
 })
 
 export type Dashboard = z.infer<typeof dashboardSchema>

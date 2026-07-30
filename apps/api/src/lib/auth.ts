@@ -7,7 +7,7 @@ import {
   findSession,
   insertAuthCode,
   insertSession,
-  recordCodeAttempt,
+  recordCodeAttempt
 } from '@santi020k/observatory-db'
 import type { Context, MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
@@ -22,17 +22,16 @@ const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
 const REQUEST_WINDOW_MS = 10 * 60 * 1000
 const MAX_CODES_PER_WINDOW = 3
 
-const getSessionCookieName = (environment: string): string =>
-  environment === 'production'
-    ? '__Host-observatory_session'
-    : 'observatory_session'
+const getSessionCookieName = (environment: string): string => environment === 'production' ?
+  '__Host-observatory_session' :
+  'observatory_session'
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase()
 
 export const requestLoginCode = async (
   context: Context<WorkerEnv>,
-  email: string,
-): Promise<{ developmentCode?: string; message: string }> => {
+  email: string
+): Promise<{ developmentCode?: string, message: string }> => {
   const normalizedEmail = normalizeEmail(email)
   const ownerEmail = normalizeEmail(context.env.OWNER_EMAIL)
 
@@ -45,9 +44,7 @@ export const requestLoginCode = async (
   const now = Date.now()
 
   const recentCount = await countRecentAuthCodes(
-    database,
-    normalizedEmail,
-    now - REQUEST_WINDOW_MS,
+    database, normalizedEmail, now - REQUEST_WINDOW_MS
   )
 
   if (recentCount >= MAX_CODES_PER_WINDOW) return { message }
@@ -55,8 +52,7 @@ export const requestLoginCode = async (
   const code = generateCode()
 
   const codeHash = await hashValue(
-    context.env.AUTH_SECRET,
-    `${normalizedEmail}:${code}`,
+    context.env.AUTH_SECRET, `${normalizedEmail}:${code}`
   )
 
   await insertAuthCode(database, {
@@ -64,7 +60,7 @@ export const requestLoginCode = async (
     createdAt: now,
     email: normalizedEmail,
     expiresAt: now + CODE_LIFETIME_MS,
-    id: crypto.randomUUID(),
+    id: crypto.randomUUID()
   })
 
   const result = await sendLoginCode(context.env, normalizedEmail, code)
@@ -75,7 +71,7 @@ export const requestLoginCode = async (
 export const verifyLoginCode = async (
   context: Context<WorkerEnv>,
   email: string,
-  code: string,
+  code: string
 ): Promise<boolean> => {
   const normalizedEmail = normalizeEmail(email)
 
@@ -88,8 +84,7 @@ export const verifyLoginCode = async (
   if (!record) return false
 
   const candidateHash = await hashValue(
-    context.env.AUTH_SECRET,
-    `${normalizedEmail}:${code}`,
+    context.env.AUTH_SECRET, `${normalizedEmail}:${code}`
   )
 
   const valid = safeEqual(record.codeHash, candidateHash)
@@ -107,7 +102,7 @@ export const verifyLoginCode = async (
     expiresAt: now + SESSION_LIFETIME_MS,
     id: crypto.randomUUID(),
     lastSeenAt: now,
-    tokenHash,
+    tokenHash
   })
 
   setCookie(context, getSessionCookieName(context.env.ENVIRONMENT), token, {
@@ -115,18 +110,17 @@ export const verifyLoginCode = async (
     maxAge: SESSION_LIFETIME_MS / 1000,
     path: '/',
     sameSite: 'Lax',
-    secure: context.env.ENVIRONMENT === 'production',
+    secure: context.env.ENVIRONMENT === 'production'
   })
 
   return true
 }
 
 export const resolveSessionEmail = async (
-  context: Context<WorkerEnv>,
+  context: Context<WorkerEnv>
 ): Promise<string | null> => {
   const token = getCookie(
-    context,
-    getSessionCookieName(context.env.ENVIRONMENT),
+    context, getSessionCookieName(context.env.ENVIRONMENT)
   )
 
   if (!token) return null
@@ -140,14 +134,13 @@ export const resolveSessionEmail = async (
 
 export const requireAuth: MiddlewareHandler<WorkerEnv> = async (
   context,
-  next,
+  next
 ) => {
   const email = await resolveSessionEmail(context)
 
   if (!email) {
     return context.json(
-      { error: { code: 'UNAUTHORIZED', message: 'Authentication required.' } },
-      401,
+      { error: { code: 'UNAUTHORIZED', message: 'Authentication required.' } }, 401
     )
   }
 
@@ -171,7 +164,7 @@ export const logout = async (context: Context<WorkerEnv>): Promise<void> => {
 }
 
 export const cleanupAuth = async (
-  env: WorkerEnv['Bindings'],
+  env: WorkerEnv['Bindings']
 ): Promise<void> => {
   await cleanupExpiredAuth(createDb(env.DB), Date.now())
 }

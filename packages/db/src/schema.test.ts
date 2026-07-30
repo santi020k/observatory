@@ -1,5 +1,5 @@
 import { getTableName } from 'drizzle-orm'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, test } from 'vitest'
 
 import {
   authCodes,
@@ -7,11 +7,11 @@ import {
   projectSnapshots,
   sessions,
   syncRuns,
-  websiteAnalyticsSnapshots,
+  websiteAnalyticsSnapshots
 } from './schema'
 
 describe('observatory database schema', () => {
-  it('keeps authentication and analytics in separate tables', () => {
+  test('keeps authentication and analytics in separate tables', () => {
     expect(getTableName(authCodes)).toBe('auth_codes')
 
     expect(getTableName(sessions)).toBe('sessions')
@@ -21,33 +21,33 @@ describe('observatory database schema', () => {
     expect(getTableName(syncRuns)).toBe('sync_runs')
 
     expect(getTableName(websiteAnalyticsSnapshots)).toBe(
-      'website_analytics_snapshots',
+      'website_analytics_snapshots'
     )
   })
 
-  it('stores visibility on every project snapshot', () => {
+  test('stores visibility on every project snapshot', () => {
     expect(projectSnapshots.visibility.name).toBe('visibility')
 
     expect(projectSnapshots.visibility.notNull).toBe(true)
   })
 
-  it('associates snapshots with the sync run that produced them', () => {
+  test('associates snapshots with the sync run that produced them', () => {
     expect(projectSnapshots.syncRunId.name).toBe('sync_run_id')
   })
 
-  it('stores the calculated relevance score with every snapshot', () => {
+  test('stores the calculated relevance score with every snapshot', () => {
     expect(projectSnapshots.relevanceScore.name).toBe('relevance_score')
 
     expect(projectSnapshots.relevanceScore.notNull).toBe(true)
   })
 
-  it('stores project-specific navigation and collection preferences', () => {
+  test('stores project-specific navigation and collection preferences', () => {
     expect(projectPreferences.attentionMode.name).toBe('attention_mode')
 
     expect(projectPreferences.pinned.name).toBe('pinned')
 
     expect(projectPreferences.websiteAnalyticsEnabled.name).toBe(
-      'website_analytics_enabled',
+      'website_analytics_enabled'
     )
   })
 })
