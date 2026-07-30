@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, isNull, lt, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 
 import {
@@ -226,7 +226,7 @@ export const getPublicSnapshotsSince = async (
     .where(
       and(
         eq(projectSnapshots.visibility, 'public'),
-        gt(projectSnapshots.collectedAt, since),
+        gte(projectSnapshots.collectedAt, since),
       ),
     )
     .orderBy(projectSnapshots.collectedAt)
@@ -284,10 +284,7 @@ export const getAnalyticsWebsites = async (db: ObservatoryDb) => {
   )
 
   return rows.flatMap((row) => {
-    if (
-      !row.websiteUrl ||
-      analyticsEnabledBySlug.get(row.slug) === false
-    )
+    if (!row.websiteUrl || analyticsEnabledBySlug.get(row.slug) === false)
       return []
 
     try {
@@ -330,5 +327,5 @@ export const getWebsiteAnalyticsSince = async (
   db
     .select()
     .from(websiteAnalyticsSnapshots)
-    .where(gt(websiteAnalyticsSnapshots.periodStart, since))
+    .where(gte(websiteAnalyticsSnapshots.periodStart, since))
     .orderBy(websiteAnalyticsSnapshots.periodStart)

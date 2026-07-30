@@ -669,15 +669,19 @@ p {
 
 .range-picker {
   display: inline-flex;
+  max-width: min(100%, 32rem);
   gap: 0.2rem;
   padding: 0.25rem;
+  overflow-x: auto;
   border: 1px solid hsl(var(--line));
   border-radius: 0.75rem;
   background: hsl(var(--surface));
+  scrollbar-width: thin;
 }
 
 .range-picker a {
   padding: 0.5rem 0.72rem;
+  white-space: nowrap;
 }
 
 .source-legend .ui-badge {
@@ -692,6 +696,28 @@ p {
 
 .history-panel {
   min-height: 22rem;
+}
+
+.history-section {
+  display: grid;
+  min-width: 0;
+  gap: 1.5rem;
+}
+
+.momentum-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.momentum-grid .history-panel {
+  min-width: 0;
+}
+
+.history-empty {
+  min-height: 14rem;
+  border-style: dashed;
 }
 
 .metric-card {
@@ -838,6 +864,42 @@ p {
 
 .category-summary strong {
   color: hsl(var(--ink));
+}
+
+.portfolio-toolbar {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  border: 1px solid hsl(var(--line));
+  border-radius: 0.9rem;
+  background: hsl(var(--surface-muted) / 0.4);
+}
+
+.portfolio-search {
+  min-width: 0;
+}
+
+.portfolio-search .ui-search-field {
+  width: 100%;
+}
+
+.portfolio-selects {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.portfolio-result-count {
+  color: hsl(var(--ink-muted));
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.portfolio-filter-empty {
+  min-height: 14rem;
+  border-style: dashed;
 }
 
 .ui-table-wrap {
@@ -1481,6 +1543,18 @@ html[data-observatory-reduce-motion='true'] *::after {
     grid-template-columns: 1fr;
   }
 
+  .momentum-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-toolbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .portfolio-search {
+    grid-column: 1 / -1;
+  }
+
   .project-detail-grid {
     grid-template-columns: 1fr;
   }
@@ -1583,7 +1657,26 @@ html[data-observatory-reduce-motion='true'] *::after {
   }
 
   .hero-controls {
+    width: 100%;
     justify-items: start;
+  }
+
+  .portfolio-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-search,
+  .portfolio-selects {
+    width: 100%;
+  }
+
+  .portfolio-selects {
+    flex-wrap: wrap;
+  }
+
+  .portfolio-selects .ui-select {
+    min-width: min(100%, 10rem);
+    flex: 1;
   }
 }
 
@@ -1594,6 +1687,10 @@ html[data-observatory-reduce-motion='true'] *::after {
 
   .website-metric-grid {
     grid-template-columns: 1fr;
+  }
+
+  .range-picker {
+    width: 100%;
   }
 
   .app-header__actions .ui-button [data-sync-label] {

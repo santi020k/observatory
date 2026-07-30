@@ -9,8 +9,8 @@
     "clean": "rm -rf .astro dist",
     "dev": "astro dev --port 4321",
     "doctor": "astro-doctor --dir . --preset recommended --fail-on error",
-    "lint": "eslint src --cache --no-warn-ignored",
-    "lint:fix": "eslint src --cache --fix --no-warn-ignored",
+    "lint": "eslint src --cache --no-warn-ignored --max-warnings=0",
+    "lint:fix": "eslint src --cache --fix --no-warn-ignored --max-warnings=0",
     "preview": "astro preview",
     "test": "vitest run",
     "type-check": "astro check"

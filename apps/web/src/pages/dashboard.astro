@@ -7,6 +7,11 @@ import RangePicker from '@/components/RangePicker.astro'
 import StatusBadge from '@/components/StatusBadge.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
+import {
+  analyticsRangeMeta,
+  formatHistoryLabel,
+  getHistoryCoverage,
+} from '@/lib/analytics-range'
 import { getBrowserApiUrl, getDashboard } from '@/lib/api'
 import { needsAttention } from '@/lib/attention'
 import {
@@ -18,11 +23,14 @@ import {
 
 import Badge from '@santi020k/lumen-astro/components/Badge'
 import BarChart from '@santi020k/lumen-astro/components/BarChart'
+import Button from '@santi020k/lumen-astro/components/Button'
 import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
 import Card from '@santi020k/lumen-astro/components/Card'
 import Empty from '@santi020k/lumen-astro/components/Empty'
 import Icon from '@santi020k/lumen-astro/components/Icon'
 import LineChart from '@santi020k/lumen-astro/components/LineChart'
+import NativeSelect from '@santi020k/lumen-astro/components/NativeSelect'
+import SearchField from '@santi020k/lumen-astro/components/SearchField'
 import Table from '@santi020k/lumen-astro/components/Table'
 
 const response = await getDashboard(Astro.request, Astro.url)
@@ -35,13 +43,13 @@ if (!response.ok || !response.parsed)
 const dashboard = response.parsed
 const apiUrl = getBrowserApiUrl()
 
-const rangeLabels = {
-  '30d': 'last 30 days',
-  '1y': 'last year',
-  '5y': 'last 5 years',
-} as const
-
-const rangeLabel = rangeLabels[dashboard.range]
+const rangeMeta = analyticsRangeMeta[dashboard.range]
+const rangeLabel = rangeMeta.longLabel
+const historyCoverage = getHistoryCoverage(
+  dashboard.period.availableFrom,
+  dashboard.period.availableTo,
+  dashboard.range,
+)
 
 const projectsByDownloads = [...dashboard.projects].sort(
   (left, right) => right.npmDownloads30d - left.npmDownloads30d,
@@ -50,15 +58,6 @@ const projectsByDownloads = [...dashboard.projects].sort(
 const chartProjects = projectsByDownloads
   .filter((project) => project.npmDownloads30d > 0)
   .slice(0, 6)
-
-const historySamples =
-  dashboard.history.length > 12
-    ? dashboard.history.filter(
-        (_, index) =>
-          index % Math.ceil(dashboard.history.length / 12) === 0 ||
-          index === dashboard.history.length - 1,
-      )
-    : dashboard.history
 
 const projectDownloadSeries = [
   {
@@ -75,9 +74,9 @@ const projectDownloadSeries = [
 
 const portfolioHistorySeries = [
   {
-    data: historySamples.map((point) => ({
+    data: dashboard.history.map((point) => ({
       label: `${formatNumber(point.npmDownloads30d)} downloads`,
-      x: formatDate(point.collectedAt),
+      x: formatHistoryLabel(point.collectedAt, dashboard.range),
       y: point.npmDownloads30d,
     })),
     id: 'downloads',
@@ -85,6 +84,22 @@ const portfolioHistorySeries = [
     tone: 'brand',
   },
 ] as const
+
+const portfolioStarsSeries = [
+  {
+    data: dashboard.history.map((point) => ({
+      label: `${formatNumber(point.stars)} stars`,
+      x: formatHistoryLabel(point.collectedAt, dashboard.range),
+      y: point.stars,
+    })),
+    id: 'stars',
+    label: 'Total stars',
+    tone: 'accent',
+  },
+] as const
+
+const formatSignedNumber = (value: number): string =>
+  `${value > 0 ? '+' : ''}${formatNumber(value)}`
 
 const attentionProjects = dashboard.projects
   .filter((project) => needsAttention(project))
@@ -169,7 +184,7 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
           </div>
         </section>
 
-        <section class="metric-grid" aria-label="Portfolio totals">
+        <section class="metric-grid" aria-label="Portfolio metrics">
           <MetricCard
             context={`${dashboard.summary.publicProjects} public repositories tracked`}
             icon="circle-dot-dashed"
@@ -189,22 +204,22 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
             value={formatNumber(dashboard.summary.githubViews14d)}
           />
           <MetricCard
-            context="Maintenance load across public repositories"
+            context={`Change in rolling download velocity · ${rangeLabel}`}
             icon="activity"
-            label="Open issues"
-            value={formatNumber(dashboard.summary.openIssues)}
+            label="Download momentum"
+            value={formatSignedNumber(dashboard.period.downloadVelocityChange)}
           />
           <MetricCard
             context={`Net portfolio change · ${rangeLabel}`}
             icon="star"
             label="Stars gained"
-            value={`${dashboard.period.starsGained >= 0 ? '+' : ''}${formatNumber(dashboard.period.starsGained)}`}
+            value={formatSignedNumber(dashboard.period.starsGained)}
           />
           <MetricCard
-            context={`Historical samples available · ${rangeLabel}`}
-            icon="history"
-            label="Sync snapshots"
-            value={formatNumber(dashboard.period.syncs)}
+            context={`${formatNumber(dashboard.summary.openIssues)} currently open · ${rangeLabel}`}
+            icon="circle-dot-dashed"
+            label="Issue change"
+            value={formatSignedNumber(dashboard.period.issueChange)}
           />
         </section>
 
@@ -315,40 +330,89 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                 </Card>
               </section>
 
-              <Card
-                as="section"
-                class="panel history-panel"
+              <section
                 aria-labelledby="history-heading"
+                class="history-section"
               >
-                <div class="panel-heading">
+                <div class="section-heading">
                   <div>
                     <span class="eyebrow">Momentum</span>
-                    <h2 id="history-heading">Portfolio history</h2>
-                  </div>
-                  <span>{rangeLabel}</span>
-                </div>
-                {historySamples.length > 1 ? (
-                  <LineChart
-                    area
-                    aria-label={`Portfolio download history for ${rangeLabel}`}
-                    caption={`Each point is the observed 30-day download velocity at a sync. ${
-                      dashboard.period.starsGained >= 0 ? '+' : ''
-                    }${formatNumber(dashboard.period.starsGained)} stars and ${
-                      dashboard.period.issueChange >= 0 ? '+' : ''
-                    }${formatNumber(
-                      dashboard.period.issueChange,
-                    )} open issues across the selected range.`}
-                    series={portfolioHistorySeries}
-                  />
-                ) : (
-                  <Empty>
+                    <h2 id="history-heading">Growth over time</h2>
                     <p>
-                      More history will appear after a second sync in this
-                      range.
+                      {rangeMeta.bucketLabel} points built from{' '}
+                      {formatNumber(dashboard.period.syncs)} persisted{' '}
+                      {dashboard.period.syncs === 1 ? 'sync' : 'syncs'}.
                     </p>
-                  </Empty>
+                  </div>
+                  <Badge
+                    variant={historyCoverage.isPartial ? 'warning' : 'outline'}
+                  >
+                    {historyCoverage.label}
+                  </Badge>
+                </div>
+
+                {dashboard.history.length > 1 ? (
+                  <div class="momentum-grid">
+                    <Card
+                      as="section"
+                      class="panel history-panel"
+                      aria-labelledby="download-history-heading"
+                    >
+                      <div class="panel-heading">
+                        <div>
+                          <span class="eyebrow">Usage</span>
+                          <h3 id="download-history-heading">
+                            Download velocity
+                          </h3>
+                        </div>
+                        <span>
+                          {formatSignedNumber(
+                            dashboard.period.downloadVelocityChange,
+                          )}
+                        </span>
+                      </div>
+                      <LineChart
+                        area
+                        markers={dashboard.history.length <= 24}
+                        aria-label={`Portfolio download velocity for ${rangeLabel}`}
+                        caption={`Rolling 30-day npm downloads observed during ${rangeLabel}.`}
+                        series={portfolioHistorySeries}
+                      />
+                    </Card>
+
+                    <Card
+                      as="section"
+                      class="panel history-panel"
+                      aria-labelledby="star-history-heading"
+                    >
+                      <div class="panel-heading">
+                        <div>
+                          <span class="eyebrow">Adoption</span>
+                          <h3 id="star-history-heading">Portfolio stars</h3>
+                        </div>
+                        <span>
+                          {formatSignedNumber(dashboard.period.starsGained)}
+                        </span>
+                      </div>
+                      <LineChart
+                        markers={dashboard.history.length <= 24}
+                        aria-label={`Portfolio star growth for ${rangeLabel}`}
+                        caption={`Total GitHub stars across enabled public projects during ${rangeLabel}.`}
+                        series={portfolioStarsSeries}
+                      />
+                    </Card>
+                  </div>
+                ) : (
+                  <Card class="panel history-empty">
+                    <Empty>
+                      <p>
+                        Run another sync to establish a trend. Every successful
+                        sync is stored in D1 and becomes part of this range.
+                      </p>
+                    </Empty>
+                  </Card>
                 )}
-              </Card>
+              </section>
 
               <section
                 class="portfolio-section"
@@ -378,6 +442,82 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                   </div>
                 </div>
 
+                <div class="portfolio-toolbar" aria-label="Project filters">
+                  <div class="portfolio-search">
+                    <label class="sr-only" for="project-search">
+                      Search projects
+                    </label>
+                    <SearchField
+                      id="project-search"
+                      autocomplete="off"
+                      data-project-search
+                      placeholder="Search projects…"
+                    />
+                  </div>
+                  <div class="portfolio-selects">
+                    <label class="sr-only" for="project-category">
+                      Filter by category
+                    </label>
+                    <NativeSelect
+                      id="project-category"
+                      data-project-category
+                      options={[
+                        { label: 'All categories', value: 'all' },
+                        { label: 'Apps', value: 'app' },
+                        { label: 'Content', value: 'content' },
+                        { label: 'Libraries', value: 'library' },
+                        { label: 'Tools', value: 'tool' },
+                      ]}
+                      size="sm"
+                    />
+                    <label class="sr-only" for="project-status">
+                      Filter by status
+                    </label>
+                    <NativeSelect
+                      id="project-status"
+                      data-project-status
+                      options={[
+                        { label: 'All statuses', value: 'all' },
+                        { label: 'Active', value: 'active' },
+                        { label: 'Maintained', value: 'maintained' },
+                        { label: 'Paused', value: 'paused' },
+                        { label: 'Archived', value: 'archived' },
+                      ]}
+                      size="sm"
+                    />
+                    <label class="sr-only" for="project-sort">
+                      Sort projects
+                    </label>
+                    <NativeSelect
+                      id="project-sort"
+                      data-project-sort
+                      options={[
+                        { label: 'Most relevant', value: 'relevance' },
+                        { label: 'Most downloads', value: 'downloads' },
+                        { label: 'Most stars', value: 'stars' },
+                        { label: 'Recently updated', value: 'updated' },
+                        { label: 'Name', value: 'name' },
+                      ]}
+                      size="sm"
+                    />
+                    <Button
+                      data-project-clear
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  <span
+                    aria-live="polite"
+                    class="portfolio-result-count"
+                    data-project-result-count
+                  >
+                    {dashboard.projects.length} projects
+                  </span>
+                </div>
+
                 <Table
                   aria-label="Project catalog. Scroll horizontally to see all columns."
                   role="region"
@@ -397,9 +537,19 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                         </th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody data-project-rows>
                       {dashboard.projects.map((project) => (
-                        <tr>
+                        <tr
+                          data-project-category={project.category}
+                          data-project-downloads={project.npmDownloads30d}
+                          data-project-name={project.name.toLocaleLowerCase()}
+                          data-project-relevance={project.relevanceScore}
+                          data-project-stars={project.stars}
+                          data-project-status={project.status}
+                          data-project-updated={
+                            project.pushedAt ? Date.parse(project.pushedAt) : 0
+                          }
+                        >
                           <td>
                             <div class="project-cell">
                               <span class="project-icon">
@@ -472,6 +622,19 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                     </tbody>
                   </table>
                 </Table>
+                <Card
+                  class="portfolio-filter-empty"
+                  data-project-filter-empty
+                  hidden
+                >
+                  <Empty>
+                    <Icon aria-hidden="true" name="search-x" />
+                    <p>No projects match those filters.</p>
+                    <Button data-project-clear type="button" variant="outline">
+                      Clear filters
+                    </Button>
+                  </Empty>
+                </Card>
               </section>
             </>
           )
@@ -493,3 +656,111 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
     </div>
   </div>
 </AppLayout>
+
+<script>
+  const search = document.querySelector<HTMLInputElement>(
+    '[data-project-search]',
+  )
+  const category = document.querySelector<HTMLSelectElement>(
+    '[data-project-category]',
+  )
+  const status = document.querySelector<HTMLSelectElement>(
+    '[data-project-status]',
+  )
+  const sort = document.querySelector<HTMLSelectElement>('[data-project-sort]')
+  const rowsContainer = document.querySelector<HTMLTableSectionElement>(
+    '[data-project-rows]',
+  )
+  const resultCount = document.querySelector<HTMLElement>(
+    '[data-project-result-count]',
+  )
+  const empty = document.querySelector<HTMLElement>(
+    '[data-project-filter-empty]',
+  )
+  const table = rowsContainer?.closest<HTMLElement>('[role="region"]')
+  const rows = rowsContainer
+    ? [...rowsContainer.querySelectorAll<HTMLTableRowElement>('tr')]
+    : []
+
+  const numericSortValue = (
+    row: HTMLTableRowElement,
+    selectedSort: string,
+  ): number => {
+    switch (selectedSort) {
+      case 'downloads':
+        return Number(row.dataset.projectDownloads ?? 0)
+      case 'stars':
+        return Number(row.dataset.projectStars ?? 0)
+      case 'updated':
+        return Number(row.dataset.projectUpdated ?? 0)
+      default:
+        return Number(row.dataset.projectRelevance ?? 0)
+    }
+  }
+
+  const updateProjects = () => {
+    const query = search?.value.trim().toLocaleLowerCase() ?? ''
+    const selectedCategory = category?.value ?? 'all'
+    const selectedStatus = status?.value ?? 'all'
+    const selectedSort = sort?.value ?? 'relevance'
+
+    rows.sort((left, right) => {
+      if (selectedSort === 'name')
+        return (left.dataset.projectName ?? '').localeCompare(
+          right.dataset.projectName ?? '',
+        )
+
+      return (
+        numericSortValue(right, selectedSort) -
+        numericSortValue(left, selectedSort)
+      )
+    })
+
+    let visibleCount = 0
+
+    for (const row of rows) {
+      const matchesQuery =
+        query.length === 0 ||
+        row.textContent?.toLocaleLowerCase().includes(query) === true
+      const matchesCategory =
+        selectedCategory === 'all' ||
+        row.dataset.projectCategory === selectedCategory
+      const matchesStatus =
+        selectedStatus === 'all' || row.dataset.projectStatus === selectedStatus
+      const isVisible = matchesQuery && matchesCategory && matchesStatus
+
+      row.hidden = !isVisible
+
+      if (isVisible) visibleCount += 1
+
+      rowsContainer?.append(row)
+    }
+
+    if (resultCount)
+      resultCount.textContent = `${visibleCount} project${
+        visibleCount === 1 ? '' : 's'
+      }`
+
+    table?.toggleAttribute('hidden', visibleCount === 0)
+    empty?.toggleAttribute('hidden', visibleCount > 0)
+  }
+
+  search?.addEventListener('input', updateProjects)
+  category?.addEventListener('change', updateProjects)
+  status?.addEventListener('change', updateProjects)
+  sort?.addEventListener('change', updateProjects)
+
+  for (const clear of document.querySelectorAll<HTMLButtonElement>(
+    '[data-project-clear]',
+  )) {
+    clear.addEventListener('click', () => {
+      if (search) search.value = ''
+      if (category) category.value = 'all'
+      if (status) status.value = 'all'
+      if (sort) sort.value = 'relevance'
+
+      updateProjects()
+      search?.focus()
+    })
+  }
+</script>

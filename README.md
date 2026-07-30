@@ -88,8 +88,8 @@ public projects, excludes bot-tagged events, and refreshes the latest 48 complet
 on every scheduled run. This overlap captures delayed analytics without duplicating rows.
 Cloudflare Web Analytics and its browser beacon must also be enabled for each hostname.
 
-The owner-authenticated API exposes `GET /analytics/websites?range=30d` and accepts `30d`, `1y`, or
-`5y`. `POST /sync/cloudflare` runs the collector manually. Cloudflare currently retains Web
+The owner-authenticated API exposes `GET /analytics/websites?range=30d` and accepts `5d`, `30d`,
+`90d`, `1y`, or `5y`. `POST /sync/cloudflare` runs the collector manually. Cloudflare currently retains Web
 Analytics source data for a shorter period, but Observatory's hourly D1 snapshots can accumulate
 longer history from the point collection is enabled.
 

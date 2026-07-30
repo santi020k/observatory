@@ -247,4 +247,79 @@ describe('dashboard snapshot selection', () => {
       status: 'failed',
     })
   })
+
+  it('queries genuinely different persisted windows for each range', async () => {
+    const now = Date.UTC(2026, 6, 30)
+    const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(now)
+
+    mocks.getLatestSyncRun.mockResolvedValue(null)
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(null)
+
+    await buildDashboard(environment, '5d')
+    await buildDashboard(environment, '30d')
+
+    expect(mocks.getPublicSnapshotsSince).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      now - 5 * 24 * 60 * 60 * 1_000,
+    )
+
+    expect(mocks.getPublicSnapshotsSince).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      now - 30 * 24 * 60 * 60 * 1_000,
+    )
+
+    dateSpy.mockRestore()
+  })
+
+  it('keeps the latest snapshot in each chart bucket and reports raw syncs', async () => {
+    const first = Date.UTC(2026, 6, 28, 1)
+    const firstLatest = Date.UTC(2026, 6, 28, 23)
+    const last = Date.UTC(2026, 6, 29, 12)
+    const lastSnapshot = {
+      ...websiteSnapshot,
+      collectedAt: last,
+      id: 'last',
+      npmDownloads30d: 30,
+      stars: 4,
+    }
+
+    mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([lastSnapshot])
+    mocks.getPublicSnapshotsSince.mockResolvedValue([
+      {
+        ...websiteSnapshot,
+        collectedAt: first,
+        id: 'first',
+        npmDownloads30d: 10,
+        stars: 1,
+      },
+      {
+        ...websiteSnapshot,
+        collectedAt: firstLatest,
+        id: 'first-latest',
+        npmDownloads30d: 20,
+        stars: 2,
+      },
+      lastSnapshot,
+    ])
+
+    const dashboard = await buildDashboard(environment, '30d')
+
+    expect(dashboard.history).toHaveLength(2)
+    expect(dashboard.history[0]).toMatchObject({
+      npmDownloads30d: 20,
+      stars: 2,
+    })
+
+    expect(dashboard.period).toMatchObject({
+      availableFrom: new Date(first).toISOString(),
+      availableTo: new Date(last).toISOString(),
+      downloadVelocityChange: 10,
+      starsGained: 2,
+      syncs: 3,
+    })
+  })
 })

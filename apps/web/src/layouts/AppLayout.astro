@@ -1,10 +1,10 @@
 ---
 import '@santi020k/lumen-astro/styles.css'
-import '@santi020k/theme/tokens.css'
 import '@/styles/global.css'
 
 import SkipLink from '@santi020k/lumen-astro/components/SkipLink'
 import UIPrimitives from '@santi020k/lumen-astro/runtime'
+import { colors, typography } from '@santi020k/theme'
 
 interface Props {
   description: string
@@ -12,6 +12,50 @@ interface Props {
 }
 
 const { description, title } = Astro.props
+
+const typographyVariables = `
+  --santi020k-font-sans: ${typography.body};
+  --santi020k-font-display: ${typography.display};
+  --santi020k-font-mono: ${typography.mono};
+`
+
+const lightVariables = colors
+  .map((token) => `--${token.name}: ${token.light};`)
+  .join('')
+const darkVariables = colors
+  .map((token) => `--${token.name}: ${token.dark};`)
+  .join('')
+const lightContrastVariables = colors
+  .map((token) => `--${token.name}: ${token.lightContrast ?? token.light};`)
+  .join('')
+const darkContrastVariables = colors
+  .map((token) => `--${token.name}: ${token.darkContrast ?? token.dark};`)
+  .join('')
+
+const themeCss = `
+  :root,
+  :root[data-theme='light'] {
+    color-scheme: light;
+    ${typographyVariables}
+    ${lightVariables}
+  }
+
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    ${darkVariables}
+  }
+
+  @media (prefers-contrast: more) {
+    :root,
+    :root[data-theme='light'] {
+      ${lightContrastVariables}
+    }
+
+    :root[data-theme='dark'] {
+      ${darkContrastVariables}
+    }
+  }
+`
 ---
 
 <!doctype html>
@@ -22,6 +66,7 @@ const { description, title } = Astro.props
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="viewport" content="width=device-width" />
     <meta name="theme-color" content="hsl(260 43% 8%)" />
+    <style is:global set:html={themeCss}></style>
     <script is:inline>
       const applyObservatoryPreferences = () => {
         const root = document.documentElement

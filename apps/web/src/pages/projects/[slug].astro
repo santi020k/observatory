@@ -7,6 +7,11 @@ import StatusBadge from '@/components/StatusBadge.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
 import {
+  analyticsRangeMeta,
+  formatHistoryLabel,
+  getHistoryCoverage,
+} from '@/lib/analytics-range'
+import {
   getBrowserApiUrl,
   getProjectDashboard,
   getProjectSettings,
@@ -70,23 +75,19 @@ const websiteDataIsSampled = websiteHistory.some(
   (point) => point.sampleInterval > 1,
 )
 
-const rangeLabels = {
-  '30d': 'last 30 days',
-  '1y': 'last year',
-  '5y': 'last 5 years',
-} as const
-
-const websiteBucketLabels = {
-  '30d': 'Daily',
-  '1y': 'Monthly',
-  '5y': 'Monthly',
-} as const
+const rangeMeta = analyticsRangeMeta[dashboard.range]
+const rangeLabel = rangeMeta.longLabel
+const historyCoverage = getHistoryCoverage(
+  dashboard.period.availableFrom,
+  dashboard.period.availableTo,
+  dashboard.range,
+)
 
 const websiteTrafficSeries = [
   {
     data: websiteHistory.map((point) => ({
       label: `${formatNumber(point.pageViews)} page views`,
-      x: formatDate(point.periodStart),
+      x: formatHistoryLabel(point.periodStart, dashboard.range),
       y: point.pageViews,
     })),
     id: 'page-views',
@@ -96,7 +97,7 @@ const websiteTrafficSeries = [
   {
     data: websiteHistory.map((point) => ({
       label: `${formatNumber(point.visits)} visits`,
-      x: formatDate(point.periodStart),
+      x: formatHistoryLabel(point.periodStart, dashboard.range),
       y: point.visits,
     })),
     id: 'visits',
@@ -109,7 +110,7 @@ const downloadHistorySeries = [
   {
     data: dashboard.history.map((point) => ({
       label: `${formatNumber(point.npmDownloads30d)} downloads`,
-      x: formatDate(point.collectedAt),
+      x: formatHistoryLabel(point.collectedAt, dashboard.range),
       y: point.npmDownloads30d,
     })),
     id: 'downloads',
@@ -117,6 +118,9 @@ const downloadHistorySeries = [
     tone: 'brand',
   },
 ] as const
+
+const formatSignedNumber = (value: number): string =>
+  `${value > 0 ? '+' : ''}${formatNumber(value)}`
 ---
 
 <AppLayout
@@ -196,10 +200,10 @@ const downloadHistorySeries = [
             value={formatNumber(project.npmDownloads30d)}
           />
           <MetricCard
-            context={`Net change · ${rangeLabels[dashboard.range]}`}
+            context={`Net change · ${rangeLabel}`}
             icon="star"
             label="Stars gained"
-            value={`${dashboard.period.starsGained >= 0 ? '+' : ''}${formatNumber(dashboard.period.starsGained)}`}
+            value={formatSignedNumber(dashboard.period.starsGained)}
           />
           <MetricCard
             context={`${project.forks} forks on GitHub`}
@@ -220,10 +224,10 @@ const downloadHistorySeries = [
             value={formatNumber(project.githubViews14d)}
           />
           <MetricCard
-            context="Latest website health check"
+            context={`Change in rolling 30-day velocity · ${rangeLabel}`}
             icon="activity"
-            label="Response time"
-            value={formatDuration(project.responseTimeMs)}
+            label="Download momentum"
+            value={formatSignedNumber(dashboard.period.downloadVelocityChange)}
           />
         </section>
 
@@ -245,9 +249,7 @@ const downloadHistorySeries = [
                   </p>
                 </div>
                 {websiteAnalytics && (
-                  <Badge variant="outline">
-                    {rangeLabels[dashboard.range]}
-                  </Badge>
+                  <Badge variant="outline">{rangeLabel}</Badge>
                 )}
               </div>
 
@@ -258,7 +260,7 @@ const downloadHistorySeries = [
                     aria-label={`${project.name} website metrics`}
                   >
                     <MetricCard
-                      context={`Cloudflare total · ${rangeLabels[dashboard.range]}`}
+                      context={`Cloudflare total · ${rangeLabel}`}
                       icon="mouse-pointer-click"
                       label="Page views"
                       value={formatNumber(websiteAnalytics.pageViews)}
@@ -288,7 +290,7 @@ const downloadHistorySeries = [
                     <LineChart
                       area
                       aria-label={`${project.name} website traffic history`}
-                      caption={`${websiteBucketLabels[dashboard.range]} Cloudflare totals.${
+                      caption={`${rangeMeta.bucketLabel} Cloudflare totals.${
                         websiteDataIsSampled
                           ? ' Cloudflare adaptive sampling is present in this range.'
                           : ''
@@ -326,14 +328,19 @@ const downloadHistorySeries = [
                 <span class="eyebrow">Reach over time</span>
                 <h2 id="project-history-heading">Download velocity</h2>
               </div>
-              <span>{rangeLabels[dashboard.range]}</span>
+              <Badge
+                variant={historyCoverage.isPartial ? 'warning' : 'outline'}
+              >
+                {historyCoverage.label}
+              </Badge>
             </div>
             {
               dashboard.history.length > 1 ? (
                 <LineChart
                   area
+                  markers={dashboard.history.length <= 24}
                   aria-label={`${project.name} download history`}
-                  caption="Rolling 30-day npm downloads observed at each sync point."
+                  caption={`${rangeMeta.bucketLabel} rolling 30-day npm download velocity built from ${formatNumber(dashboard.period.syncs)} persisted ${dashboard.period.syncs === 1 ? 'sync' : 'syncs'}.`}
                   series={downloadHistorySeries}
                 />
               ) : (
@@ -369,6 +376,10 @@ const downloadHistorySeries = [
               <div>
                 <dt>npm packages</dt>
                 <dd>{formatNumber(project.sources.npm.length)}</dd>
+              </div>
+              <div>
+                <dt>Response time</dt>
+                <dd>{formatDuration(project.responseTimeMs)}</dd>
               </div>
               <div>
                 <dt>Snapshots in range</dt>

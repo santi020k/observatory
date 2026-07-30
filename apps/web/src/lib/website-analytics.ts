@@ -13,12 +13,23 @@ const getBucketStart = (
 
   date.setUTCMinutes(0, 0, 0)
 
-  if (range === '30d') {
-    date.setUTCHours(0)
-  } else {
-    date.setUTCDate(1)
+  switch (range) {
+    case '5d':
+      date.setUTCHours(Math.floor(date.getUTCHours() / 6) * 6)
+      break
+    case '30d':
+      date.setUTCHours(0)
+      break
+    case '90d': {
+      const day = date.getUTCDay()
 
-    date.setUTCHours(0)
+      date.setUTCDate(date.getUTCDate() - day)
+      date.setUTCHours(0)
+      break
+    }
+    default:
+      date.setUTCDate(1)
+      date.setUTCHours(0)
   }
 
   return date.getTime()

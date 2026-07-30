@@ -19,7 +19,11 @@ const collectionWindowMilliseconds = 48 * hourMilliseconds
 const websitesPerRequest = 10
 
 const getRangeMilliseconds = (range: AnalyticsRange): number => {
+  if (range === '5d') return 5 * 24 * hourMilliseconds
+
   if (range === '30d') return 30 * 24 * hourMilliseconds
+
+  if (range === '90d') return 90 * 24 * hourMilliseconds
 
   if (range === '1y') return 365 * 24 * hourMilliseconds
 

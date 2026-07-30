@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "check": "turbo run check",
     "clean": "turbo run clean",
-    "commit": "cz",
+    "commit": "commitprompt",
     "db:migrate:local": "pnpm --filter @santi020k/observatory-api run db:migrate:local",
     "dev": "turbo run dev",
     "dev:api": "pnpm --filter @santi020k/observatory-api dev",
@@ -19,29 +19,33 @@
     "doctor": "pnpm --filter @santi020k/observatory-web doctor",
     "lint": "pnpm run lint:repo && turbo run lint",
     "lint:fix": "pnpm run lint:repo:fix && turbo run lint:fix",
-    "lint:repo": "eslint eslint.config.ts scripts --cache --no-warn-ignored",
-    "lint:repo:fix": "eslint eslint.config.ts scripts --cache --fix --no-warn-ignored",
+    "lint:repo": "eslint eslint.config.ts scripts --cache --no-warn-ignored --max-warnings=0",
+    "lint:repo:fix": "eslint eslint.config.ts scripts --cache --fix --no-warn-ignored --max-warnings=0",
     "setup:github": "node scripts/setup-github-token.mjs",
     "setup:local": "node scripts/setup-local.mjs",
     "test": "turbo run test",
     "type-check": "turbo run type-check",
-    "verify": "pnpm run lint && pnpm run check && pnpm run type-check && pnpm run test && pnpm run doctor && pnpm run build"
+    "verify": "pnpm run lint && pnpm run check && pnpm run type-check && pnpm run test && pnpm run doctor && pnpm run build",
+    "prepare": "husky",
+    "pre-push": "pnpm run verify"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
-    "@santi020k/eslint-config-basic": "2.1.1",
-    "commitizen": "^4.3.2",
-    "cz-conventional-changelog": "^3.3.0",
+    "@santi020k/commitprompt": "catalog:",
+    "@santi020k/eslint-config-astro": "catalog:",
+    "@santi020k/eslint-config-basic": "catalog:",
+    "@santi020k/eslint-config-extensions": "catalog:",
+    "@santi020k/eslint-config-formats": "catalog:",
+    "@santi020k/eslint-config-hono": "catalog:",
+    "@santi020k/eslint-config-libraries": "catalog:",
+    "@santi020k/eslint-config-testing": "catalog:",
+    "@santi020k/eslint-config-tools": "catalog:",
     "eslint": "^10.7.0",
+    "husky": "^9.1.7",
     "prettier": "^3.9.5",
     "prettier-plugin-astro": "^0.14.1",
     "turbo": "^2.10.6",
     "typescript": "^6.0.3"
-  },
-  "config": {
-    "commitizen": {
-      "path": "./node_modules/cz-conventional-changelog"
-    }
   }
 }

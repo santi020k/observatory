@@ -43,7 +43,11 @@ const compareProjectRelevance = (
   left.name.localeCompare(right.name)
 
 const getRangeMilliseconds = (range: AnalyticsRange): number => {
+  if (range === '5d') return 5 * 24 * 60 * 60 * 1_000
+
   if (range === '30d') return 30 * 24 * 60 * 60 * 1_000
+
+  if (range === '90d') return 90 * 24 * 60 * 60 * 1_000
 
   if (range === '1y') return 365 * 24 * 60 * 60 * 1_000
 
@@ -104,40 +108,98 @@ const sumNullable = (values: readonly (number | null)[]): number | null => {
     : null
 }
 
-const buildHistory = (rows: Snapshot[]) => {
-  const groups = new Map<number, Snapshot[]>()
+const getBucketStart = (timestamp: number, range: AnalyticsRange): number => {
+  if (range === '5y') {
+    const date = new Date(timestamp)
 
-  for (const row of rows) {
-    groups.set(row.collectedAt, [...(groups.get(row.collectedAt) ?? []), row])
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)
   }
 
-  return [...groups.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([collectedAt, snapshots]) => ({
-      collectedAt: new Date(collectedAt).toISOString(),
-      githubViews14d: sumNullable(
-        snapshots.map((snapshot) => snapshot.githubViews14d),
-      ),
-      npmDownloads30d: snapshots.reduce(
-        (total, snapshot) => total + snapshot.npmDownloads30d,
-        0,
-      ),
-      openIssues: snapshots.reduce(
-        (total, snapshot) => total + snapshot.openIssues,
-        0,
-      ),
-      stars: snapshots.reduce((total, snapshot) => total + snapshot.stars, 0),
-    }))
+  let bucketMilliseconds: number
+
+  switch (range) {
+    case '5d':
+      bucketMilliseconds = 6 * 60 * 60 * 1_000
+      break
+    case '30d':
+      bucketMilliseconds = 24 * 60 * 60 * 1_000
+      break
+    case '90d':
+      bucketMilliseconds = 3 * 24 * 60 * 60 * 1_000
+      break
+    default:
+      bucketMilliseconds = 7 * 24 * 60 * 60 * 1_000
+  }
+
+  return Math.floor(timestamp / bucketMilliseconds) * bucketMilliseconds
 }
 
-const getPeriodSummary = (history: ReturnType<typeof buildHistory>) => {
+const buildHistory = (rows: Snapshot[], range: AnalyticsRange) => {
+  const buckets = new Map<number, Map<string, Snapshot>>()
+
+  for (const row of rows) {
+    const bucketStart = getBucketStart(row.collectedAt, range)
+    const bucket = buckets.get(bucketStart) ?? new Map<string, Snapshot>()
+    const current = bucket.get(row.slug)
+
+    if (!current || current.collectedAt < row.collectedAt)
+      bucket.set(row.slug, row)
+
+    buckets.set(bucketStart, bucket)
+  }
+
+  return [...buckets.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([bucketStart, snapshotsBySlug]) => {
+      const snapshots = [...snapshotsBySlug.values()]
+
+      return {
+        collectedAt: new Date(
+          Math.max(
+            bucketStart,
+            ...snapshots.map((snapshot) => snapshot.collectedAt),
+          ),
+        ).toISOString(),
+        githubViews14d: sumNullable(
+          snapshots.map((snapshot) => snapshot.githubViews14d),
+        ),
+        npmDownloads30d: snapshots.reduce(
+          (total, snapshot) => total + snapshot.npmDownloads30d,
+          0,
+        ),
+        openIssues: snapshots.reduce(
+          (total, snapshot) => total + snapshot.openIssues,
+          0,
+        ),
+        stars: snapshots.reduce((total, snapshot) => total + snapshot.stars, 0),
+      }
+    })
+}
+
+const getPeriodSummary = (
+  history: ReturnType<typeof buildHistory>,
+  rows: Snapshot[],
+) => {
   const first = history[0]
   const last = history[history.length - 1]
+  const collectedAt = [...new Set(rows.map((row) => row.collectedAt))].sort(
+    (left, right) => left - right,
+  )
+  const availableFrom = collectedAt[0]
+  const availableTo = collectedAt[collectedAt.length - 1]
 
   return {
+    availableFrom:
+      availableFrom === undefined
+        ? null
+        : new Date(availableFrom).toISOString(),
+    availableTo:
+      availableTo === undefined ? null : new Date(availableTo).toISOString(),
+    downloadVelocityChange:
+      first && last ? last.npmDownloads30d - first.npmDownloads30d : 0,
     issueChange: first && last ? last.openIssues - first.openIssues : 0,
     starsGained: first && last ? last.stars - first.stars : 0,
-    syncs: history.length,
+    syncs: collectedAt.length,
   }
 }
 
@@ -206,12 +268,12 @@ export const buildDashboard = async (
     .map((row) => toProjectMetric(row, getPreference(row.slug)))
     .sort(compareProjectRelevance)
 
-  const history = buildHistory(historyRows)
+  const history = buildHistory(historyRows, range)
 
   return dashboardSchema.parse({
     generatedAt: new Date().toISOString(),
     history,
-    period: getPeriodSummary(history),
+    period: getPeriodSummary(history, historyRows),
     projects,
     range,
     summary: {
@@ -256,9 +318,10 @@ export const buildProjectDashboard = async (
 
   const preference = getPreference(slug)
 
-  const history = buildHistory(
-    historyRows.filter((snapshot) => snapshot.slug === slug),
+  const projectHistoryRows = historyRows.filter(
+    (snapshot) => snapshot.slug === slug,
   )
+  const history = buildHistory(projectHistoryRows, range)
 
   const websiteAnalytics =
     row.websiteUrl && preference.websiteAnalyticsEnabled
@@ -270,7 +333,7 @@ export const buildProjectDashboard = async (
   return projectDashboardSchema.parse({
     generatedAt: new Date().toISOString(),
     history,
-    period: getPeriodSummary(history),
+    period: getPeriodSummary(history, projectHistoryRows),
     project: toProjectMetric(row, preference),
     range,
     websiteAnalytics,

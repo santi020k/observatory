@@ -45,7 +45,7 @@ export const projectMetricSchema = z.object({
   websiteAnalyticsEnabled: z.boolean(),
 })
 
-export const analyticsRangeSchema = z.enum(['30d', '1y', '5y'])
+export const analyticsRangeSchema = z.enum(['5d', '30d', '90d', '1y', '5y'])
 
 export const historyPointSchema = z.object({
   collectedAt: z.string().trim(),
@@ -56,6 +56,9 @@ export const historyPointSchema = z.object({
 })
 
 export const periodSummarySchema = z.object({
+  availableFrom: z.string().trim().nullable(),
+  availableTo: z.string().trim().nullable(),
+  downloadVelocityChange: z.int(),
   issueChange: z.int(),
   starsGained: z.int(),
   syncs: z.int().nonnegative(),

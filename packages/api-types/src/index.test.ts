@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  analyticsRangeSchema,
   requestCodeSchema,
   updateProjectSettingSchema,
   verifyCodeSchema,
   websiteAnalyticsSchema,
 } from './index'
+
+describe('analytics range contracts', () => {
+  it('supports short, medium, and long persisted history windows', () => {
+    expect(
+      ['5d', '30d', '90d', '1y', '5y'].every(
+        (range) => analyticsRangeSchema.safeParse(range).success,
+      ),
+    ).toBe(true)
+  })
+})
 
 describe('authentication contracts', () => {
   it('normalizes owner email addresses', () => {

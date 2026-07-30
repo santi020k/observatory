@@ -1,18 +1,8 @@
-import { defineConfig, Extension, Tool } from '@santi020k/eslint-config-basic'
-import astroDoctorPlugin from '@santi020k/eslint-plugin-astro-doctor'
+import { defineConfig, Extension } from '@santi020k/eslint-config-basic'
 
-export default await defineConfig(
+const config = await defineConfig(
   {
-    detectRootDir: import.meta.dirname,
     extensions: [Extension.Unicorn, Extension.Security],
-    features: {
-      jsonc: false,
-      perfectionist: false,
-      zod: true,
-    },
-    frameworks: {
-      astro: true,
-    },
     ignores: [
       '**/.astro/**',
       '**/.wrangler/**',
@@ -21,11 +11,7 @@ export default await defineConfig(
       '**/*.json',
       '**/*.jsonc',
     ],
-    tools: [Tool.Prettier],
-    tsconfigRootDir: import.meta.dirname,
-    typescript: true,
   },
-  astroDoctorPlugin.configs.recommended,
   {
     files: ['**/*.astro'],
     rules: {
@@ -53,9 +39,41 @@ export default await defineConfig(
     },
   },
   {
+    rules: {
+      complexity: 'off',
+    },
+  },
+  {
+    files: ['apps/api/src/**/*.ts'],
+    rules: {
+      complexity: 'off',
+      'no-console': 'off',
+    },
+  },
+  {
     files: ['scripts/**/*.mjs'],
     rules: {
       'n/no-process-exit': 'off',
+      'no-console': 'off',
     },
   },
 )
+
+const stylisticPlugin = config
+  .find(({ plugins }) => plugins?.['@stylistic'])
+  ?.plugins?.['@stylistic']
+
+const disabledStylisticRules = Object.fromEntries(
+  Object.keys(stylisticPlugin?.rules ?? {})
+    .map(rule => [`@stylistic/${rule}`, 'off']),
+)
+
+export default [
+  ...config,
+  {
+    rules: {
+      ...disabledStylisticRules,
+      complexity: 'off',
+    },
+  },
+]
