@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import {
+  getCanonicalProjectSlug,
   getCatalogOverride,
   getVscodeExtensionMappings,
   titleFromSlug
@@ -18,6 +19,12 @@ describe('project catalog', () => {
       '@santi020k/theme',
       '@santi020k/theme-core'
     ])
+  })
+
+  test('maps the retired Chrome theme repository to the unified theme', () => {
+    expect(getCanonicalProjectSlug('santi020k-chrome-theme')).toBe(
+      'santi020k-theme'
+    )
   })
 
   test('creates readable fallback names', () => {

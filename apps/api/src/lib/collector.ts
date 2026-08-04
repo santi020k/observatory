@@ -1,4 +1,5 @@
 import {
+  getCanonicalProjectSlug,
   getCatalogOverride,
   getVscodeExtensionMappings,
   githubOwner,
@@ -385,7 +386,8 @@ const collectGithubRepositories = async (
     page += 1
   } while (pageRepositories.length === 100)
 
-  return repositories.filter(repository => !repository.fork)
+  return repositories.filter(repository => !repository.fork &&
+    getCanonicalProjectSlug(repository.name) === repository.name)
 }
 
 const collectTraffic = async (
@@ -544,9 +546,15 @@ const mergePackageMetrics = (
     return metric ? [metric] : []
   })
 
+  const downloads = metrics.reduce(
+    (total, metric) => total + metric.downloads, 0
+  )
+
   return {
     downloadHistory: metrics.flatMap(metric => metric.downloadHistory),
-    downloads: metrics.reduce((total, metric) => total + metric.downloads, 0),
+    downloads: metrics.length === 0 ?
+      0 :
+      Math.round(downloads / metrics.length),
     latestVersion:
       metrics.find(metric => metric.latestVersion)?.latestVersion ?? null,
     packages: metrics
@@ -565,7 +573,8 @@ const getPackageProjectSlug = (packageResult: AuthorPackage): string => {
         .split('/')
         .filter(Boolean)
 
-      if (owner === githubOwner && repository) return repository
+      if (owner === githubOwner && repository)
+        return getCanonicalProjectSlug(repository)
     } catch {
       // Fall through to the stable package-name fallback.
     }
@@ -873,5 +882,6 @@ export const collectorInternals = {
   collectOpenVsxExtensions,
   collectPackageMetrics,
   collectVscodeExtensions,
+  mergePackageMetrics,
   scoreSnapshotsByRelevance
 }

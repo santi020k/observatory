@@ -144,6 +144,42 @@ describe('npm download analytics', () => {
       packageName: '@santi020k/observatory'
     })
   })
+
+  test('averages sibling packages before adding a project to portfolio totals', () => {
+    const analytics = buildNpmAnalytics([
+      {
+        collectedAt: Date.UTC(2026, 6, 30),
+        downloads: 100,
+        id: 'basic',
+        packageName: '@santi020k/eslint-config-basic',
+        periodStart: Date.UTC(2026, 6, 29),
+        slug: 'eslint-config-basic'
+      },
+      {
+        collectedAt: Date.UTC(2026, 6, 30),
+        downloads: 20,
+        id: 'typescript',
+        packageName: '@santi020k/eslint-config-typescript',
+        periodStart: Date.UTC(2026, 6, 29),
+        slug: 'eslint-config-basic'
+      },
+      {
+        collectedAt: Date.UTC(2026, 6, 30),
+        downloads: 40,
+        id: 'lumen',
+        packageName: '@santi020k/lumen',
+        periodStart: Date.UTC(2026, 6, 29),
+        slug: 'lumen'
+      }
+    ])
+
+    expect(analytics.totalDownloads).toBe(100)
+    expect(analytics.daily).toEqual([{
+      downloads: 100,
+      periodStart: '2026-07-29T00:00:00.000Z'
+    }])
+    expect(analytics.packages).toHaveLength(3)
+  })
 })
 
 describe('VS Code Marketplace analytics', () => {
@@ -375,6 +411,23 @@ describe('project preferences', () => {
 })
 
 describe('dashboard snapshot selection', () => {
+  test('hides a retired repository after it is merged into another project', async () => {
+    mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([{
+      ...websiteSnapshot,
+      id: 'retired-theme',
+      name: 'Santi020k Chrome Theme',
+      repositoryUrl:
+        'https://github.com/santi020k/santi020k-chrome-theme',
+      slug: 'santi020k-chrome-theme'
+    }])
+
+    const dashboard = await buildDashboard(environment)
+
+    expect(dashboard.projects).toEqual([])
+  })
+
   test('reads one completed run consistently while reporting the latest failure', async () => {
     mocks.getLatestSyncRun.mockResolvedValue({
       completedAt: 3_000,

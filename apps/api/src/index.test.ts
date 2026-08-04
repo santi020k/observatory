@@ -1,6 +1,33 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 
-import { app } from './index'
+import { app, runDashboardSync } from './index'
+
+describe('dashboard synchronization', () => {
+  test('refreshes projects before collecting website analytics', async () => {
+    const calls: string[] = []
+    const synchronizeProjects = vi.fn(() => {
+      calls.push('projects')
+
+      return Promise.resolve(9)
+    })
+    const synchronizeWebsiteAnalytics = vi.fn(() => {
+      calls.push('website analytics')
+
+      return Promise.resolve(3)
+    })
+    const result = await runDashboardSync(
+      {}, synchronizeProjects, synchronizeWebsiteAnalytics
+    )
+
+    expect(result).toEqual({ count: 9, websiteAnalyticsCount: 3 })
+
+    expect(synchronizeProjects).toHaveBeenCalledOnce()
+
+    expect(synchronizeWebsiteAnalytics).toHaveBeenCalledOnce()
+
+    expect(calls).toEqual(['projects', 'website analytics'])
+  })
+})
 
 describe('API request origin protection', () => {
   test('rejects state-changing requests from untrusted browser origins', async () => {

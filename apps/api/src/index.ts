@@ -87,6 +87,23 @@ app.route('/auth', authRoutes)
 
 const readRange = (value: string | undefined) => analyticsRangeSchema.catch('30d').parse(value)
 
+export const runDashboardSync = async <Environment>(
+  environment: Environment,
+  synchronizeProjects: (environment: Environment) => Promise<number>,
+  synchronizeWebsiteAnalytics: (
+    environment: Environment
+  ) => Promise<number>
+) => {
+  const count = await synchronizeProjects(environment)
+  const websiteAnalyticsCount = await synchronizeWebsiteAnalytics(environment)
+
+  return { count, websiteAnalyticsCount }
+}
+
+const syncDashboardData = (env: Bindings) => runDashboardSync(
+  env, syncProjects, syncCloudflareAnalytics
+)
+
 app.get('/dashboard', requireAuth, async context => context.json(
   await buildDashboard(context.env, readRange(context.req.query('range')))
 ))
@@ -143,9 +160,9 @@ app.post('/settings/projects', requireAuth, async context => {
 })
 
 app.post('/sync', requireAuth, async context => {
-  const count = await syncProjects(context.env)
+  const { count, websiteAnalyticsCount } = await syncDashboardData(context.env)
 
-  return context.json({ count, status: 'succeeded' })
+  return context.json({ count, status: 'succeeded', websiteAnalyticsCount })
 })
 
 app.get('/analytics/websites', requireAuth, async context => context.json(
@@ -190,11 +207,9 @@ export default {
   ) => {
     executionContext.waitUntil(
       (async () => {
-        await Promise.all([
-          syncProjects(env),
-          syncCloudflareAnalytics(env),
-          cleanupAuth(env)
-        ])
+        await syncDashboardData(env)
+
+        await cleanupAuth(env)
       })()
     )
   }

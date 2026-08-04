@@ -73,10 +73,13 @@ afterEach(() => {
 })
 
 describe('public project collection', () => {
-  test('paginates GitHub repository discovery and excludes forks', async () => {
+  test('paginates discovery and excludes forks and retired repositories', async () => {
     const firstPage = Array.from({ length: 100 }, (_, index) => repository(`project-${index}`, index === 0))
 
-    const secondPage = [repository('project-100')]
+    const secondPage = [
+      repository('project-100'),
+      repository('santi020k-chrome-theme')
+    ]
 
     const fetchMock = vi.fn((input: string | URL | Request) => {
       let url: string
@@ -98,6 +101,10 @@ describe('public project collection', () => {
     expect(projects).toHaveLength(100)
 
     expect(projects.some(project => project.name === 'project-0')).toBe(false)
+
+    expect(
+      projects.some(project => project.name === 'santi020k-chrome-theme')
+    ).toBe(false)
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
@@ -243,6 +250,30 @@ describe('public project collection', () => {
         '/range/2025-07-30:2026-07-29/%40santi020k%2Flumen'
       ))
     ).toBe(true)
+  })
+
+  test('uses average downloads when multiple packages map to one project', () => {
+    const packageMetric = (
+      packageName: string,
+      downloads: number
+    ) => ({
+      downloadHistory: [],
+      downloads,
+      latestVersion: '1.0.0',
+      packageName
+    })
+    const metricsByPackage = new Map([
+      ['@santi020k/eslint-config-basic', packageMetric(
+        '@santi020k/eslint-config-basic', 100
+      )],
+      ['@santi020k/eslint-config-typescript', packageMetric(
+        '@santi020k/eslint-config-typescript', 20
+      )]
+    ])
+
+    expect(collectorInternals.mergePackageMetrics(
+      [...metricsByPackage.keys()], metricsByPackage
+    ).downloads).toBe(60)
   })
 
   test('bounds concurrent npm requests to avoid provider rate limits', async () => {

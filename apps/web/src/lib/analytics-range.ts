@@ -116,32 +116,32 @@ type NpmCadence = 'daily' | 'monthly' | 'weekly' | 'yearly'
 const npmChartMeta = {
   '5d': {
     cadence: 'daily',
-    caption: 'Completed UTC days across every enabled mapped package.',
+    caption: 'Completed UTC days, averaging packages within each project.',
     heading: 'Downloads per day'
   },
   '30d': {
     cadence: 'daily',
-    caption: 'Completed UTC days across every enabled mapped package.',
+    caption: 'Completed UTC days, averaging packages within each project.',
     heading: 'Downloads per day'
   },
   '90d': {
     cadence: 'weekly',
-    caption: 'Daily downloads grouped into Monday-starting UTC weeks.',
+    caption: 'Project-adjusted downloads grouped into Monday-starting UTC weeks.',
     heading: 'Downloads per week'
   },
   ytd: {
     cadence: 'monthly',
-    caption: 'Daily downloads grouped by UTC calendar month.',
+    caption: 'Project-adjusted downloads grouped by UTC calendar month.',
     heading: 'Downloads per month'
   },
   '1y': {
     cadence: 'monthly',
-    caption: 'Daily downloads grouped by UTC calendar month.',
+    caption: 'Project-adjusted downloads grouped by UTC calendar month.',
     heading: 'Downloads per month'
   },
   '5y': {
     cadence: 'yearly',
-    caption: 'Daily downloads grouped by UTC calendar year.',
+    caption: 'Project-adjusted downloads grouped by UTC calendar year.',
     heading: 'Downloads per year'
   }
 } as const satisfies Record<

@@ -8,7 +8,10 @@ import {
   type ProjectSettings,
   projectSettingsSchema
 } from '@santi020k/observatory-api-types'
-import { getCatalogOverride } from '@santi020k/observatory-catalog'
+import {
+  getCanonicalProjectSlug,
+  getCatalogOverride
+} from '@santi020k/observatory-catalog'
 import {
   createDb,
   getLatestSuccessfulSyncRun,
@@ -264,6 +267,14 @@ const getPeriodSummary = (rows: Snapshot[]) => {
 
 type NpmBucket = 'day' | 'month' | 'week' | 'year'
 
+const averageDownloads = (downloads: readonly number[]): number => {
+  if (downloads.length === 0) return 0
+
+  return Math.round(
+    downloads.reduce((total, value) => total + value, 0) / downloads.length
+  )
+}
+
 const getNpmBucketStart = (timestamp: number, bucket: NpmBucket): number => {
   const date = new Date(timestamp)
   const year = date.getUTCFullYear()
@@ -287,20 +298,39 @@ const aggregateNpmDownloads = (
   rows: readonly NpmDownloadSnapshot[],
   bucket: NpmBucket
 ) => {
-  const downloadsByPeriod = new Map<number, number>()
+  const downloadsByPeriod = new Map<
+    number,
+    Map<string, Map<string, number>>
+  >()
 
   for (const row of rows) {
     const periodStart = getNpmBucketStart(row.periodStart, bucket)
 
-    downloadsByPeriod.set(
-      periodStart, (downloadsByPeriod.get(periodStart) ?? 0) + row.downloads
-    )
+    const downloadsByProject = downloadsByPeriod.get(periodStart) ??
+      new Map<string, Map<string, number>>()
+
+    const downloadsByPackage = downloadsByProject.get(row.slug) ??
+      new Map<string, number>()
+
+    downloadsByPackage.set(row.packageName, (downloadsByPackage.get(row.packageName) ?? 0) + row.downloads)
+
+    downloadsByProject.set(row.slug, downloadsByPackage)
+
+    downloadsByPeriod.set(periodStart, downloadsByProject)
   }
 
   return [...downloadsByPeriod.entries()]
     .sort(([left], [right]) => left - right)
-    .map(([periodStart, downloads]) => ({
-      downloads,
+    .map(([periodStart, downloadsByProject]) => ({
+      downloads: [...downloadsByProject.values()].reduce(
+        (portfolioTotal, downloadsByPackage) => {
+          const projectAverage = averageDownloads(
+            [...downloadsByPackage.values()]
+          )
+
+          return portfolioTotal + projectAverage
+        }, 0
+      ),
       periodStart: new Date(periodStart).toISOString()
     }))
 }
@@ -332,6 +362,21 @@ export const buildNpmAnalytics = (rows: readonly NpmDownloadSnapshot[]) => {
   )
 
   const lastRow = sortedRows[sortedRows.length - 1]
+  const packageDownloadsByProject = new Map<string, number[]>()
+
+  for (const packageDownloads of packages) {
+    const projectDownloads = packageDownloadsByProject.get(
+      packageDownloads.slug
+    ) ?? []
+
+    projectDownloads.push(packageDownloads.downloads)
+
+    packageDownloadsByProject.set(packageDownloads.slug, projectDownloads)
+  }
+
+  const totalDownloads = [...packageDownloadsByProject.values()].reduce(
+    (portfolioTotal, projectDownloads) => portfolioTotal + averageDownloads(projectDownloads), 0
+  )
 
   return {
     availableFrom: sortedRows[0] ?
@@ -341,9 +386,7 @@ export const buildNpmAnalytics = (rows: readonly NpmDownloadSnapshot[]) => {
     daily: aggregateNpmDownloads(sortedRows, 'day'),
     monthly: aggregateNpmDownloads(sortedRows, 'month'),
     packages,
-    totalDownloads: packages.reduce(
-      (total, packageDownloads) => total + packageDownloads.downloads, 0
-    ),
+    totalDownloads,
     weekly: aggregateNpmDownloads(sortedRows, 'week'),
     yearly: aggregateNpmDownloads(sortedRows, 'year')
   }
@@ -503,7 +546,9 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
     } satisfies ProjectPreference
   }
 
-  const isEnabled = (slug: string) => preferencesBySlug.get(slug)?.enabled !== false
+  const isEnabled = (slug: string) => getCanonicalProjectSlug(slug) === slug &&
+    preferencesBySlug.get(slug)?.enabled !== false
+
   const now = Date.now()
   const since = now - getRangeMilliseconds(range)
 

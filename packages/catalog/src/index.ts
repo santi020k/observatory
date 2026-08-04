@@ -11,6 +11,10 @@ export interface CatalogOverride {
 
 export const githubOwner = 'santi020k'
 
+const projectAliases = new Map<string, string>([
+  ['santi020k-chrome-theme', 'santi020k-theme']
+])
+
 export const catalogOverrides = new Map<string, CatalogOverride>(
   Object.entries({
     'astro-doctor': {
@@ -82,6 +86,8 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
 export const getCatalogOverride = (
   repository: string
 ): CatalogOverride | undefined => catalogOverrides.get(repository)
+
+export const getCanonicalProjectSlug = (slug: string): string => projectAliases.get(slug) ?? slug
 
 interface VscodeExtensionMapping {
   extensionId: string

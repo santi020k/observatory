@@ -181,9 +181,9 @@ let primaryReachMetric: ProjectPulseMetric = {
 
 if (project.sources.npm.length > 0)
   primaryReachMetric = {
-    context: `Exact completed-day total · ${rangeLabel}`,
+    context: `Average per package · ${rangeLabel}`,
     icon: 'download',
-    label: 'Downloads',
+    label: 'Adjusted downloads',
     value: formatNumber(dashboard.npmAnalytics.totalDownloads)
   }
 else if (websiteAnalytics)

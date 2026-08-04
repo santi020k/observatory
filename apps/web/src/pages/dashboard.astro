@@ -51,20 +51,34 @@ const historyCoverage = getHistoryCoverage(
 )
 
 const downloadsByProject = dashboard.npmAnalytics.packages.reduce<
-  Map<string, number>
+  Map<string, number[]>
 >((downloads, packageDownloads) => {
-  downloads.set(
-    packageDownloads.slug, (downloads.get(packageDownloads.slug) ?? 0) + packageDownloads.downloads
-  )
+  const projectDownloads = downloads.get(packageDownloads.slug) ?? []
+
+  projectDownloads.push(packageDownloads.downloads)
+
+  downloads.set(packageDownloads.slug, projectDownloads)
 
   return downloads
 }, new Map())
 
+const averageDownloads = (downloads: readonly number[]): number => {
+  if (downloads.length === 0) return 0
+
+  return Math.round(
+    downloads.reduce((total, value) => total + value, 0) / downloads.length
+  )
+}
+
 const projectsByDownloads = dashboard.projects
-  .map(project => ({
-    downloads: downloadsByProject.get(project.slug) ?? 0,
-    name: project.name
-  }))
+  .map(project => {
+    const projectDownloads = downloadsByProject.get(project.slug) ?? []
+
+    return {
+      downloads: averageDownloads(projectDownloads),
+      name: project.name
+    }
+  })
   .sort((left, right) => right.downloads - left.downloads)
 
 const chartProjects = projectsByDownloads
@@ -142,6 +156,10 @@ const toNpmSeries = (
 const npmChart = getNpmChart(dashboard.npmAnalytics, dashboard.range)
 const npmChartSeries = toNpmSeries(npmChart.points, npmChart.cadence)
 const npmTopPackage = dashboard.npmAnalytics.packages[0]
+
+const npmRawDownloads = dashboard.npmAnalytics.packages.reduce(
+  (total, packageDownloads) => total + packageDownloads.downloads, 0
+)
 
 const npmPeakDay = dashboard.npmAnalytics.daily.reduce<
   (typeof dashboard.npmAnalytics.daily)[number] | null
@@ -573,7 +591,7 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                           (
                             <BarChart
                               aria-label={`Package downloads by project for ${rangeLabel}`}
-                              caption={`Exact npm downloads aggregated by project for ${rangeLabel}.`}
+                              caption={`Average npm downloads per package, grouped by project for ${rangeLabel}.`}
                               orientation="horizontal"
                               series={projectDownloadSeries}
                             />
@@ -1074,13 +1092,13 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                           <>
                             <dl class="npm-summary-grid">
                               <div>
-                                <dt>Total downloads</dt>
+                                <dt>Adjusted downloads</dt>
                                 <dd>
                                   {formatNumber(
                                     dashboard.npmAnalytics.totalDownloads
                                   )}
                                 </dd>
-                                <small>{rangeLabel}</small>
+                                <small>Package average per project · {rangeLabel}</small>
                               </div>
                               <div>
                                 <dt>Daily average</dt>
@@ -1200,7 +1218,7 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                                           </td>
                                           <td>
                                             {formatDownloadShare(
-                                              packageDownloads.downloads, dashboard.npmAnalytics.totalDownloads
+                                              packageDownloads.downloads, npmRawDownloads
                                             )}
                                           </td>
                                           <td>
@@ -1217,12 +1235,12 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                                   <tfoot>
                                     <tr>
                                       <th colspan={3} scope="row">
-                                        Total
+                                        Raw package total
                                       </th>
                                       <td>
                                         <strong>
                                           {formatNumber(
-                                            dashboard.npmAnalytics.totalDownloads
+                                            npmRawDownloads
                                           )}
                                         </strong>
                                       </td>
