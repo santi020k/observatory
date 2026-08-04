@@ -1,12 +1,14 @@
 import {
   cleanupExpiredAuth,
   countRecentAuthCodes,
+  countRecentFailedAuthAttempts,
   createDb,
   deleteSession,
   findLatestUsableCode,
   findSession,
   insertAuthCode,
   insertSession,
+  recordAuthAttempt,
   recordCodeAttempt
 } from '@santi020k/observatory-db'
 import type { Context, MiddlewareHandler } from 'hono'
@@ -21,6 +23,8 @@ const CODE_LIFETIME_MS = 10 * 60 * 1000
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
 const REQUEST_WINDOW_MS = 10 * 60 * 1000
 const MAX_CODES_PER_WINDOW = 3
+const MAX_RECOVERY_ATTEMPTS = 5
+const RECOVERY_ATTEMPT_WINDOW_MS = 15 * 60 * 1000
 
 const getSessionCookieName = (environment: string): string => environment === 'production' ?
   '__Host-observatory_session' :
@@ -68,6 +72,32 @@ export const requestLoginCode = async (
   return { ...result, message }
 }
 
+export const createOwnerSession = async (
+  context: Context<WorkerEnv>
+): Promise<void> => {
+  const database = createDb(context.env.DB)
+  const now = Date.now()
+  const token = generateToken()
+  const tokenHash = await hashValue(context.env.AUTH_SECRET, token)
+
+  await insertSession(database, {
+    createdAt: now,
+    email: normalizeEmail(context.env.OWNER_EMAIL),
+    expiresAt: now + SESSION_LIFETIME_MS,
+    id: crypto.randomUUID(),
+    lastSeenAt: now,
+    tokenHash
+  })
+
+  setCookie(context, getSessionCookieName(context.env.ENVIRONMENT), token, {
+    httpOnly: true,
+    maxAge: SESSION_LIFETIME_MS / 1000,
+    path: '/',
+    sameSite: 'Lax',
+    secure: context.env.ENVIRONMENT === 'production'
+  })
+}
+
 export const verifyLoginCode = async (
   context: Context<WorkerEnv>,
   email: string,
@@ -93,27 +123,52 @@ export const verifyLoginCode = async (
 
   if (!valid) return false
 
-  const token = generateToken()
-  const tokenHash = await hashValue(context.env.AUTH_SECRET, token)
-
-  await insertSession(database, {
-    createdAt: now,
-    email: normalizedEmail,
-    expiresAt: now + SESSION_LIFETIME_MS,
-    id: crypto.randomUUID(),
-    lastSeenAt: now,
-    tokenHash
-  })
-
-  setCookie(context, getSessionCookieName(context.env.ENVIRONMENT), token, {
-    httpOnly: true,
-    maxAge: SESSION_LIFETIME_MS / 1000,
-    path: '/',
-    sameSite: 'Lax',
-    secure: context.env.ENVIRONMENT === 'production'
-  })
+  await createOwnerSession(context)
 
   return true
+}
+
+const getClientIdentity = (context: Context<WorkerEnv>): string => {
+  const cloudflareIp = context.req.header('CF-Connecting-IP')
+
+  if (cloudflareIp) return cloudflareIp
+
+  return context.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ?? 'local'
+}
+
+export const verifyRecoveryPasscode = async (
+  context: Context<WorkerEnv>,
+  passcode: string
+): Promise<'invalid' | 'limited' | 'valid'> => {
+  const database = createDb(context.env.DB)
+  const now = Date.now()
+  const identity = getClientIdentity(context)
+
+  const recentFailures = await countRecentFailedAuthAttempts(
+    database, identity, now - RECOVERY_ATTEMPT_WINDOW_MS
+  )
+
+  if (recentFailures >= MAX_RECOVERY_ATTEMPTS) return 'limited'
+
+  const [candidateHash, expectedHash] = await Promise.all([
+    hashValue(context.env.AUTH_SECRET, passcode),
+    hashValue(context.env.AUTH_SECRET, context.env.OWNER_PASSCODE)
+  ])
+
+  const valid = safeEqual(candidateHash, expectedHash)
+
+  await recordAuthAttempt(database, {
+    createdAt: now,
+    id: crypto.randomUUID(),
+    identity,
+    succeeded: valid
+  })
+
+  if (!valid) return 'invalid'
+
+  await createOwnerSession(context)
+
+  return 'valid'
 }
 
 export const resolveSessionEmail = async (

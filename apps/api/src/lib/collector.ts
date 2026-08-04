@@ -10,6 +10,7 @@ import {
   completeSyncRun,
   createDb,
   getLatestNpmDownloadDates,
+  getNpmDownloadsSince,
   getWebsiteAnalyticsSince,
   insertSnapshots,
   insertVscodeExtensionSnapshots,
@@ -91,6 +92,9 @@ interface WebsiteHealth {
 
 const dayMilliseconds = 24 * 60 * 60 * 1_000
 const relevanceWindowMilliseconds = 30 * dayMilliseconds
+const npmRequestConcurrency = 1
+const npmRequestDelayMilliseconds = 250
+const npmRetryAttempts = 3
 
 const relevanceWeights = {
   forks: 0.03,
@@ -194,6 +198,84 @@ const fetchJson = async <Result>(
   }
 
   return response.json<Result>()
+}
+
+const delay = (milliseconds: number): Promise<void> => new Promise(
+  resolve => setTimeout(resolve, milliseconds)
+)
+
+const toIsoDate = (timestamp: number): string => new Date(timestamp).toISOString().slice(0, 10)
+
+const fetchNpmJson = async <Result>(url: string): Promise<Result> => {
+  for (let attempt = 0; attempt < npmRetryAttempts; attempt += 1) {
+    try {
+      return await fetchJson<Result>(url)
+    } catch (error) {
+      const canRetry =
+        error instanceof ProviderRequestError &&
+        error.status === 429 &&
+        attempt < npmRetryAttempts - 1
+
+      if (!canRetry) throw error
+
+      await delay(1_000 * 2 ** attempt)
+    }
+  }
+
+  throw new Error('npm request retry limit reached')
+}
+
+interface NpmDownloadsResponse {
+  downloads: { day: string, downloads: number }[]
+}
+
+const collectNpmDownloads = async (
+  url: string,
+  packageName: string,
+  cachedDownloads: ReadonlyMap<string, PackageDownload[]>
+): Promise<NpmDownloadsResponse | null> => {
+  try {
+    return await fetchNpmJson<NpmDownloadsResponse>(url)
+  } catch (error) {
+    if (error instanceof ProviderRequestError && error.status === 404)
+      return { downloads: [] }
+
+    const cachedPackageDownloads = cachedDownloads.get(packageName)
+
+    if (
+      error instanceof ProviderRequestError &&
+      error.status === 429 &&
+      cachedPackageDownloads &&
+      cachedPackageDownloads.length > 0
+    ) {
+      return { downloads: cachedPackageDownloads }
+    }
+
+    if (error instanceof ProviderRequestError && error.status === 429)
+      return null
+
+    throw error
+  }
+}
+
+const groupCachedDownloads = (
+  rows: readonly NpmDownloadWrite[]
+): ReadonlyMap<string, PackageDownload[]> => {
+  const downloadsByPackage = new Map<string, PackageDownload[]>()
+
+  for (const row of rows) {
+    const packageDownloads = downloadsByPackage.get(row.packageName) ?? []
+
+    packageDownloads.push({
+      day: toIsoDate(row.periodStart),
+      downloads: row.downloads,
+      packageName: row.packageName
+    })
+
+    downloadsByPackage.set(row.packageName, packageDownloads)
+  }
+
+  return downloadsByPackage
 }
 
 const collectVscodeExtensions = async (
@@ -365,7 +447,8 @@ const collectPackageMetrics = async (
   packageNames: readonly string[],
   latestDownloadDates: ReadonlyMap<string, number> = new Map(),
   now: number = Date.now(),
-  latestVersions: ReadonlyMap<string, string> = new Map()
+  latestVersions: ReadonlyMap<string, string> = new Map(),
+  cachedDownloads: readonly NpmDownloadWrite[] = []
 ): Promise<PackageMetrics> => {
   const today = new Date(now)
 
@@ -375,54 +458,72 @@ const collectPackageMetrics = async (
 
   const rollingStart = completedDayEnd - 29 * dayMilliseconds
   const bootstrapStart = completedDayEnd - 364 * dayMilliseconds
-  const toDate = (timestamp: number): string => new Date(timestamp).toISOString().slice(0, 10)
+  const metrics: PackageMetric[] = []
+  const cachedDownloadsByPackage = groupCachedDownloads(cachedDownloads)
 
-  const metrics = await Promise.all(
-    packageNames.map(async packageName => {
-      const encoded = encodeURIComponent(packageName)
-      const latestDownloadDate = latestDownloadDates.get(packageName)
+  for (
+    let index = 0;
+    index < packageNames.length;
+    index += npmRequestConcurrency
+  ) {
+    const packageBatch = packageNames.slice(
+      index, index + npmRequestConcurrency
+    )
 
-      const rangeStart =
-        latestDownloadDate === undefined ? bootstrapStart : rollingStart
-
-      const period = `${toDate(rangeStart)}:${toDate(completedDayEnd)}`
-
-      const downloads = await fetchJson<{
-        downloads: { day: string, downloads: number }[]
-      }>(`https://api.npmjs.org/downloads/range/${period}/${encoded}`).catch(
-        (error: unknown) => {
-          if (error instanceof ProviderRequestError && error.status === 404) {
-            return { downloads: [] }
-          }
-
-          throw error
-        }
-      )
-
-      const knownVersion = latestVersions.get(packageName)
-
-      const registry =
-        knownVersion === undefined ?
-          await fetchJson<{ 'dist-tags'?: { latest?: string } }>(
-            `https://registry.npmjs.org/${encoded}`
-          ) :
-          null
-
-      return {
-        downloadHistory: downloads.downloads.map(point => ({
-          ...point,
-          packageName
-        })),
-        downloads: downloads.downloads.reduce((total, point) => {
-          const timestamp = Date.parse(`${point.day}T00:00:00.000Z`)
-
-          return timestamp >= rollingStart ? total + point.downloads : total
-        }, 0),
-        latestVersion: knownVersion ?? registry?.['dist-tags']?.latest ?? null,
+    const batchMetrics = await Promise.all(
+      packageBatch.map(async (
         packageName
-      }
-    })
-  )
+      ): Promise<PackageMetric | null> => {
+        const encoded = encodeURIComponent(packageName)
+        const latestDownloadDate = latestDownloadDates.get(packageName)
+
+        const rangeStart =
+          latestDownloadDate === undefined ? bootstrapStart : rollingStart
+
+        const period = `${toIsoDate(rangeStart)}:${toIsoDate(completedDayEnd)}`
+
+        const downloadsUrl =
+          `https://api.npmjs.org/downloads/range/${period}/${encoded}`
+
+        const downloads = await collectNpmDownloads(
+          downloadsUrl, packageName, cachedDownloadsByPackage
+        )
+
+        if (!downloads) return null
+
+        const knownVersion = latestVersions.get(packageName)
+
+        const registry =
+          knownVersion === undefined ?
+            await fetchJson<{ 'dist-tags'?: { latest?: string } }>(
+              `https://registry.npmjs.org/${encoded}`
+            ) :
+            null
+
+        return {
+          downloadHistory: downloads.downloads.map(point => ({
+            ...point,
+            packageName
+          })),
+          downloads: downloads.downloads.reduce((total, point) => {
+            const timestamp = Date.parse(`${point.day}T00:00:00.000Z`)
+
+            return timestamp >= rollingStart ? total + point.downloads : total
+          }, 0),
+          latestVersion:
+            knownVersion ?? registry?.['dist-tags']?.latest ?? null,
+          packageName
+        }
+      })
+    )
+
+    metrics.push(...batchMetrics.filter(
+      (metric): metric is PackageMetric => metric !== null
+    ))
+
+    if (index + npmRequestConcurrency < packageNames.length)
+      await delay(npmRequestDelayMilliseconds)
+  }
 
   return {
     downloadHistory: metrics.flatMap(metric => metric.downloadHistory),
@@ -574,7 +675,7 @@ const toSnapshot = (
     latestVersion: packageMetrics.latestVersion,
     name: getSnapshotName(repository),
     npmDownloads30d: packageMetrics.downloads,
-    npmPackages: getSnapshotPackages(repository),
+    npmPackages: packageMetrics.packages.map(metric => metric.packageName),
     openIssues: Math.max(0, repository.open_issues_count - pullRequestsCount),
     pushedAt: repository.pushed_at,
     relevanceScore: 0,
@@ -595,10 +696,9 @@ const collectRepository = async (
   env: Bindings,
   collectedAt: number,
   syncRunId: string,
-  metricsByPackage: ReadonlyMap<string, PackageMetric>
+  metricsByPackage: ReadonlyMap<string, PackageMetric>,
+  packages: readonly string[]
 ): Promise<SnapshotWrite> => {
-  const packages = getCatalogOverride(repository.name)?.npmPackages ?? []
-
   const [packageMetrics, websiteHealth, views, clones, pullRequestsCount] =
     await Promise.all([
       Promise.resolve(mergePackageMetrics(packages, metricsByPackage)),
@@ -629,6 +729,7 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
       repositories,
       websiteAnalytics,
       latestNpmDownloadDates,
+      cachedNpmDownloads,
       authorPackages,
       vscodeExtensions,
       openVsxExtensions
@@ -638,6 +739,9 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
         database, startedAt - relevanceWindowMilliseconds
       ),
       getLatestNpmDownloadDates(database),
+      getNpmDownloadsSince(
+        database, startedAt - relevanceWindowMilliseconds
+      ),
       collectAuthorPackages(),
       collectVscodeExtensions(startedAt, runId),
       collectOpenVsxExtensions(startedAt, runId)
@@ -663,7 +767,7 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
           packageResult.name,
           packageResult.version
         ])
-      )
+      ), cachedNpmDownloads
     )
 
     const metricsByPackage = new Map(
@@ -677,8 +781,27 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
       ])
     )
 
+    const discoveredPackagesBySlug = new Map<string, string[]>()
+
+    for (const [packageName, slug] of slugByPackage) {
+      const packages = discoveredPackagesBySlug.get(slug) ?? []
+
+      packages.push(packageName)
+
+      discoveredPackagesBySlug.set(slug, packages)
+    }
+
     const collectedSnapshots = await Promise.all(
-      repositories.map(repository => collectRepository(repository, env, startedAt, runId, metricsByPackage))
+      repositories.map(repository => {
+        const packages = [...new Set([
+          ...getSnapshotPackages(repository),
+          ...(discoveredPackagesBySlug.get(repository.name) ?? [])
+        ])]
+
+        return collectRepository(
+          repository, env, startedAt, runId, metricsByPackage, packages
+        )
+      })
     )
 
     const snapshots = scoreSnapshotsByRelevance(

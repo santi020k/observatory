@@ -67,6 +67,8 @@ const requestUrl = (input: string | URL | Request): string => {
 }
 
 afterEach(() => {
+  vi.useRealTimers()
+
   vi.unstubAllGlobals()
 })
 
@@ -110,14 +112,55 @@ describe('public project collection', () => {
     ).rejects.toThrow('Provider request failed with 503')
   })
 
-  test('does not replace package metrics with zeros on provider failure', async () => {
+  test('omits uncached packages instead of inventing zeros on rate limits', async () => {
+    vi.useFakeTimers()
+
     vi.stubGlobal(
       'fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 429 })))
     )
 
-    await expect(
-      collectorInternals.collectPackageMetrics(['@santi020k/lumen'])
-    ).rejects.toThrow('Provider request failed with 429')
+    const collection = collectorInternals.collectPackageMetrics([
+      '@santi020k/lumen'
+    ])
+    await vi.runAllTimersAsync()
+
+    await expect(collection).resolves.toMatchObject({
+      downloads: 0,
+      packages: []
+    })
+  })
+
+  test('preserves cached downloads when npm temporarily rate limits', async () => {
+    vi.useFakeTimers()
+
+    vi.stubGlobal(
+      'fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 429 })))
+    )
+
+    const packageNames = ['@santi020k/lumen']
+    const latestDates = new Map([
+      ['@santi020k/lumen', Date.UTC(2026, 6, 29)]
+    ])
+    const now = Date.parse('2026-07-30T12:00:00.000Z')
+    const latestVersions = new Map([['@santi020k/lumen', '1.0.0']])
+    const cachedDownloads = [{
+      collectedAt: Date.UTC(2026, 6, 29),
+      downloads: 42,
+      id: 'cached-downloads',
+      packageName: '@santi020k/lumen',
+      periodStart: Date.UTC(2026, 6, 29),
+      slug: 'lumen'
+    }]
+    const collection = collectorInternals.collectPackageMetrics(
+      packageNames, latestDates, now, latestVersions, cachedDownloads
+    )
+
+    await vi.runAllTimersAsync()
+
+    await expect(collection).resolves.toMatchObject({
+      downloads: 42,
+      packages: [{ downloads: 42, packageName: '@santi020k/lumen' }]
+    })
   })
 
   test('uses zero downloads when npm has package metadata but no download history', async () => {
@@ -200,6 +243,38 @@ describe('public project collection', () => {
         '/range/2025-07-30:2026-07-29/%40santi020k%2Flumen'
       ))
     ).toBe(true)
+  })
+
+  test('bounds concurrent npm requests to avoid provider rate limits', async () => {
+    let activeRequests = 0
+    let maximumActiveRequests = 0
+
+    vi.stubGlobal(
+      'fetch', vi.fn(async () => {
+        activeRequests += 1
+        maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests)
+
+        await Promise.resolve()
+
+        activeRequests -= 1
+
+        return Response.json({ downloads: [] })
+      })
+    )
+
+    const packageNames = Array.from(
+      { length: 4 }, (_, index) => `@santi020k/package-${index}`
+    )
+    const now = Date.parse('2026-07-30T12:00:00.000Z')
+    const latestVersions = new Map(
+      packageNames.map(name => [name, '1.0.0'])
+    )
+
+    await collectorInternals.collectPackageMetrics(
+      packageNames, new Map(), now, latestVersions
+    )
+
+    expect(maximumActiveRequests).toBe(1)
   })
 
   test('still fails when the package itself is missing from the npm registry', async () => {

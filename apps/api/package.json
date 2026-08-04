@@ -20,6 +20,7 @@
     "@santi020k/observatory-api-types": "workspace:*",
     "@santi020k/observatory-catalog": "workspace:*",
     "@santi020k/observatory-db": "workspace:*",
+    "@simplewebauthn/server": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },

@@ -2,8 +2,11 @@ import { getTableName } from 'drizzle-orm'
 import { describe, expect, test } from 'vitest'
 
 import {
+  authAttempts,
   authCodes,
   npmDownloadSnapshots,
+  passkeyChallenges,
+  passkeyCredentials,
   projectPreferences,
   projectSnapshots,
   sessions,
@@ -31,6 +34,12 @@ describe('observatory database schema', () => {
     expect(getTableName(websiteAnalyticsSnapshots)).toBe(
       'website_analytics_snapshots'
     )
+  })
+
+  test('keeps passkey material and one-time challenges separate', () => {
+    expect(getTableName(passkeyCredentials)).toBe('passkey_credentials')
+    expect(getTableName(passkeyChallenges)).toBe('passkey_challenges')
+    expect(getTableName(authAttempts)).toBe('auth_attempts')
   })
 
   test('stores exact npm downloads separately from rolling project metrics', () => {

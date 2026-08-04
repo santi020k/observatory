@@ -199,6 +199,78 @@ export const updateProjectSettingSchema = z
       websiteAnalyticsEnabled !== undefined, { error: 'At least one project setting is required.' }
   )
 
+const base64UrlSchema = z.string().trim().min(1).regex(/^[A-Za-z0-9_-]+$/)
+
+const authenticatorTransportSchema = z.enum([
+  'ble',
+  'cable',
+  'hybrid',
+  'internal',
+  'nfc',
+  'smart-card',
+  'usb'
+])
+
+const clientExtensionResultsSchema = z.record(z.string(), z.unknown())
+
+export const recoveryLoginSchema = z.object({
+  passcode: z.string().trim().min(8).max(128)
+})
+
+export const passkeyRegistrationResponseSchema = z.object({
+  authenticatorAttachment: z.enum(['cross-platform', 'platform']).optional(),
+  clientExtensionResults: clientExtensionResultsSchema,
+  id: base64UrlSchema,
+  rawId: base64UrlSchema,
+  response: z.object({
+    attestationObject: base64UrlSchema,
+    authenticatorData: base64UrlSchema.optional(),
+    clientDataJSON: base64UrlSchema,
+    publicKey: base64UrlSchema.optional(),
+    publicKeyAlgorithm: z.int().optional(),
+    transports: z.array(authenticatorTransportSchema).optional()
+  }),
+  type: z.literal('public-key')
+})
+
+export const passkeyAuthenticationResponseSchema = z.object({
+  authenticatorAttachment: z.enum(['cross-platform', 'platform']).optional(),
+  clientExtensionResults: clientExtensionResultsSchema,
+  id: base64UrlSchema,
+  rawId: base64UrlSchema,
+  response: z.object({
+    authenticatorData: base64UrlSchema,
+    clientDataJSON: base64UrlSchema,
+    signature: base64UrlSchema,
+    userHandle: base64UrlSchema.optional()
+  }),
+  type: z.literal('public-key')
+})
+
+export const verifyPasskeyRegistrationSchema = z.object({
+  challengeId: z.string().trim().min(1),
+  name: z.string().trim().min(1).max(80),
+  response: passkeyRegistrationResponseSchema
+})
+
+export const verifyPasskeyAuthenticationSchema = z.object({
+  challengeId: z.string().trim().min(1),
+  response: passkeyAuthenticationResponseSchema
+})
+
+export const passkeyCredentialSchema = z.object({
+  backedUp: z.boolean(),
+  createdAt: z.int().nonnegative(),
+  deviceType: z.enum(['singleDevice', 'multiDevice']),
+  id: z.string().trim(),
+  lastUsedAt: z.int().nonnegative().nullable(),
+  name: z.string().trim()
+})
+
+export const passkeyCredentialsSchema = z.object({
+  credentials: z.array(passkeyCredentialSchema)
+})
+
 export const websiteAnalyticsPointSchema = z.object({
   pageViews: z.int().nonnegative(),
   periodStart: z.string().trim(),
@@ -246,6 +318,13 @@ export type WebsiteAnalyticsPoint = z.infer<typeof websiteAnalyticsPointSchema>
 export type WebsiteAnalyticsSite = z.infer<typeof websiteAnalyticsSiteSchema>
 export type RequestCodeInput = z.infer<typeof requestCodeSchema>
 export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>
+export type PasskeyCredential = z.infer<typeof passkeyCredentialSchema>
+export type VerifyPasskeyAuthenticationInput = z.infer<
+  typeof verifyPasskeyAuthenticationSchema
+>
+export type VerifyPasskeyRegistrationInput = z.infer<
+  typeof verifyPasskeyRegistrationSchema
+>
 
 export interface ApiError {
   error: {

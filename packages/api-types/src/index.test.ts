@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest'
 import {
   analyticsRangeSchema,
   projectDashboardSchema,
+  recoveryLoginSchema,
   requestCodeSchema,
   updateProjectSettingSchema,
   verifyCodeSchema,
@@ -40,6 +41,13 @@ describe('authentication contracts', () => {
       verifyCodeSchema.safeParse({ code: '12345a', email: 'santi@example.com' })
         .success
     ).toBe(false)
+  })
+
+  test('keeps recovery codes bounded without restricting symbols', () => {
+    expect(recoveryLoginSchema.safeParse({ passcode: 'private@@' }).success)
+      .toBe(true)
+    expect(recoveryLoginSchema.safeParse({ passcode: 'short' }).success)
+      .toBe(false)
   })
 })
 

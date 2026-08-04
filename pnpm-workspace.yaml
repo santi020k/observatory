@@ -6,6 +6,8 @@ catalog:
   '@astrojs/check': '^0.9.9'
   '@astrojs/cloudflare': '^14.1.4'
   '@cloudflare/workers-types': '^5.20260716.1'
+  '@simplewebauthn/browser': '^13.3.0'
+  '@simplewebauthn/server': '^13.3.2'
   '@commitlint/cli': ^21.2.1
   '@commitlint/config-conventional': ^21.2.0
   '@santi020k/astro-doctor': '^1.0.4'
@@ -44,21 +46,9 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@santi020k/astro-doctor'
   - '@santi020k/eslint-config-basic'
+  - '@santi020k/commitprompt'
   - '@santi020k/eslint-plugin-astro-doctor'
   - '@santi020k/lumen-astro'
   - astro
-  - '@santi020k/lumen-core@0.3.0'
-  - '@santi020k/lumen@0.3.0'
   - hono@4.12.32
-  - '@santi020k/lumen-core@0.4.0'
-  - '@santi020k/lumen@0.4.0'
-  - '@santi020k/eslint-config-core@3.1.0'
   - '@santi020k/eslint-config-typescript'
-  - '@santi020k/eslint-config-extensions@3.1.0'
-  - '@santi020k/eslint-config-formats@3.1.0'
-  - '@santi020k/eslint-config-libraries@3.1.0'
-  - '@santi020k/eslint-config-testing@3.1.0'
-  - '@santi020k/eslint-config-tools@3.1.0'
-  - '@santi020k/eslint-config-astro@3.1.0'
-  - '@santi020k/eslint-config-hono@3.1.0'
-  - '@santi020k/commitprompt@1.0.0'

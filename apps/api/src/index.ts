@@ -66,7 +66,7 @@ app.use('*', async (context, next) => {
 
 app.use('*', cors({
   allowHeaders: ['Content-Type'],
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowMethods: ['DELETE', 'GET', 'POST', 'OPTIONS'],
   credentials: true,
   origin: (origin, context) => {
     const allowedOrigins = readCorsOrigin(context.env)

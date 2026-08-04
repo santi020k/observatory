@@ -41,11 +41,13 @@ const {
 
 const environment = {
   AUTH_SECRET: 'test-secret',
+  OWNER_PASSCODE: 'test-recovery-code',
   CORS_ORIGIN: 'https://observatory.example',
   DB: {} as D1Database,
   ENVIRONMENT: 'test',
   MAIL_FROM: 'Observatory <observatory@example.com>',
-  OWNER_EMAIL: 'owner@example.com'
+  OWNER_EMAIL: 'owner@example.com',
+  SITE_URL: 'https://observatory.example'
 } satisfies Bindings
 
 const websiteSnapshot = {

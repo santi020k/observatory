@@ -31,6 +31,7 @@ import Empty from '@santi020k/lumen-astro/components/Empty'
 import Icon from '@santi020k/lumen-astro/components/Icon'
 import LineChart from '@santi020k/lumen-astro/components/LineChart'
 import Table from '@santi020k/lumen-astro/components/Table'
+import Tabs from '@santi020k/lumen-astro/components/Tabs'
 import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
 
 const slug = Astro.params.slug
@@ -163,6 +164,56 @@ const getOpenVsxUrl = (extensionId: string): string => {
 }
 
 const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${formatNumber(value)}`
+
+interface ProjectPulseMetric {
+  context: string
+  icon: 'download' | 'monitor' | 'mouse-pointer-click' | 'star'
+  label: string
+  value: string
+}
+
+let primaryReachMetric: ProjectPulseMetric = {
+  context: `${formatNumber(project.forks)} forks on GitHub`,
+  icon: 'star',
+  label: 'Total stars',
+  value: formatNumber(project.stars)
+}
+
+if (project.sources.npm.length > 0)
+  primaryReachMetric = {
+    context: `Exact completed-day total · ${rangeLabel}`,
+    icon: 'download',
+    label: 'Downloads',
+    value: formatNumber(dashboard.npmAnalytics.totalDownloads)
+  }
+else if (websiteAnalytics)
+  primaryReachMetric = {
+    context: `Cloudflare total · ${rangeLabel}`,
+    icon: 'mouse-pointer-click',
+    label: 'Page views',
+    value: formatNumber(websiteAnalytics.pageViews)
+  }
+else if (dashboard.vscodeAnalytics.extensions.length > 0)
+  primaryReachMetric = {
+    context: `${formatNumber(dashboard.vscodeAnalytics.totalInstalls)} current installs`,
+    icon: 'monitor',
+    label: 'Extension downloads',
+    value: formatNumber(dashboard.vscodeAnalytics.totalDownloads)
+  }
+
+const momentumMetric = project.sources.npm.length > 0 ?
+  {
+    context: `Rolling 30-day velocity · ${rangeLabel}`,
+    icon: 'activity' as const,
+    label: 'Download momentum',
+    value: formatSignedNumber(dashboard.period.downloadVelocityChange)
+  } :
+  {
+    context: `Net change · ${rangeLabel}`,
+    icon: 'star' as const,
+    label: 'Stars gained',
+    value: formatSignedNumber(dashboard.period.starsGained)
+  }
 ---
 
 <AppLayout
@@ -209,6 +260,10 @@ const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${
                   <Badge variant="secondary">v{project.latestVersion}</Badge>
                 )
               }
+              <Badge variant="outline">
+                <Icon aria-hidden="true" name="history" />
+                Pushed {formatRelativeDate(project.pushedAt)}
+              </Badge>
             </div>
           </div>
           <div class="hero-controls">
@@ -262,410 +317,512 @@ const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${
           </div>
         </section>
 
-        <section class="metric-grid" aria-label={`${project.name} metrics`}>
-          <MetricCard
-            context={`Exact completed-day total · ${rangeLabel}`}
-            icon="download"
-            label="Downloads"
-            value={formatNumber(dashboard.npmAnalytics.totalDownloads)}
-          />
-          <MetricCard
-            context={`Net change · ${rangeLabel}`}
-            icon="star"
-            label="Stars gained"
-            value={formatSignedNumber(dashboard.period.starsGained)}
-          />
-          {
-            dashboard.vscodeAnalytics.extensions.length > 0 && (
-              <MetricCard
-                context={`${formatNumber(
-                  dashboard.vscodeAnalytics.totalInstalls
-                )} current installs · VS Code Marketplace`}
-                icon="monitor"
-                label="Extension downloads"
-                value={formatNumber(dashboard.vscodeAnalytics.totalDownloads)}
-              />
-            )
-          }
-          {
-            dashboard.openVsxAnalytics.extensions.length > 0 && (
-              <MetricCard
-                context="Cumulative downloads · Open VSX Registry"
-                icon="blocks"
-                label="Open VSX downloads"
-                value={formatNumber(
-                  dashboard.openVsxAnalytics.totalDownloads
-                )}
-              />
-            )
-          }
-          <MetricCard
-            context={`${project.forks} forks on GitHub`}
-            icon="git-fork"
-            label="Total stars"
-            value={formatNumber(project.stars)}
-          />
-          <MetricCard
-            context={`Change ${dashboard.period.issueChange >= 0 ? '+' : ''}${formatNumber(dashboard.period.issueChange)} in range`}
-            icon="circle-dot-dashed"
-            label="Open issues"
-            value={formatNumber(project.openIssues)}
-          />
-          <MetricCard
-            context="Current authenticated 14-day traffic"
-            icon="eye"
-            label="GitHub views"
-            value={formatNumber(project.githubViews14d)}
-          />
-          <MetricCard
-            context={`Change in rolling 30-day velocity · ${rangeLabel}`}
-            icon="activity"
-            label="Download momentum"
-            value={formatSignedNumber(dashboard.period.downloadVelocityChange)}
-          />
-        </section>
-
-        {
-          project.sources.website && (
-            <section
-              class="website-analytics-section"
-              aria-labelledby="website-analytics-heading"
-            >
-              <div class="section-heading">
-                <div>
-                  <span class="eyebrow">Cloudflare Web Analytics</span>
-                  <h2 id="website-analytics-heading">Website traffic</h2>
-                  <p>
-                    Privacy-first page activity for{' '}
-                    {websiteAnalytics?.hostname ??
-                      new URL(project.sources.website).hostname}
-                    .
-                  </p>
-                </div>
-                {websiteAnalytics && (
-                  <Badge variant="outline">{rangeLabel}</Badge>
-                )}
-              </div>
-
-              {websiteAnalytics ?
-                (
-                  <div class="website-analytics-grid">
-                    <div
-                      class="website-metric-grid"
-                      aria-label={`${project.name} website metrics`}
-                    >
-                      <MetricCard
-                        context={`Cloudflare total · ${rangeLabel}`}
-                        icon="mouse-pointer-click"
-                        label="Page views"
-                        value={formatNumber(websiteAnalytics.pageViews)}
-                      />
-                      <MetricCard
-                        context="Direct or externally referred sessions"
-                        icon="users"
-                        label="Visits"
-                        value={formatNumber(websiteAnalytics.visits)}
-                      />
-                    </div>
-
-                    <Card
-                      as="section"
-                      class="panel website-traffic-panel"
-                      aria-labelledby="website-traffic-history-heading"
-                    >
-                      <div class="panel-heading">
-                        <div>
-                          <span class="eyebrow">Traffic over time</span>
-                          <h3 id="website-traffic-history-heading">
-                            Page views and visits
-                          </h3>
-                        </div>
-                      </div>
-
-                      <LineChart
-                        area
-                        aria-label={`${project.name} website traffic history`}
-                        caption={`${rangeMeta.bucketLabel} Cloudflare totals.${
-                          websiteDataIsSampled ?
-                            ' Cloudflare adaptive sampling is present in this range.' :
-                            ''
-                        }`}
-                        series={websiteTrafficSeries}
-                      />
-                    </Card>
-                  </div>
-                ) :
-                (
-                  <Card class="panel website-analytics-empty">
-                    <Empty>
-                      <span class="empty-icon">
-                        <Icon aria-hidden="true" name="chart-no-axes-column" />
-                      </span>
-                      <h3>No Cloudflare traffic yet</h3>
-                      <p>
-                        Data will appear after the Web Analytics beacon reports
-                        activity and the next analytics sync completes.
-                      </p>
-                    </Empty>
-                  </Card>
-                )}
-            </section>
-          )
-        }
-
-        {
-          dashboard.vscodeAnalytics.extensions.length > 0 && (
-            <section
-              class="vscode-analytics-section"
-              aria-labelledby="project-vscode-heading"
-            >
-              <div class="section-heading">
-                <div>
-                  <span class="eyebrow">VS Code Marketplace</span>
-                  <h2 id="project-vscode-heading">Extension reach</h2>
-                  <p>
-                    Marketplace data stays separate from npm package downloads
-                    and GitHub repository activity.
-                  </p>
-                </div>
-                <Badge variant="outline">Marketplace snapshot</Badge>
-              </div>
-              <div class="vscode-project-grid">
-                {dashboard.vscodeAnalytics.history.length > 1 && (
-                  <Card
-                    as="section"
-                    class="panel"
-                    aria-labelledby="project-vscode-history-heading"
-                  >
-                    <div class="panel-heading">
-                      <div>
-                        <span class="eyebrow">Observed growth</span>
-                        <h3 id="project-vscode-history-heading">
-                          Cumulative downloads
-                        </h3>
-                      </div>
-                    </div>
-                    <LineChart
-                      markers={dashboard.vscodeAnalytics.history.length <= 24}
-                      aria-label={`${project.name} VS Code Marketplace downloads for ${rangeLabel}`}
-                      caption="Cumulative downloads reported by the VS Code Marketplace at each Observatory sync."
-                      series={vscodeHistorySeries}
-                    />
-                  </Card>
-                )}
-                <Card class="panel">
-                  <Table>
-                    <caption class="sr-only">
-                      {project.name} VS Code Marketplace extensions
-                    </caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Extension</th>
-                        <th scope="col">Version</th>
-                        <th scope="col">Downloads</th>
-                        <th scope="col">Installs</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dashboard.vscodeAnalytics.extensions.map(extension => (
-                        <tr>
-                          <td>
-                            <a
-                              class="npm-package-link"
-                              href={`https://marketplace.visualstudio.com/items?itemName=${extension.extensionId}`}
-                              rel="noreferrer"
-                              target="_blank"
-                            >
-                              {extension.extensionId}
-                              <Icon aria-hidden="true" name="arrow-up-right" />
-                            </a>
-                          </td>
-                          <td>{extension.version}</td>
-                          <td>{formatNumber(extension.downloads)}</td>
-                          <td>{formatNumber(extension.installs)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </Card>
-              </div>
-            </section>
-          )
-        }
-
-        {
-          dashboard.openVsxAnalytics.extensions.length > 0 && (
-            <section
-              class="vscode-analytics-section"
-              aria-labelledby="project-open-vsx-heading"
-            >
-              <div class="section-heading">
-                <div>
-                  <span class="eyebrow">Open VSX Registry</span>
-                  <h2 id="project-open-vsx-heading">Open editor reach</h2>
-                  <p>
-                    Downloads from Open VSX stay separate from Microsoft
-                    Marketplace installs and npm package usage.
-                  </p>
-                </div>
-                <Badge variant="outline">Open VSX snapshot</Badge>
-              </div>
-              <div class="vscode-project-grid">
-                {dashboard.openVsxAnalytics.history.length > 1 && (
-                  <Card
-                    as="section"
-                    class="panel"
-                    aria-labelledby="project-open-vsx-history-heading"
-                  >
-                    <div class="panel-heading">
-                      <div>
-                        <span class="eyebrow">Observed growth</span>
-                        <h3 id="project-open-vsx-history-heading">
-                          Cumulative downloads
-                        </h3>
-                      </div>
-                    </div>
-                    <LineChart
-                      markers={
-                        dashboard.openVsxAnalytics.history.length <= 24
-                      }
-                      aria-label={`${project.name} Open VSX downloads for ${rangeLabel}`}
-                      caption="Cumulative downloads reported by Open VSX at each Observatory sync."
-                      series={openVsxHistorySeries}
-                    />
-                  </Card>
-                )}
-                <Card class="panel">
-                  <Table>
-                    <table>
-                      <caption class="sr-only">
-                        {project.name} Open VSX extensions
-                      </caption>
-                      <thead>
-                        <tr>
-                          <th scope="col">Extension</th>
-                          <th scope="col">Version</th>
-                          <th scope="col">Downloads</th>
-                          <th scope="col">Reviews</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dashboard.openVsxAnalytics.extensions.map(
-                          extension => (
-                            <tr>
-                              <td>
-                                <a
-                                  class="npm-package-link"
-                                  href={getOpenVsxUrl(extension.extensionId)}
-                                  rel="noreferrer"
-                                  target="_blank"
-                                >
-                                  {extension.extensionId}
-                                  <Icon
-                                    aria-hidden="true"
-                                    name="arrow-up-right"
-                                  />
-                                </a>
-                              </td>
-                              <td>{extension.version}</td>
-                              <td>{formatNumber(extension.downloads)}</td>
-                              <td>{formatNumber(extension.reviewCount)}</td>
-                            </tr>
-                          )
-                        )}
-                      </tbody>
-                    </table>
-                  </Table>
-                </Card>
-              </div>
-            </section>
-          )
-        }
-
-        <section class="project-detail-grid">
-          <Card
-            as="section"
-            class="panel history-panel"
-            aria-labelledby="project-history-heading"
+        <Tabs
+          class="dashboard-tabs project-tabs"
+          initialValue="pulse"
+        >
+          <div
+            aria-label={`${project.name} dashboard views`}
+            class="dashboard-tablist"
+            role="tablist"
           >
-            <div class="panel-heading">
-              <div>
-                <span class="eyebrow">Reach over time</span>
-                <h2 id="project-history-heading">{npmChart.heading}</h2>
-              </div>
-              <Badge variant="outline">{rangeLabel}</Badge>
-            </div>
+            <button aria-selected="true" data-value="pulse" role="tab">
+              <Icon aria-hidden="true" name="gauge" />
+              Pulse
+            </button>
             {
-              npmChart.points.length > 0 ?
-                (
-                  <LineChart
-                    area
-                    markers={npmChart.points.length <= 31}
-                    aria-label={`${project.name} ${npmChart.heading.toLocaleLowerCase()} for ${rangeLabel}`}
-                    caption={npmChart.caption}
-                    series={downloadHistorySeries}
-                  />
-                ) :
-                (
-                  <Empty>
-                    <p>No npm download history is stored for {rangeLabel}.</p>
-                  </Empty>
-                )
-            }
-          </Card>
-
-          <Card
-            as="section"
-            class="panel project-facts"
-            aria-labelledby="project-facts-heading"
-          >
-            <div class="panel-heading">
-              <div>
-                <span class="eyebrow">Details</span>
-                <h2 id="project-facts-heading">Project facts</h2>
-              </div>
-            </div>
-            <dl>
-              <div>
-                <dt>Last push</dt>
-                <dd>{formatRelativeDate(project.pushedAt)}</dd>
-              </div>
-              <div>
-                <dt>Exact date</dt>
-                <dd>{formatDate(project.pushedAt)}</dd>
-              </div>
-              <div>
-                <dt>npm packages</dt>
-                <dd>{formatNumber(project.sources.npm.length)}</dd>
-              </div>
-              <div>
-                <dt>VS Code extensions</dt>
-                <dd>{formatNumber(project.sources.vscode.length)}</dd>
-              </div>
-              <div>
-                <dt>Open VSX extensions</dt>
-                <dd>{formatNumber(project.sources.openVsx.length)}</dd>
-              </div>
-              <div>
-                <dt>Response time</dt>
-                <dd>{formatDuration(project.responseTimeMs)}</dd>
-              </div>
-              <div>
-                <dt>Snapshots in range</dt>
-                <dd>{formatNumber(dashboard.period.syncs)}</dd>
-              </div>
-            </dl>
-            {
-              project.topics.length > 0 && (
-                <div class="topic-list" aria-label="Repository topics">
-                  {project.topics.map(topic => (
-                    <Badge variant="outline">{topic}</Badge>
-                  ))}
-                </div>
+              project.sources.website && (
+                <button aria-selected="false" data-value="website" role="tab">
+                  <Icon aria-hidden="true" name="globe" />
+                  Website
+                </button>
               )
             }
-          </Card>
-        </section>
+            {
+              project.sources.npm.length > 0 && (
+                <button aria-selected="false" data-value="packages" role="tab">
+                  <Icon aria-hidden="true" name="package" />
+                  Packages
+                </button>
+              )
+            }
+            {
+              (project.sources.vscode.length > 0 ||
+                project.sources.openVsx.length > 0) && (
+                <button
+                  aria-selected="false"
+                  data-value="extensions"
+                  role="tab"
+                >
+                  <Icon aria-hidden="true" name="blocks" />
+                  Extensions
+                </button>
+              )
+            }
+            <button aria-selected="false" data-value="details" role="tab">
+              <Icon aria-hidden="true" name="list-tree" />
+              Details
+            </button>
+          </div>
+
+          <div
+            class="dashboard-tab-panel dashboard-tab-panel--pulse"
+            data-value="pulse"
+            role="tabpanel"
+          >
+            <section
+              class="metric-grid project-metric-grid"
+              aria-label={`${project.name} metrics`}
+            >
+              <MetricCard {...primaryReachMetric} />
+              <MetricCard {...momentumMetric} />
+              <MetricCard
+                context="Current authenticated 14-day traffic"
+                icon="eye"
+                label="GitHub views"
+                value={formatNumber(project.githubViews14d)}
+              />
+              <MetricCard
+                context={`Change ${dashboard.period.issueChange >= 0 ? '+' : ''}${formatNumber(dashboard.period.issueChange)} in range`}
+                icon="circle-dot-dashed"
+                label="Open issues"
+                value={formatNumber(project.openIssues)}
+              />
+            </section>
+          </div>
+
+          {
+            project.sources.website && (
+              <div
+                class="dashboard-tab-panel"
+                data-value="website"
+                role="tabpanel"
+              >
+                <section
+                  class="website-analytics-section"
+                  aria-labelledby="website-analytics-heading"
+                >
+                  <div class="section-heading">
+                    <div>
+                      <span class="eyebrow">Cloudflare Web Analytics</span>
+                      <h2 id="website-analytics-heading">Website traffic</h2>
+                      <p>
+                        Privacy-first page activity for{' '}
+                        {websiteAnalytics?.hostname ??
+                          new URL(project.sources.website).hostname}
+                        .
+                      </p>
+                    </div>
+                    {websiteAnalytics && (
+                      <Badge variant="outline">{rangeLabel}</Badge>
+                    )}
+                  </div>
+
+                  {websiteAnalytics ?
+                    (
+                      <div class="website-analytics-grid">
+                        <div
+                          class="website-metric-grid"
+                          aria-label={`${project.name} website metrics`}
+                        >
+                          <MetricCard
+                            context={`Cloudflare total · ${rangeLabel}`}
+                            icon="mouse-pointer-click"
+                            label="Page views"
+                            value={formatNumber(websiteAnalytics.pageViews)}
+                          />
+                          <MetricCard
+                            context="Direct or externally referred sessions"
+                            icon="users"
+                            label="Visits"
+                            value={formatNumber(websiteAnalytics.visits)}
+                          />
+                        </div>
+
+                        <Card
+                          as="section"
+                          class="panel website-traffic-panel"
+                          aria-labelledby="website-traffic-history-heading"
+                        >
+                          <div class="panel-heading">
+                            <div>
+                              <span class="eyebrow">Traffic over time</span>
+                              <h3 id="website-traffic-history-heading">
+                                Page views and visits
+                              </h3>
+                            </div>
+                          </div>
+
+                          <LineChart
+                            area
+                            aria-label={`${project.name} website traffic history`}
+                            caption={`${rangeMeta.bucketLabel} Cloudflare totals.${
+                              websiteDataIsSampled ?
+                                ' Cloudflare adaptive sampling is present in this range.' :
+                                ''
+                            }`}
+                            series={websiteTrafficSeries}
+                          />
+                        </Card>
+                      </div>
+                    ) :
+                    (
+                      <Card class="panel website-analytics-empty">
+                        <Empty>
+                          <span class="empty-icon">
+                            <Icon
+                              aria-hidden="true"
+                              name="chart-no-axes-column"
+                            />
+                          </span>
+                          <h3>No Cloudflare traffic yet</h3>
+                          <p>
+                            Data will appear after the Web Analytics beacon reports
+                            activity and the next analytics sync completes.
+                          </p>
+                        </Empty>
+                      </Card>
+                    )}
+                </section>
+              </div>
+            )
+          }
+
+          {
+            (project.sources.vscode.length > 0 ||
+              project.sources.openVsx.length > 0) && (
+              <div
+                class="dashboard-tab-panel project-channel-panel"
+                data-value="extensions"
+                role="tabpanel"
+              >
+                {
+                  dashboard.vscodeAnalytics.extensions.length > 0 && (
+                    <section
+                      class="vscode-analytics-section"
+                      aria-labelledby="project-vscode-heading"
+                    >
+                      <div class="section-heading">
+                        <div>
+                          <span class="eyebrow">VS Code Marketplace</span>
+                          <h2 id="project-vscode-heading">Extension reach</h2>
+                          <p>
+                            Marketplace data stays separate from npm package downloads
+                            and GitHub repository activity.
+                          </p>
+                        </div>
+                        <Badge variant="outline">Marketplace snapshot</Badge>
+                      </div>
+                      <div class="vscode-project-grid">
+                        {dashboard.vscodeAnalytics.history.length > 1 && (
+                          <Card
+                            as="section"
+                            class="panel"
+                            aria-labelledby="project-vscode-history-heading"
+                          >
+                            <div class="panel-heading">
+                              <div>
+                                <span class="eyebrow">Observed growth</span>
+                                <h3 id="project-vscode-history-heading">
+                                  Cumulative downloads
+                                </h3>
+                              </div>
+                            </div>
+                            <LineChart
+                              markers={dashboard.vscodeAnalytics.history.length <= 24}
+                              aria-label={`${project.name} VS Code Marketplace downloads for ${rangeLabel}`}
+                              caption="Cumulative downloads reported by the VS Code Marketplace at each Observatory sync."
+                              series={vscodeHistorySeries}
+                            />
+                          </Card>
+                        )}
+                        <Card class="panel">
+                          <Table>
+                            <caption class="sr-only">
+                              {project.name} VS Code Marketplace extensions
+                            </caption>
+                            <thead>
+                              <tr>
+                                <th scope="col">Extension</th>
+                                <th scope="col">Version</th>
+                                <th scope="col">Downloads</th>
+                                <th scope="col">Installs</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dashboard.vscodeAnalytics.extensions.map(extension => (
+                                <tr>
+                                  <td>
+                                    <a
+                                      class="npm-package-link"
+                                      href={
+                                        'https://marketplace.visualstudio.com/items?itemName=' +
+                                        extension.extensionId
+                                      }
+                                      rel="noreferrer"
+                                      target="_blank"
+                                    >
+                                      {extension.extensionId}
+                                      <Icon aria-hidden="true" name="arrow-up-right" />
+                                    </a>
+                                  </td>
+                                  <td>{extension.version}</td>
+                                  <td>{formatNumber(extension.downloads)}</td>
+                                  <td>{formatNumber(extension.installs)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </Table>
+                        </Card>
+                      </div>
+                    </section>
+                  )
+                }
+
+                {
+                  dashboard.openVsxAnalytics.extensions.length > 0 && (
+                    <section
+                      class="vscode-analytics-section"
+                      aria-labelledby="project-open-vsx-heading"
+                    >
+                      <div class="section-heading">
+                        <div>
+                          <span class="eyebrow">Open VSX Registry</span>
+                          <h2 id="project-open-vsx-heading">Open editor reach</h2>
+                          <p>
+                            Downloads from Open VSX stay separate from Microsoft
+                            Marketplace installs and npm package usage.
+                          </p>
+                        </div>
+                        <Badge variant="outline">Open VSX snapshot</Badge>
+                      </div>
+                      <div class="vscode-project-grid">
+                        {dashboard.openVsxAnalytics.history.length > 1 && (
+                          <Card
+                            as="section"
+                            class="panel"
+                            aria-labelledby="project-open-vsx-history-heading"
+                          >
+                            <div class="panel-heading">
+                              <div>
+                                <span class="eyebrow">Observed growth</span>
+                                <h3 id="project-open-vsx-history-heading">
+                                  Cumulative downloads
+                                </h3>
+                              </div>
+                            </div>
+                            <LineChart
+                              markers={
+                                dashboard.openVsxAnalytics.history.length <= 24
+                              }
+                              aria-label={`${project.name} Open VSX downloads for ${rangeLabel}`}
+                              caption="Cumulative downloads reported by Open VSX at each Observatory sync."
+                              series={openVsxHistorySeries}
+                            />
+                          </Card>
+                        )}
+                        <Card class="panel">
+                          <Table>
+                            <table>
+                              <caption class="sr-only">
+                                {project.name} Open VSX extensions
+                              </caption>
+                              <thead>
+                                <tr>
+                                  <th scope="col">Extension</th>
+                                  <th scope="col">Version</th>
+                                  <th scope="col">Downloads</th>
+                                  <th scope="col">Reviews</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {dashboard.openVsxAnalytics.extensions.map(
+                                  extension => (
+                                    <tr>
+                                      <td>
+                                        <a
+                                          class="npm-package-link"
+                                          href={getOpenVsxUrl(extension.extensionId)}
+                                          rel="noreferrer"
+                                          target="_blank"
+                                        >
+                                          {extension.extensionId}
+                                          <Icon
+                                            aria-hidden="true"
+                                            name="arrow-up-right"
+                                          />
+                                        </a>
+                                      </td>
+                                      <td>{extension.version}</td>
+                                      <td>{formatNumber(extension.downloads)}</td>
+                                      <td>{formatNumber(extension.reviewCount)}</td>
+                                    </tr>
+                                  )
+                                )}
+                              </tbody>
+                            </table>
+                          </Table>
+                        </Card>
+                      </div>
+                    </section>
+                  )
+                }
+
+                {
+                  dashboard.vscodeAnalytics.extensions.length === 0 &&
+                  dashboard.openVsxAnalytics.extensions.length === 0 && (
+                    <Empty class="project-channel-empty">
+                      <span class="empty-icon">
+                        <Icon aria-hidden="true" name="blocks" />
+                      </span>
+                      <h2>Extension analytics start with the next sync</h2>
+                      <p>
+                        Observatory knows which registries this project uses and
+                        will keep each provider's reach separate once a snapshot
+                        succeeds.
+                      </p>
+                      <div class="project-channel-actions">
+                        {
+                          project.sources.vscode[0] && (
+                            <ButtonLink
+                              href={project.sources.vscode[0]}
+                              newTab
+                              variant="secondary"
+                            >
+                              <Icon aria-hidden="true" name="monitor" />
+                              Open VS Code Marketplace
+                            </ButtonLink>
+                          )
+                        }
+                        {
+                          project.sources.openVsx[0] && (
+                            <ButtonLink
+                              href={project.sources.openVsx[0]}
+                              newTab
+                              variant="secondary"
+                            >
+                              <Icon aria-hidden="true" name="blocks" />
+                              Open VSX Registry
+                            </ButtonLink>
+                          )
+                        }
+                      </div>
+                    </Empty>
+                  )
+                }
+              </div>
+            )
+          }
+
+          {
+            project.sources.npm.length > 0 && (
+              <div
+                class="dashboard-tab-panel"
+                data-value="packages"
+                role="tabpanel"
+              >
+                <Card
+                  as="section"
+                  class="panel history-panel project-reach-panel"
+                  aria-labelledby="project-history-heading"
+                >
+                  <div class="panel-heading">
+                    <div>
+                      <span class="eyebrow">Reach over time</span>
+                      <h2 id="project-history-heading">{npmChart.heading}</h2>
+                    </div>
+                    <Badge variant="outline">{rangeLabel}</Badge>
+                  </div>
+                  {
+                    npmChart.points.length > 0 ?
+                      (
+                        <LineChart
+                          area
+                          markers={npmChart.points.length <= 31}
+                          aria-label={`${project.name} ${npmChart.heading.toLocaleLowerCase()} for ${rangeLabel}`}
+                          caption={npmChart.caption}
+                          series={downloadHistorySeries}
+                        />
+                      ) :
+                      (
+                        <Empty>
+                          <p>
+                            No npm download history is stored for {rangeLabel}.
+                          </p>
+                        </Empty>
+                      )
+                  }
+                </Card>
+              </div>
+            )
+          }
+
+          <div
+            class="dashboard-tab-panel"
+            data-value="details"
+            role="tabpanel"
+          >
+            <Card
+              as="section"
+              class="panel project-facts project-facts--full"
+              aria-labelledby="project-facts-heading"
+            >
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">Details</span>
+                  <h2 id="project-facts-heading">Project facts</h2>
+                </div>
+              </div>
+              <dl>
+                <div>
+                  <dt>Last push</dt>
+                  <dd>{formatRelativeDate(project.pushedAt)}</dd>
+                </div>
+                <div>
+                  <dt>Exact date</dt>
+                  <dd>{formatDate(project.pushedAt)}</dd>
+                </div>
+                <div>
+                  <dt>npm packages</dt>
+                  <dd>{formatNumber(project.sources.npm.length)}</dd>
+                </div>
+                <div>
+                  <dt>VS Code extensions</dt>
+                  <dd>{formatNumber(project.sources.vscode.length)}</dd>
+                </div>
+                <div>
+                  <dt>Open VSX extensions</dt>
+                  <dd>{formatNumber(project.sources.openVsx.length)}</dd>
+                </div>
+                <div>
+                  <dt>Response time</dt>
+                  <dd>{formatDuration(project.responseTimeMs)}</dd>
+                </div>
+                <div>
+                  <dt>Snapshots in range</dt>
+                  <dd>{formatNumber(dashboard.period.syncs)}</dd>
+                </div>
+                <div>
+                  <dt>GitHub stars</dt>
+                  <dd>{formatNumber(project.stars)}</dd>
+                </div>
+                <div>
+                  <dt>GitHub forks</dt>
+                  <dd>{formatNumber(project.forks)}</dd>
+                </div>
+              </dl>
+              {
+                project.topics.length > 0 && (
+                  <div class="topic-list" aria-label="Repository topics">
+                    {project.topics.map(topic => (
+                      <Badge variant="outline">{topic}</Badge>
+                    ))}
+                  </div>
+                )
+              }
+            </Card>
+          </div>
+        </Tabs>
       </main>
 
       <footer class="app-footer">

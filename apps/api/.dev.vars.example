@@ -1,8 +1,10 @@
 AUTH_SECRET=replace-with-at-least-32-random-characters
+OWNER_PASSCODE=replace-with-a-private-recovery-code
 CORS_ORIGIN=http://localhost:4321,http://localhost:4322
 ENVIRONMENT=development
 MAIL_FROM=Observatory <observatory@example.com>
 OWNER_EMAIL=you@example.com
+SITE_URL=http://localhost:4321
 
 # Optional as a pair. Enables Cloudflare Web Analytics collection.
 # Account ID: Cloudflare Dashboard > Account home.

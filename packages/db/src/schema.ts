@@ -26,6 +26,44 @@ export const sessions = sqliteTable('sessions', {
   tokenHash: text('token_hash').notNull().unique()
 })
 
+export const authAttempts = sqliteTable(
+  'auth_attempts', {
+    createdAt: integer('created_at').notNull(),
+    id: text('id').primaryKey(),
+    identity: text('identity').notNull(),
+    succeeded: integer('succeeded', { mode: 'boolean' }).notNull()
+  }, table => [index('auth_attempts_identity_created_idx').on(
+    table.identity, table.createdAt
+  )]
+)
+
+export const passkeyCredentials = sqliteTable('passkey_credentials', {
+  backedUp: integer('backed_up', { mode: 'boolean' }).notNull(),
+  counter: integer('counter').notNull(),
+  createdAt: integer('created_at').notNull(),
+  deviceType: text('device_type', {
+    enum: ['singleDevice', 'multiDevice']
+  }).notNull(),
+  id: text('id').primaryKey(),
+  lastUsedAt: integer('last_used_at'),
+  name: text('name').notNull(),
+  publicKey: text('public_key').notNull(),
+  transports: text('transports').notNull().default('[]')
+})
+
+export const passkeyChallenges = sqliteTable(
+  'passkey_challenges', {
+    challenge: text('challenge').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    id: text('id').primaryKey(),
+    ownerEmail: text('owner_email'),
+    purpose: text('purpose', {
+      enum: ['authentication', 'registration']
+    }).notNull(),
+    usedAt: integer('used_at')
+  }, table => [index('passkey_challenges_expires_idx').on(table.expiresAt)]
+)
+
 export const syncRuns = sqliteTable('sync_runs', {
   completedAt: integer('completed_at'),
   errorMessage: text('error_message'),

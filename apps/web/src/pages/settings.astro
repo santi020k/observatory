@@ -7,11 +7,15 @@ import { getBrowserApiUrl, getProjectSettings } from '@/lib/api'
 import { formatRelativeDate } from '@/lib/format'
 
 import Accordion from '@santi020k/lumen-astro/components/Accordion'
+import Alert from '@santi020k/lumen-astro/components/Alert'
 import Badge from '@santi020k/lumen-astro/components/Badge'
 import Button from '@santi020k/lumen-astro/components/Button'
 import Card from '@santi020k/lumen-astro/components/Card'
 import Empty from '@santi020k/lumen-astro/components/Empty'
+import Field from '@santi020k/lumen-astro/components/Field'
 import Icon from '@santi020k/lumen-astro/components/Icon'
+import Input from '@santi020k/lumen-astro/components/Input'
+import Label from '@santi020k/lumen-astro/components/Label'
 import NativeSelect from '@santi020k/lumen-astro/components/NativeSelect'
 import SearchField from '@santi020k/lumen-astro/components/SearchField'
 import Switch from '@santi020k/lumen-astro/components/Switch'
@@ -97,6 +101,16 @@ const getCategoryIcon = (
             >
               <Icon aria-hidden="true" name="panel-top" />
               Display
+            </button>
+            <button
+              aria-selected="false"
+              data-value="security"
+              role="tab"
+              tabindex="-1"
+              type="button"
+            >
+              <Icon aria-hidden="true" name="fingerprint" />
+              Security
             </button>
             <button
               aria-selected="false"
@@ -464,6 +478,82 @@ const getCategoryIcon = (
                 />
               </div>
             </Card>
+          </section>
+
+          <section data-value="security" hidden role="tabpanel">
+            <div class="settings-section-heading">
+              <div>
+                <span class="eyebrow">Owner access</span>
+                <h2>Passkeys</h2>
+                <p>
+                  Use Face ID, Touch ID, Windows Hello, or a hardware security
+                  key to open Observatory without typing a code.
+                </p>
+              </div>
+              <Badge data-passkey-count variant="outline">Loading…</Badge>
+            </div>
+
+            <Alert
+              aria-atomic="true"
+              aria-live="polite"
+              data-passkey-alert
+              hidden
+              role="status"
+            />
+
+            <Card
+              as="section"
+              aria-labelledby="passkey-devices-heading"
+              class="settings-panel passkey-panel"
+            >
+              <div class="settings-panel__heading">
+                <div>
+                  <h3 id="passkey-devices-heading">Trusted devices</h3>
+                  <p>
+                    The private key remains in your device or password manager.
+                  </p>
+                </div>
+                <Icon aria-hidden="true" name="shield-check" />
+              </div>
+
+              <div
+                aria-live="polite"
+                class="passkey-list"
+                data-passkey-list
+              >
+                <p data-passkey-loading>Loading registered passkeys…</p>
+              </div>
+
+              <form
+                class="passkey-create"
+                data-api-url={apiUrl}
+                data-passkey-form
+                data-ui-form
+              >
+                <Field>
+                  <Label for="passkey-name">Device name</Label>
+                  <Input
+                    id="passkey-name"
+                    maxlength="80"
+                    name="name"
+                    placeholder="My MacBook"
+                    required
+                  />
+                </Field>
+                <Button data-passkey-create type="submit">
+                  <Icon aria-hidden="true" name="key-round" />
+                  <span data-passkey-create-label>Create passkey</span>
+                </Button>
+              </form>
+            </Card>
+
+            <div class="settings-callout">
+              <Icon aria-hidden="true" name="life-buoy" />
+              <p>
+                Your private recovery code remains available if a trusted
+                device is lost. Observatory never displays or returns it.
+              </p>
+            </div>
           </section>
 
           <section data-value="privacy" hidden role="tabpanel">
@@ -917,4 +1007,177 @@ for (const control of projectControls) {
     }
   })
 }
+</script>
+
+<script>
+import {
+  deletePasskey,
+  listPasskeys,
+  registerPasskey,
+  supportsPasskeys
+} from '@/lib/passkeys'
+
+import type { PasskeyCredential } from '@santi020k/observatory-api-types'
+
+const passkeyForm = document.querySelector<HTMLFormElement>('[data-passkey-form]')
+const passkeyList = document.querySelector<HTMLElement>('[data-passkey-list]')
+const passkeyCount = document.querySelector<HTMLElement>('[data-passkey-count]')
+const passkeyAlert = document.querySelector<HTMLElement>('[data-passkey-alert]')
+const passkeyApiUrl = passkeyForm?.dataset.apiUrl ?? '/api'
+let passkeys: PasskeyCredential[] = []
+
+const formatPasskeyDate = (value: number | null): string => value === null ?
+  'Not used yet' :
+  `Last used ${new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value))}`
+
+const showPasskeyMessage = (message: string, destructive = false) => {
+  if (!passkeyAlert) return
+
+  passkeyAlert.hidden = false
+
+  passkeyAlert.textContent = message
+
+  passkeyAlert.dataset.variant = destructive ? 'destructive' : 'default'
+}
+
+const renderPasskeys = () => {
+  if (passkeyCount) {
+    passkeyCount.textContent = `${passkeys.length} registered`
+  }
+
+  if (!passkeyList) return
+
+  passkeyList.replaceChildren()
+
+  if (passkeys.length === 0) {
+    const empty = document.createElement('p')
+
+    empty.className = 'passkey-empty'
+
+    empty.textContent = 'No passkeys registered yet. Create one on this device.'
+
+    passkeyList.append(empty)
+
+    return
+  }
+
+  for (const credential of passkeys) {
+    const row = document.createElement('div')
+    const details = document.createElement('div')
+    const name = document.createElement('strong')
+    const metadata = document.createElement('span')
+    const remove = document.createElement('button')
+
+    row.className = 'passkey-row'
+
+    details.className = 'passkey-row__details'
+
+    name.textContent = credential.name
+
+    metadata.textContent = formatPasskeyDate(credential.lastUsedAt)
+
+    remove.className = 'passkey-remove'
+
+    remove.type = 'button'
+
+    remove.textContent = 'Remove'
+
+    remove.setAttribute('aria-label', `Remove ${credential.name}`)
+
+    remove.addEventListener('click', async () => {
+      remove.disabled = true
+
+      try {
+        await deletePasskey(passkeyApiUrl, credential.id)
+
+        passkeys = passkeys.filter(item => item.id !== credential.id)
+
+        renderPasskeys()
+
+        showPasskeyMessage('Passkey removed.')
+      } catch (error) {
+        remove.disabled = false
+
+        showPasskeyMessage(
+          error instanceof Error ? error.message : 'Could not remove the passkey.', true
+        )
+      }
+    })
+
+    details.append(name, metadata)
+
+    row.append(details, remove)
+
+    passkeyList.append(row)
+  }
+}
+
+const loadPasskeys = async () => {
+  try {
+    passkeys = await listPasskeys(passkeyApiUrl)
+
+    renderPasskeys()
+  } catch (error) {
+    showPasskeyMessage(
+      error instanceof Error ? error.message : 'Could not load passkeys.', true
+    )
+  }
+}
+
+if (!supportsPasskeys()) {
+  const createButton = passkeyForm?.querySelector<HTMLButtonElement>(
+    '[data-passkey-create]'
+  )
+
+  if (createButton) createButton.disabled = true
+
+  showPasskeyMessage('This browser does not support passkeys.', true)
+}
+
+passkeyForm?.addEventListener('submit', async event => {
+  event.preventDefault()
+
+  const button = passkeyForm.querySelector<HTMLButtonElement>(
+    '[data-passkey-create]'
+  )
+
+  const label = passkeyForm.querySelector<HTMLElement>(
+    '[data-passkey-create-label]'
+  )
+
+  const name = String(new FormData(passkeyForm).get('name') ?? '').trim()
+
+  if (!name) return
+
+  if (button) button.disabled = true
+
+  if (label) label.textContent = 'Creating…'
+
+  if (passkeyAlert) passkeyAlert.hidden = true
+
+  try {
+    const credential = await registerPasskey(passkeyApiUrl, name)
+
+    passkeys = [...passkeys, credential]
+
+    passkeyForm.reset()
+
+    renderPasskeys()
+
+    showPasskeyMessage('Passkey created. You can use it on your next sign-in.')
+  } catch (error) {
+    showPasskeyMessage(
+      error instanceof Error ? error.message : 'Could not create the passkey.', true
+    )
+  } finally {
+    if (button) button.disabled = false
+
+    if (label) label.textContent = 'Create passkey'
+  }
+})
+
+loadPasskeys()
 </script>

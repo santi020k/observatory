@@ -1,5 +1,6 @@
 export interface Bindings {
   AUTH_SECRET: string
+  OWNER_PASSCODE: string
   CLOUDFLARE_ACCOUNT_ID?: string
   CLOUDFLARE_API_TOKEN?: string
   CORS_ORIGIN: string
@@ -8,6 +9,7 @@ export interface Bindings {
   GITHUB_TOKEN?: string
   MAIL_FROM: string
   OWNER_EMAIL: string
+  SITE_URL: string
   RESEND_API_KEY?: string
 }
 

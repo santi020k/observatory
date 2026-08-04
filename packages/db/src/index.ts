@@ -2,8 +2,11 @@ import { and, desc, eq, gt, gte, isNull, lt, max, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 
 import {
+  authAttempts,
   authCodes,
   npmDownloadSnapshots,
+  passkeyChallenges,
+  passkeyCredentials,
   projectPreferences,
   projectSnapshots,
   sessions,
@@ -90,6 +93,121 @@ export interface ProjectPreferenceWrite {
 
 export const createDb = (client: D1Database) => drizzle(client)
 
+export const countRecentFailedAuthAttempts = async (
+  db: ObservatoryDb,
+  identity: string,
+  since: number
+): Promise<number> => {
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(authAttempts)
+    .where(and(
+      eq(authAttempts.identity, identity), eq(authAttempts.succeeded, false), gt(authAttempts.createdAt, since)
+    ))
+
+  return result[0]?.count ?? 0
+}
+
+export const recordAuthAttempt = async (
+  db: ObservatoryDb,
+  values: typeof authAttempts.$inferInsert
+): Promise<void> => {
+  await db.insert(authAttempts).values(values)
+}
+
+export const insertPasskeyChallenge = async (
+  db: ObservatoryDb,
+  values: typeof passkeyChallenges.$inferInsert
+): Promise<void> => {
+  await db.insert(passkeyChallenges).values(values)
+}
+
+export const consumePasskeyChallenge = async (
+  db: ObservatoryDb,
+  values: {
+    id: string
+    now: number
+    ownerEmail: string | null
+    purpose: 'authentication' | 'registration'
+  }
+): Promise<string | null> => {
+  const ownerCondition = values.ownerEmail === null ?
+    isNull(passkeyChallenges.ownerEmail) :
+    eq(passkeyChallenges.ownerEmail, values.ownerEmail)
+
+  const matchingId = eq(passkeyChallenges.id, values.id)
+  const matchingPurpose = eq(passkeyChallenges.purpose, values.purpose)
+  const unused = isNull(passkeyChallenges.usedAt)
+  const unexpired = gt(passkeyChallenges.expiresAt, values.now)
+
+  const where = and(
+    matchingId, matchingPurpose, ownerCondition, unused, unexpired
+  )
+
+  const rows = await db
+    .select({ challenge: passkeyChallenges.challenge })
+    .from(passkeyChallenges)
+    .where(where)
+    .limit(1)
+
+  const row = rows[0]
+
+  if (!row) return null
+
+  const result = await db
+    .update(passkeyChallenges)
+    .set({ usedAt: values.now })
+    .where(where)
+
+  return result.meta.changes === 1 ? row.challenge : null
+}
+
+export const deleteExpiredPasskeyChallenges = async (
+  db: ObservatoryDb,
+  now: number
+): Promise<void> => {
+  await db.delete(passkeyChallenges).where(lt(passkeyChallenges.expiresAt, now))
+}
+
+export const listPasskeyCredentials = async (db: ObservatoryDb) => db
+  .select()
+  .from(passkeyCredentials)
+  .orderBy(passkeyCredentials.createdAt)
+
+export const findPasskeyCredential = async (
+  db: ObservatoryDb,
+  id: string
+) => db
+  .select()
+  .from(passkeyCredentials)
+  .where(eq(passkeyCredentials.id, id))
+  .limit(1)
+  .then(rows => rows[0] ?? null)
+
+export const insertPasskeyCredential = async (
+  db: ObservatoryDb,
+  values: typeof passkeyCredentials.$inferInsert
+): Promise<void> => {
+  await db.insert(passkeyCredentials).values(values)
+}
+
+export const updatePasskeyCredential = async (
+  db: ObservatoryDb,
+  id: string,
+  values: Partial<typeof passkeyCredentials.$inferInsert>
+): Promise<void> => {
+  await db.update(passkeyCredentials).set(values).where(eq(passkeyCredentials.id, id))
+}
+
+export const deletePasskeyCredential = async (
+  db: ObservatoryDb,
+  id: string
+): Promise<boolean> => {
+  const result = await db.delete(passkeyCredentials).where(eq(passkeyCredentials.id, id))
+
+  return result.meta.changes === 1
+}
+
 export const insertAuthCode = async (
   db: ObservatoryDb,
   values: typeof authCodes.$inferInsert
@@ -172,6 +290,10 @@ export const cleanupExpiredAuth = async (
   await db.delete(authCodes).where(lt(authCodes.expiresAt, now))
 
   await db.delete(sessions).where(lt(sessions.expiresAt, now))
+
+  await db.delete(authAttempts).where(lt(authAttempts.createdAt, now - 86_400_000))
+
+  await db.delete(passkeyChallenges).where(lt(passkeyChallenges.expiresAt, now))
 }
 
 export const startSyncRun = async (

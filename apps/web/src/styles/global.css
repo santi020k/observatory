@@ -36,7 +36,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-a {
+a:not(.ui-button-link) {
   color: inherit;
 }
 
@@ -1381,6 +1381,37 @@ p {
   gap: clamp(2rem, 4vw, 3.5rem);
 }
 
+.project-metric-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.project-channel-panel:not([hidden]) {
+  gap: clamp(3rem, 5vw, 5rem);
+}
+
+.project-channel-empty {
+  min-height: 22rem;
+  border: 1px dashed hsl(var(--line));
+  border-radius: 1rem;
+}
+
+.project-channel-empty .empty-icon {
+  margin-inline: auto;
+}
+
+.project-channel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+}
+
+.project-reach-panel {
+  width: 100%;
+  min-height: 31rem;
+}
+
 .project-meta {
   display: flex;
   flex-wrap: wrap;
@@ -1431,12 +1462,26 @@ p {
   margin: 1rem 0 0;
 }
 
+.project-facts--full dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .project-facts dl > div {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
   padding-block: 0.85rem;
   border-bottom: 1px solid hsl(var(--line));
+}
+
+.project-facts--full dl > div {
+  padding-inline: 1rem;
+  border-right: 1px solid hsl(var(--line));
+}
+
+.project-facts--full dl > div:nth-child(3n) {
+  border-right: 0;
 }
 
 .project-facts dt {
@@ -1808,6 +1853,91 @@ p {
   min-width: 9.5rem;
 }
 
+.passkey-panel > .settings-panel__heading > .ui-icon {
+  color: hsl(var(--brand));
+}
+
+.passkey-list {
+  display: grid;
+}
+
+.passkey-list > p {
+  margin: 0;
+  padding: 1.4rem;
+}
+
+.passkey-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.4rem;
+  border-bottom: 1px solid hsl(var(--line));
+}
+
+.passkey-row__details {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.passkey-row__details strong {
+  overflow: hidden;
+  color: hsl(var(--ink));
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.passkey-row__details span {
+  color: hsl(var(--ink-muted));
+  font-size: 0.74rem;
+}
+
+.passkey-remove {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid hsl(var(--line));
+  border-radius: 0.6rem;
+  background: transparent;
+  color: hsl(var(--ink-muted));
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.passkey-remove:hover {
+  border-color: hsl(var(--danger) / 0.45);
+  color: hsl(var(--danger));
+}
+
+.passkey-remove:focus-visible {
+  outline: 2px solid hsl(var(--focus));
+  outline-offset: 2px;
+}
+
+.passkey-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 1rem;
+  padding: 1.4rem;
+}
+
+.passkey-login-actions {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.auth-card form[hidden],
+.passkey-login-actions[hidden] {
+  display: none;
+}
+
+.passkey-login-actions > .ui-button:first-child {
+  width: 100%;
+}
+
 .privacy-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1871,6 +2001,22 @@ html[data-observatory-reduce-motion='true'] *::after {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .project-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-facts--full dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-facts--full dl > div:nth-child(3n) {
+    border-right: 1px solid hsl(var(--line));
+  }
+
+  .project-facts--full dl > div:nth-child(2n) {
+    border-right: 0;
+  }
+
   .insight-grid {
     grid-template-columns: 1fr;
   }
@@ -1924,7 +2070,7 @@ html[data-observatory-reduce-motion='true'] *::after {
   }
 
   .auth-story {
-    min-height: 28rem;
+    min-height: 21rem;
     border-right: 0;
     border-bottom: 1px solid hsl(var(--line));
   }
@@ -2033,8 +2179,26 @@ html[data-observatory-reduce-motion='true'] *::after {
 }
 
 @media (max-width: 38rem) {
+  .auth-card__icon {
+    margin-bottom: 1rem;
+  }
+
+  .auth-card form {
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+
   .metric-grid {
     grid-template-columns: 1fr;
+  }
+
+  .project-facts--full dl {
+    grid-template-columns: 1fr;
+  }
+
+  .project-facts--full dl > div,
+  .project-facts--full dl > div:nth-child(3n) {
+    border-right: 0;
   }
 
   .website-metric-grid {
