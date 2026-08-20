@@ -21,7 +21,7 @@ catalog:
   '@santi020k/eslint-config-testing': ^3.1.0
   '@santi020k/eslint-config-tools': ^3.1.0
   '@santi020k/eslint-plugin-astro-doctor': '^1.0.4'
-  '@santi020k/lumen-astro': '^0.4.0'
+  '@santi020k/lumen-astro': '^1.0.0'
   '@santi020k/theme': '^1.2.0'
   '@types/node': '^26.1.1'
   astro: '^7.1.3'
@@ -48,7 +48,9 @@ minimumReleaseAgeExclude:
   - '@santi020k/eslint-config-basic'
   - '@santi020k/commitprompt'
   - '@santi020k/eslint-plugin-astro-doctor'
+  - '@santi020k/lumen'
   - '@santi020k/lumen-astro'
+  - '@santi020k/lumen-core'
   - astro
   - hono@4.12.32
   - '@santi020k/eslint-config-typescript'

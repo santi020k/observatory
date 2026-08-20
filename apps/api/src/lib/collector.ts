@@ -93,9 +93,11 @@ interface WebsiteHealth {
 
 const dayMilliseconds = 24 * 60 * 60 * 1_000
 const relevanceWindowMilliseconds = 30 * dayMilliseconds
+const githubDiscoveryRetryAttempts = 3
 const npmRequestConcurrency = 1
 const npmRequestDelayMilliseconds = 250
 const npmRetryAttempts = 3
+const providerRequestTimeoutMilliseconds = 15_000
 
 const relevanceWeights = {
   forks: 0.03,
@@ -191,7 +193,7 @@ const fetchJson = async <Result>(
   const response = await fetch(url, {
     ...init,
     ...(headers ? { headers } : {}),
-    signal: AbortSignal.timeout(8_000)
+    signal: AbortSignal.timeout(providerRequestTimeoutMilliseconds)
   })
 
   if (!response.ok) {
@@ -204,6 +206,32 @@ const fetchJson = async <Result>(
 const delay = (milliseconds: number): Promise<void> => new Promise(
   resolve => setTimeout(resolve, milliseconds)
 )
+
+const isTransportError = (error: unknown): boolean => error instanceof TypeError ||
+  (error instanceof Error && error.name === 'TimeoutError')
+
+const fetchGithubRepositoriesPage = async (
+  page: number,
+  token?: string
+): Promise<GithubRepository[]> => {
+  const url = `https://api.github.com/users/${githubOwner}/repos?per_page=100&sort=updated&page=${page}`
+
+  for (let attempt = 0; attempt < githubDiscoveryRetryAttempts; attempt += 1) {
+    try {
+      return await fetchJson<GithubRepository[]>(url, githubHeaders(token))
+    } catch (error) {
+      const canRetry =
+        isTransportError(error) &&
+        attempt < githubDiscoveryRetryAttempts - 1
+
+      if (!canRetry) throw error
+
+      await delay(500 * 2 ** attempt)
+    }
+  }
+
+  throw new Error('GitHub repository discovery exhausted all retry attempts.')
+}
 
 const toIsoDate = (timestamp: number): string => new Date(timestamp).toISOString().slice(0, 10)
 
@@ -377,9 +405,7 @@ const collectGithubRepositories = async (
   let pageRepositories: GithubRepository[]
 
   do {
-    pageRepositories = await fetchJson<GithubRepository[]>(
-      `https://api.github.com/users/${githubOwner}/repos?per_page=100&sort=updated&page=${page}`, githubHeaders(token)
-    )
+    pageRepositories = await fetchGithubRepositoriesPage(page, token)
 
     repositories.push(...pageRepositories)
 

@@ -109,6 +109,28 @@ describe('public project collection', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  test('retries repository discovery after a transport timeout', async () => {
+    vi.useFakeTimers()
+
+    const timeoutError = new Error('The operation was aborted due to timeout')
+
+    timeoutError.name = 'TimeoutError'
+
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(timeoutError)
+      .mockResolvedValueOnce(Response.json([repository('project')]))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const collection = collectorInternals.collectGithubRepositories()
+
+    await vi.runAllTimersAsync()
+
+    await expect(collection).resolves.toEqual([repository('project')])
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   test('fails repository discovery on an upstream HTTP error', async () => {
     vi.stubGlobal(
       'fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 503 })))
