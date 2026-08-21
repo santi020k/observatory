@@ -6,6 +6,15 @@ MAIL_FROM=Observatory <observatory@example.com>
 OWNER_EMAIL=you@example.com
 SITE_URL=http://localhost:4321
 
+# Optional dedicated key for hashing feedback voter and rate-limit identifiers.
+# AUTH_SECRET is used when omitted.
+FEEDBACK_HASH_SECRET=
+
+# Optional in development because Turnstile is bypassed locally. Configure both
+# values in production for public website submissions.
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+
 # Optional as a pair. Enables Cloudflare Web Analytics collection.
 # Account ID: Cloudflare Dashboard > Account home.
 CLOUDFLARE_ACCOUNT_ID=

@@ -3,6 +3,8 @@ import { describe, expect, test } from 'vitest'
 import {
   getCanonicalProjectSlug,
   getCatalogOverride,
+  getFeedbackOrigins,
+  getFeedbackProject,
   getVscodeExtensionMappings,
   titleFromSlug
 } from './index'
@@ -36,5 +38,14 @@ describe('project catalog', () => {
       extensionId: 'santi020k.vscode-astro-doctor',
       slug: 'astro-doctor'
     })
+  })
+
+  test('registers project-scoped feedback surfaces and their trusted origins', () => {
+    expect(getFeedbackProject('postlens')).toMatchObject({
+      displayName: 'PostLens',
+      locales: ['en', 'es']
+    })
+    expect(getFeedbackProject('between-contractions')).toBeDefined()
+    expect(getFeedbackOrigins()).toContain('https://between.santi020k.com')
   })
 })

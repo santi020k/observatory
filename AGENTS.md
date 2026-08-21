@@ -1,6 +1,6 @@
 # Observatory — Agent Instructions
 
-Observatory is Santiago Molina's private project analytics control room.
+Observatory is Santiago Molina's private portfolio operations control room.
 
 ## Architecture
 
@@ -17,6 +17,9 @@ Observatory is Santiago Molina's private project analytics control room.
 - Database helpers accept a D1 client; packages do not create global clients.
 - Public-source collection and private-source collection stay separate.
 - Private project names or metrics must never be returned unless the authenticated owner requests them.
+- Observatory owns shared project feedback storage, abuse controls, moderation, and delivery kanbans.
+- Public feedback routes must be project-scoped and enforce the catalog's origin and locale boundaries.
+- Bug reports, messages, contact email, and diagnostics must never be returned from public routes.
 
 ## UI
 

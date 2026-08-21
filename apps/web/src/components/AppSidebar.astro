@@ -72,6 +72,18 @@ const getCategoryIcon = (
       </span>
     </a>
 
+    <a
+      aria-current={currentPath.startsWith('/feedback/') ? 'page' : undefined}
+      class="sidebar-link sidebar-link--overview"
+      href="/feedback/"
+    >
+      <Icon aria-hidden="true" name="messages-square" />
+      <span>
+        <strong>Feedback operations</strong>
+        <small>Inbox and kanbans</small>
+      </span>
+    </a>
+
     <div class="sidebar-projects">
       <div class="sidebar-section-heading">
         <span>Project dashboards</span>

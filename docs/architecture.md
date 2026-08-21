@@ -1,4 +1,4 @@
-# Architecture decision: owner-only project observatory
+# Architecture decision: portfolio observatory and operations control plane
 
 ## Decision
 
@@ -14,6 +14,8 @@ Cloudflare D1 snapshots, and shared contract/catalog/data packages.
 - Separate packages prevent the frontend from duplicating provider or database shapes.
 - Public and private collectors can evolve independently while producing the same normalized metric
   contract.
+- Product-facing feedback uses a deliberately small public route boundary. Observatory owns the
+  shared schema and private workflow; each product continues to own its branded customer UI.
 
 ## Data flow
 
@@ -25,9 +27,22 @@ Open VSX API ────┤                      ├─> extension snapshots �
 website checks ───┘                      └─> source identity ──────┤
 Cloudflare GraphQL ─> private hourly sync ──> web snapshots ───────┘
 
+PostLens / Between Contractions
+        └─> project-scoped feedback API ──> feedback items + hashed votes ──> owner kanbans
+
 GitHub App / commercial sources
         └─> future private collectors ─> isolated credentials + visibility-aware snapshots
 ```
+
+## Feedback isolation
+
+- Every public request includes a project slug registered in the shared catalog and is restricted
+  to that project's configured origins and locales.
+- New submissions enter moderation. Only approved, public ideas appear on customer-facing boards;
+  bug reports and private messages never do.
+- Optional email addresses and diagnostic context are returned only by authenticated admin routes.
+- Votes and rate limits use HMAC-derived identifiers. Raw IP addresses are never persisted, and
+  production submissions can be protected with Turnstile without coupling products to its keys.
 
 ## Authentication
 

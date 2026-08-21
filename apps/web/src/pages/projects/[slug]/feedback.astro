@@ -1,0 +1,509 @@
+---
+import AppHeader from '@/components/AppHeader.astro'
+import AppSidebar from '@/components/AppSidebar.astro'
+import AppLayout from '@/layouts/AppLayout.astro'
+
+import {
+  getAdminFeedback,
+  getBrowserApiUrl,
+  getProjectSettings
+} from '@/lib/api'
+import { formatRelativeDate } from '@/lib/format'
+
+import Alert from '@santi020k/lumen-astro/components/Alert'
+import AlertDialog from '@santi020k/lumen-astro/components/AlertDialog'
+import Badge from '@santi020k/lumen-astro/components/Badge'
+import Button from '@santi020k/lumen-astro/components/Button'
+import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
+import Card from '@santi020k/lumen-astro/components/Card'
+import Icon from '@santi020k/lumen-astro/components/Icon'
+import NativeSelect from '@santi020k/lumen-astro/components/NativeSelect'
+import SearchField from '@santi020k/lumen-astro/components/SearchField'
+
+const slug = Astro.params.slug
+
+if (!slug) return Astro.redirect('/feedback/')
+
+const [feedbackResponse, settingsResponse] = await Promise.all([
+  getAdminFeedback(Astro.request, Astro.url, slug),
+  getProjectSettings(Astro.request, Astro.url)
+])
+
+if (
+  feedbackResponse.status === 401 ||
+  settingsResponse.status === 401
+) return Astro.redirect('/login/')
+
+if (feedbackResponse.status === 404) return Astro.redirect('/404/')
+
+if (
+  !feedbackResponse.ok || !feedbackResponse.parsed ||
+  !settingsResponse.ok || !settingsResponse.parsed
+) throw new Error('Observatory feedback is unavailable.')
+
+const { items, project } = feedbackResponse.parsed.data
+
+if (!project) throw new Error('Feedback project metadata is unavailable.')
+
+const settings = settingsResponse.parsed
+const apiUrl = getBrowserApiUrl()
+
+const statuses = [
+  { label: 'Inbox', value: 'inbox' },
+  { label: 'Under review', value: 'under_review' },
+  { label: 'Planned', value: 'planned' },
+  { label: 'In progress', value: 'in_progress' },
+  { label: 'Released', value: 'shipped' },
+  { label: 'Closed', value: 'closed' }
+]
+
+const moderationOptions = [
+  { label: 'Pending', value: 'pending' },
+  { label: 'Approved', value: 'approved' },
+  { label: 'Rejected', value: 'rejected' }
+]
+---
+
+<AppLayout
+  description={`Private ${project.displayName} feedback moderation board.`}
+  title={`${project.displayName} feedback · Observatory`}
+>
+  <div class="app-shell">
+    <AppSidebar projects={settings.projects.filter(candidate => candidate.enabled)} />
+    <div class="app-workspace">
+      <AppHeader
+        apiUrl={apiUrl}
+        lastSync={settings.sync.completedAt ?
+          formatRelativeDate(settings.sync.completedAt) :
+          'awaiting first sync'}
+        syncStatus={settings.sync.status}
+      />
+
+      <main
+        class="dashboard feedback-dashboard"
+        data-feedback-api={apiUrl}
+        data-feedback-project={project.slug}
+        id="main-content"
+      >
+        <section class="hero-row feedback-board-hero" aria-labelledby="board-title">
+          <div>
+            <ButtonLink href="/feedback/" variant="ghost">
+              <Icon aria-hidden="true" name="arrow-left" />
+              All feedback
+            </ButtonLink>
+            <span class="eyebrow">{project.displayName} · Feedback</span>
+            <h1 id="board-title">Delivery board</h1>
+            <p>Moderate incoming ideas and private reports, then manage accepted work.</p>
+          </div>
+          <Badge variant="outline" data-board-total>{items.length} items</Badge>
+        </section>
+
+        <section class="feedback-toolbar" aria-label="Board filters">
+          <SearchField
+            aria-label="Search feedback"
+            data-feedback-search
+            placeholder="Search title, details, or email"
+          />
+          <NativeSelect
+            aria-label="Filter by feedback type"
+            data-feedback-type-filter
+            options={[
+              { label: 'All feedback', value: '' },
+              { label: 'Ideas', value: 'idea' },
+              { label: 'Bugs', value: 'bug' },
+              { label: 'Messages', value: 'message' }
+            ]}
+            value=""
+          />
+          <NativeSelect
+            aria-label="Filter by moderation status"
+            data-feedback-moderation-filter
+            options={[
+              { label: 'All moderation states', value: '' },
+              ...moderationOptions
+            ]}
+            value=""
+          />
+        </section>
+
+        <Alert class="feedback-board-alert" data-feedback-alert hidden tabindex="-1"></Alert>
+
+        <div class="feedback-kanban" aria-label={`${project.displayName} feedback kanban`}>
+          {statuses.map(status => {
+            const columnItems = items.filter(item => item.status === status.value)
+
+            return (
+              <section
+                class="feedback-kanban-column"
+                data-feedback-column={status.value}
+                aria-labelledby={`column-${status.value}`}
+              >
+                <header>
+                  <h2 id={`column-${status.value}`}>{status.label}</h2>
+                  <Badge variant="outline" data-column-count>{columnItems.length}</Badge>
+                </header>
+                <div class="feedback-kanban-items" data-column-items>
+                  {columnItems.map(item => (
+                    <Card
+                      as="article"
+                      class="feedback-admin-card"
+                      data-description={item.description}
+                      data-email={item.email ?? ''}
+                      data-feedback-item={item.id}
+                      data-moderation={item.moderationStatus}
+                      data-status={item.status}
+                      data-title={item.title}
+                      data-type={item.type}
+                      draggable="true"
+                    >
+                      <div class="feedback-admin-card__badges">
+                        <Badge variant="outline">{item.type}</Badge>
+                        <Badge
+                          data-item-moderation-badge
+                          variant={item.moderationStatus === 'pending' ? 'warning' : 'secondary'}
+                        >
+                          {item.moderationStatus}
+                        </Badge>
+                      </div>
+                      <h3>{item.title}</h3>
+                      <p>{item.description}</p>
+                      <small>
+                        {item.source} · {item.locale} · {new Date(item.createdAt).toLocaleDateString('en')}
+                      </small>
+                      {item.email && <a href={`mailto:${item.email}`}>{item.email}</a>}
+                      {item.diagnosticReport && (
+                        <details>
+                          <summary>Diagnostic report</summary>
+                          <pre>{item.diagnosticReport}</pre>
+                        </details>
+                      )}
+                      <label>
+                        <span>Status</span>
+                        <NativeSelect data-item-status options={statuses} value={item.status} />
+                      </label>
+                      <label>
+                        <span>Moderation</span>
+                        <NativeSelect
+                          data-item-moderation
+                          options={moderationOptions}
+                          value={item.moderationStatus}
+                        />
+                      </label>
+                      <div class="feedback-admin-card__actions">
+                        <Button data-item-visibility size="sm" variant="outline">
+                          {item.isPublic ? 'Make private' : 'Make public'}
+                        </Button>
+                        <Button data-item-delete size="sm" variant="destructive">
+                          Delete
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      </main>
+
+      <AlertDialog
+        aria-describedby="delete-feedback-description"
+        aria-labelledby="delete-feedback-title"
+        id="delete-feedback-dialog"
+      >
+        <Card class="feedback-delete-dialog-card">
+          <div class="feedback-project-card__icon">
+            <Icon aria-hidden="true" name="trash-2" />
+          </div>
+          <h2 id="delete-feedback-title">Delete feedback permanently?</h2>
+          <p id="delete-feedback-description">
+            This removes the report and its votes. This action cannot be undone.
+          </p>
+          <div class="feedback-admin-card__actions">
+            <Button data-ui-alert-dialog-close variant="outline">Cancel</Button>
+            <Button data-feedback-delete-confirm variant="destructive">
+              Delete permanently
+            </Button>
+          </div>
+        </Card>
+      </AlertDialog>
+    </div>
+  </div>
+</AppLayout>
+
+<script>
+const dashboard = document.querySelector<HTMLElement>('[data-feedback-project]')
+const apiUrl = dashboard?.dataset.feedbackApi ?? '/api'
+const projectSlug = dashboard?.dataset.feedbackProject ?? ''
+const alert = document.querySelector<HTMLElement>('[data-feedback-alert]')
+const search = document.querySelector<HTMLInputElement>('[data-feedback-search]')
+const typeFilter = document.querySelector<HTMLSelectElement>('[data-feedback-type-filter]')
+const moderationFilter = document.querySelector<HTMLSelectElement>('[data-feedback-moderation-filter]')
+
+const deleteDialog = document.querySelector<HTMLDialogElement>(
+  '#delete-feedback-dialog'
+)
+
+const deleteConfirm = document.querySelector<HTMLButtonElement>(
+  '[data-feedback-delete-confirm]'
+)
+
+let pendingDeleteCard: HTMLElement | null = null
+
+const itemCards = (): HTMLElement[] => [
+  ...document.querySelectorAll<HTMLElement>('[data-feedback-item]')
+]
+
+const showAlert = (message: string, state: 'error' | 'success') => {
+  if (!alert) return
+
+  alert.textContent = message
+
+  alert.dataset.state = state
+
+  alert.hidden = false
+
+  alert.focus()
+}
+
+const updateCounts = () => {
+  for (const column of document.querySelectorAll<HTMLElement>('[data-feedback-column]')) {
+    const count = column.querySelector<HTMLElement>('[data-column-count]')
+
+    const visibleItems = column.querySelectorAll<HTMLElement>(
+      '[data-feedback-item]:not([hidden])'
+    ).length
+
+    if (count) count.textContent = String(visibleItems)
+  }
+
+  const total = itemCards().filter(card => !card.hidden).length
+  const totalBadge = document.querySelector<HTMLElement>('[data-board-total]')
+
+  if (totalBadge) totalBadge.textContent = `${total} items`
+}
+
+const cardMatchesFilters = (
+  card: HTMLElement,
+  query: string,
+  type: string,
+  moderation: string
+): boolean => {
+  const searchable = [
+    card.dataset.title,
+    card.dataset.description,
+    card.dataset.email
+  ].join(' ').toLowerCase()
+
+  if (query && !searchable.includes(query)) return false
+
+  if (type && card.dataset.type !== type) return false
+
+  if (moderation && card.dataset.moderation !== moderation) return false
+
+  return true
+}
+
+const applyFilters = () => {
+  const query = search?.value.trim().toLowerCase() ?? ''
+  const type = typeFilter?.value ?? ''
+  const moderation = moderationFilter?.value ?? ''
+
+  for (const card of itemCards()) {
+    card.hidden = !cardMatchesFilters(card, query, type, moderation)
+  }
+
+  updateCounts()
+}
+
+const updateItem = async (id: string, change: Record<string, boolean | string>) => {
+  const response = await fetch(
+    `${apiUrl}/feedback/admin/projects/${encodeURIComponent(projectSlug)}/items/${encodeURIComponent(id)}`, {
+      body: JSON.stringify(change),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH'
+    }
+  )
+
+  if (!response.ok) throw new Error('Feedback update failed')
+}
+
+const moveCard = async (card: HTMLElement, status: string) => {
+  const id = card.dataset.feedbackItem
+
+  const target = document.querySelector<HTMLElement>(
+    `[data-feedback-column="${status}"] [data-column-items]`
+  )
+
+  if (!id || !target) return
+
+  await updateItem(id, { status })
+
+  target.prepend(card)
+
+  card.dataset.status = status
+
+  const select = card.querySelector<HTMLSelectElement>('[data-item-status]')
+
+  if (select) select.value = status
+
+  updateCounts()
+
+  showAlert('Feedback status updated.', 'success')
+}
+
+const updateModeration = async (
+  card: HTMLElement,
+  id: string,
+  moderationStatus: string
+) => {
+  try {
+    await updateItem(id, { moderationStatus })
+
+    card.dataset.moderation = moderationStatus
+
+    const badge = card.querySelector<HTMLElement>('[data-item-moderation-badge]')
+
+    if (badge) badge.textContent = moderationStatus
+
+    applyFilters()
+
+    showAlert('Moderation updated.', 'success')
+  } catch {
+    const select = card.querySelector<HTMLSelectElement>('[data-item-moderation]')
+
+    if (select) select.value = card.dataset.moderation ?? 'pending'
+
+    showAlert('Could not update moderation.', 'error')
+  }
+}
+
+const updateVisibility = async (
+  id: string,
+  button: HTMLButtonElement,
+  isPublic: boolean
+) => {
+  try {
+    await updateItem(id, { isPublic })
+
+    button.textContent = isPublic ? 'Make private' : 'Make public'
+
+    showAlert(`Feedback is now ${isPublic ? 'public' : 'private'}.`, 'success')
+  } catch {
+    showAlert('Could not update visibility.', 'error')
+  }
+}
+
+for (const control of [search, typeFilter, moderationFilter])
+  control?.addEventListener(control === search ? 'input' : 'change', applyFilters)
+
+for (const card of itemCards()) {
+  const id = card.dataset.feedbackItem
+
+  if (!id) continue
+
+  card.addEventListener('dragstart', event => {
+    event.dataTransfer?.setData('text/plain', id)
+
+    card.classList.add('is-dragging')
+  })
+
+  card.addEventListener('dragend', () => card.classList.remove('is-dragging'))
+
+  card.querySelector<HTMLSelectElement>('[data-item-status]')?.addEventListener('change', event => {
+    const select = event.currentTarget
+
+    if (!(select instanceof HTMLSelectElement)) return
+
+    const previousStatus = card.dataset.status ?? 'inbox'
+
+    moveCard(card, select.value).catch(() => {
+      select.value = previousStatus
+
+      showAlert('Could not update the status.', 'error')
+    })
+  })
+
+  card.querySelector<HTMLSelectElement>('[data-item-moderation]')?.addEventListener('change', event => {
+    const select = event.currentTarget
+
+    if (!(select instanceof HTMLSelectElement)) return
+
+    updateModeration(card, id, select.value).catch(() => undefined)
+  })
+
+  card.querySelector<HTMLButtonElement>('[data-item-visibility]')?.addEventListener('click', event => {
+    const button = event.currentTarget
+
+    if (!(button instanceof HTMLButtonElement)) return
+
+    const makePublic = button.textContent?.trim() === 'Make public'
+
+    updateVisibility(id, button, makePublic).catch(() => undefined)
+  })
+
+  card.querySelector<HTMLButtonElement>('[data-item-delete]')?.addEventListener('click', () => {
+    pendingDeleteCard = card
+
+    deleteDialog?.showModal()
+  })
+}
+
+deleteConfirm?.addEventListener('click', async () => {
+  const card = pendingDeleteCard
+  const id = card?.dataset.feedbackItem
+
+  if (!card || !id) return
+
+  const itemUrl = `${apiUrl}/feedback/admin/projects/${encodeURIComponent(
+    projectSlug
+  )}/items/${encodeURIComponent(id)}`
+
+  const response = await fetch(itemUrl, {
+    credentials: 'include',
+    method: 'DELETE'
+  })
+
+  if (!response.ok) {
+    deleteDialog?.close()
+
+    showAlert('Could not delete the feedback item.', 'error')
+
+    return
+  }
+
+  card.remove()
+
+  pendingDeleteCard = null
+
+  deleteDialog?.close()
+
+  updateCounts()
+
+  showAlert('Feedback item deleted.', 'success')
+})
+
+for (const column of document.querySelectorAll<HTMLElement>('[data-feedback-column]')) {
+  column.addEventListener('dragover', event => {
+    event.preventDefault()
+
+    column.classList.add('is-drag-over')
+  })
+
+  column.addEventListener('dragleave', () => column.classList.remove('is-drag-over'))
+
+  column.addEventListener('drop', event => {
+    event.preventDefault()
+
+    column.classList.remove('is-drag-over')
+
+    const id = event.dataTransfer?.getData('text/plain')
+    const status = column.dataset.feedbackColumn
+    const card = id ? document.querySelector<HTMLElement>(`[data-feedback-item="${id}"]`) : null
+
+    if (card && status)
+      moveCard(card, status).catch(() => showAlert('Could not update the status.', 'error'))
+  })
+}
+</script>

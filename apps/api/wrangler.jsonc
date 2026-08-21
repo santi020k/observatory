@@ -14,6 +14,16 @@
   "triggers": {
     "crons": ["17 * * * *"],
   },
+  "routes": [
+    {
+      "pattern": "postlens.santi020k.com/api/feedback/*",
+      "zone_name": "santi020k.com",
+    },
+    {
+      "pattern": "between.santi020k.com/api/feedback/*",
+      "zone_name": "santi020k.com",
+    },
+  ],
   "vars": {
     "ENVIRONMENT": "production",
   },

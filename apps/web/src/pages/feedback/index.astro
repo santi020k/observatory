@@ -1,0 +1,122 @@
+---
+import AppHeader from '@/components/AppHeader.astro'
+import AppSidebar from '@/components/AppSidebar.astro'
+import AppLayout from '@/layouts/AppLayout.astro'
+
+import {
+  getAdminFeedback,
+  getBrowserApiUrl,
+  getFeedbackProjects,
+  getProjectSettings
+} from '@/lib/api'
+import { formatRelativeDate } from '@/lib/format'
+
+import Badge from '@santi020k/lumen-astro/components/Badge'
+import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
+import Card from '@santi020k/lumen-astro/components/Card'
+import Icon from '@santi020k/lumen-astro/components/Icon'
+
+const [feedbackResponse, projectsResponse, settingsResponse] = await Promise.all([
+  getAdminFeedback(Astro.request, Astro.url),
+  getFeedbackProjects(Astro.request, Astro.url),
+  getProjectSettings(Astro.request, Astro.url)
+])
+
+if (
+  feedbackResponse.status === 401 ||
+  settingsResponse.status === 401
+) return Astro.redirect('/login/')
+
+if (
+  !feedbackResponse.ok || !feedbackResponse.parsed ||
+  !projectsResponse.ok || !projectsResponse.parsed ||
+  !settingsResponse.ok || !settingsResponse.parsed
+) throw new Error('Observatory feedback is unavailable.')
+
+const items = feedbackResponse.parsed.data.items
+const projects = projectsResponse.parsed.data.projects
+const settings = settingsResponse.parsed
+const apiUrl = getBrowserApiUrl()
+
+const summary = {
+  inbox: items.filter(item => item.status === 'inbox').length,
+  pending: items.filter(item => item.moderationStatus === 'pending').length,
+  private: items.filter(item => !item.isPublic).length,
+  total: items.length
+}
+---
+
+<AppLayout
+  description="Private feedback moderation and project kanban workspace."
+  title="Feedback operations · Observatory"
+>
+  <div class="app-shell">
+    <AppSidebar projects={settings.projects.filter(project => project.enabled)} />
+    <div class="app-workspace">
+      <AppHeader
+        apiUrl={apiUrl}
+        lastSync={settings.sync.completedAt ?
+          formatRelativeDate(settings.sync.completedAt) :
+          'awaiting first sync'}
+        syncStatus={settings.sync.status}
+      />
+
+      <main class="dashboard feedback-dashboard" id="main-content">
+        <section class="hero-row" aria-labelledby="feedback-title">
+          <div>
+            <span class="eyebrow">Portfolio operations</span>
+            <h1 id="feedback-title">Feedback</h1>
+            <p>
+              Moderate every product inbox, then move accepted work through a
+              project-specific delivery pipeline.
+            </p>
+          </div>
+        </section>
+
+        <section class="feedback-summary" aria-label="Feedback summary">
+          <Card><span>All items</span><strong>{summary.total}</strong></Card>
+          <Card><span>New inbox</span><strong>{summary.inbox}</strong></Card>
+          <Card><span>Awaiting moderation</span><strong>{summary.pending}</strong></Card>
+          <Card><span>Private reports</span><strong>{summary.private}</strong></Card>
+        </section>
+
+        <section aria-labelledby="project-boards-title">
+          <div class="feedback-section-heading">
+            <div>
+              <span class="eyebrow">Project boards</span>
+              <h2 id="project-boards-title">Choose a workspace</h2>
+              <p>Each board is isolated by project while sharing one operating model.</p>
+            </div>
+            <Badge variant="outline">{projects.length} projects</Badge>
+          </div>
+
+          <div class="feedback-project-grid">
+            {projects.map(project => {
+              const projectItems = items.filter(item => item.projectSlug === project.slug)
+              const pending = projectItems.filter(item => item.moderationStatus === 'pending').length
+
+              return (
+                <Card as="article" class="feedback-project-card">
+                  <div class="feedback-project-card__icon">
+                    <Icon aria-hidden="true" name="columns-3" />
+                  </div>
+                  <div>
+                    <Badge variant={pending > 0 ? 'warning' : 'outline'}>
+                      {pending > 0 ? `${pending} need review` : 'Inbox clear'}
+                    </Badge>
+                    <h3>{project.displayName}</h3>
+                    <p>{projectItems.length} feedback items across the delivery pipeline.</p>
+                  </div>
+                  <ButtonLink href={`/projects/${project.slug}/feedback/`}>
+                    Open kanban
+                    <Icon aria-hidden="true" name="arrow-right" />
+                  </ButtonLink>
+                </Card>
+              )
+            })}
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</AppLayout>

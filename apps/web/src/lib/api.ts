@@ -1,10 +1,30 @@
 import type {
+  AdminFeedbackItem,
   AnalyticsRange,
   Dashboard,
   ProjectDashboard,
   ProjectSettings,
   SessionResponse
 } from '@santi020k/observatory-api-types'
+
+export interface AdminFeedbackResponse {
+  data: {
+    items: AdminFeedbackItem[]
+    project?: { displayName: string, slug: string }
+  }
+}
+
+export interface FeedbackProjectsResponse {
+  data: {
+    projects: {
+      displayName: string
+      locales: string[]
+      slug: string
+      turnstileEnabled: boolean
+      turnstileSiteKey: string | null
+    }[]
+  }
+}
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/$/, '')
 
@@ -66,3 +86,20 @@ export const getProjectSettings = async (
 ): Promise<ApiResponse<ProjectSettings>> => (await requestFromApi(
   '/settings/projects', request, requestUrl
 )) as ApiResponse<ProjectSettings>
+
+export const getAdminFeedback = async (
+  request: Request,
+  requestUrl: URL,
+  projectSlug?: string
+): Promise<ApiResponse<AdminFeedbackResponse>> => (await requestFromApi(
+  projectSlug ?
+    `/feedback/admin/projects/${encodeURIComponent(projectSlug)}/items` :
+    '/feedback/admin/items', request, requestUrl
+)) as ApiResponse<AdminFeedbackResponse>
+
+export const getFeedbackProjects = async (
+  request: Request,
+  requestUrl: URL
+): Promise<ApiResponse<FeedbackProjectsResponse>> => (await requestFromApi(
+  '/feedback/projects', request, requestUrl
+)) as ApiResponse<FeedbackProjectsResponse>

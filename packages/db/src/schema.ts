@@ -186,3 +186,64 @@ export const websiteAnalyticsSnapshots = sqliteTable(
     )
   ]
 )
+
+export const feedbackItems = sqliteTable(
+  'feedback_items', {
+    contactEmail: text('contact_email'),
+    createdAt: integer('created_at').notNull(),
+    description: text('description').notNull(),
+    diagnosticReport: text('diagnostic_report'),
+    id: text('id').primaryKey(),
+    isPublic: integer('is_public', { mode: 'boolean' }).notNull().default(false),
+    locale: text('locale').notNull(),
+    moderationStatus: text('moderation_status', {
+      enum: ['pending', 'approved', 'rejected']
+    }).notNull().default('pending'),
+    projectSlug: text('project_slug').notNull(),
+    source: text('source', {
+      enum: ['android', 'ios', 'website']
+    }).notNull(),
+    status: text('status', {
+      enum: ['inbox', 'under_review', 'planned', 'in_progress', 'shipped', 'closed']
+    }).notNull().default('inbox'),
+    title: text('title').notNull(),
+    type: text('type', { enum: ['idea', 'bug', 'message'] }).notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    voteCount: integer('vote_count').notNull().default(0)
+  }, table => [
+    index('feedback_items_public_feed').on(
+      table.projectSlug, table.type, table.moderationStatus, table.isPublic, table.status
+    ),
+    index('feedback_items_admin_board').on(
+      table.projectSlug, table.status, table.updatedAt
+    )
+  ]
+)
+
+export const feedbackVotes = sqliteTable(
+  'feedback_votes', {
+    createdAt: integer('created_at').notNull(),
+    itemId: text('item_id').notNull().references(
+      () => feedbackItems.id, { onDelete: 'cascade' }
+    ),
+    voterHash: text('voter_hash').notNull()
+  }, table => [
+    uniqueIndex('feedback_votes_item_voter_idx').on(
+      table.itemId, table.voterHash
+    ),
+    index('feedback_votes_voter').on(table.voterHash, table.itemId)
+  ]
+)
+
+export const feedbackRateLimits = sqliteTable(
+  'feedback_rate_limits', {
+    action: text('action').notNull(),
+    keyHash: text('key_hash').notNull(),
+    requestCount: integer('request_count').notNull().default(1),
+    windowStart: text('window_start').notNull()
+  }, table => [
+    uniqueIndex('feedback_rate_limits_key_action_window_idx').on(
+      table.keyHash, table.action, table.windowStart
+    )
+  ]
+)

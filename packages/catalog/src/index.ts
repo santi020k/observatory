@@ -9,6 +9,52 @@ export interface CatalogOverride {
   vscodeExtensions?: readonly string[]
 }
 
+export interface FeedbackProject {
+  allowedOrigins: readonly string[]
+  displayName: string
+  locales: readonly string[]
+  slug: string
+}
+
+const feedbackProjects = new Map<string, FeedbackProject>([
+  ['postlens', {
+    allowedOrigins: [
+      'https://postlens.santi020k.com',
+      'http://localhost:4176',
+      'http://127.0.0.1:4176',
+      'http://localhost:4321',
+      'http://127.0.0.1:4321'
+    ],
+    displayName: 'PostLens',
+    locales: ['en', 'es'],
+    slug: 'postlens'
+  }],
+  ['between-contractions', {
+    allowedOrigins: [
+      'https://between.santi020k.com',
+      'http://localhost:4321',
+      'http://127.0.0.1:4321',
+      'http://localhost:4322',
+      'http://127.0.0.1:4322'
+    ],
+    displayName: 'Between Contractions',
+    locales: ['en', 'es'],
+    slug: 'between-contractions'
+  }]
+])
+
+export const getFeedbackProject = (
+  slug: string
+): FeedbackProject | undefined => feedbackProjects.get(slug)
+
+export const getFeedbackProjects = (): FeedbackProject[] => [
+  ...feedbackProjects.values()
+]
+
+export const getFeedbackOrigins = (): string[] => [
+  ...new Set(getFeedbackProjects().flatMap(project => project.allowedOrigins))
+]
+
 export const githubOwner = 'santi020k'
 
 const projectAliases = new Map<string, string>([

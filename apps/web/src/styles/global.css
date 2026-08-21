@@ -2178,6 +2178,264 @@ html[data-observatory-reduce-motion='true'] *::after {
   }
 }
 
+.feedback-dashboard {
+  padding-bottom: 3rem;
+}
+
+.feedback-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 2.5rem;
+}
+
+.feedback-summary .ui-card {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 7.5rem;
+  align-content: end;
+  padding: 1.25rem;
+  border-color: hsl(var(--line));
+  background: hsl(var(--surface));
+}
+
+.feedback-summary span {
+  color: hsl(var(--ink-muted));
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.feedback-summary strong {
+  font-size: 2rem;
+  letter-spacing: -0.04em;
+}
+
+.feedback-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.feedback-project-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.feedback-project-card {
+  display: grid;
+  min-height: 16rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1.35rem;
+  border-color: hsl(var(--line));
+  background: hsl(var(--surface));
+}
+
+.feedback-project-card__icon {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  border-radius: 0.8rem;
+  background: hsl(var(--brand-soft));
+  color: hsl(var(--brand));
+}
+
+.feedback-project-card h3 {
+  margin-top: 0.8rem;
+  font-size: 1.25rem;
+}
+
+.feedback-project-card .ui-button-link {
+  align-self: end;
+  justify-self: start;
+  grid-column: 1 / -1;
+}
+
+.feedback-board-hero .ui-button-link {
+  width: max-content;
+  margin-bottom: 1.25rem;
+}
+
+.feedback-toolbar {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) repeat(2, minmax(10rem, 0.35fr));
+  gap: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid hsl(var(--line));
+  border-radius: 1rem;
+  background: hsl(var(--surface));
+}
+
+.feedback-board-alert {
+  margin-bottom: 1rem;
+}
+
+.feedback-kanban {
+  display: grid;
+  grid-auto-columns: minmax(18rem, 22rem);
+  grid-auto-flow: column;
+  gap: 0.85rem;
+  padding-bottom: 1rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+
+.feedback-kanban-column {
+  min-height: 28rem;
+  padding: 0.8rem;
+  border: 1px solid hsl(var(--line));
+  border-radius: 1rem;
+  background: hsl(var(--surface-muted));
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.feedback-kanban-column.is-drag-over {
+  border-color: hsl(var(--brand));
+  background: hsl(var(--brand-soft));
+}
+
+.feedback-kanban-column > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.25rem 0.25rem 0.8rem;
+}
+
+.feedback-kanban-column h2 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.feedback-kanban-items {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.feedback-admin-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+  border-color: hsl(var(--line));
+  background: hsl(var(--surface));
+  cursor: grab;
+}
+
+.feedback-admin-card.is-dragging {
+  opacity: 0.55;
+}
+
+.feedback-admin-card[hidden] {
+  display: none;
+}
+
+.feedback-admin-card__badges,
+.feedback-admin-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.feedback-admin-card h3,
+.feedback-admin-card p,
+.feedback-admin-card small {
+  margin: 0;
+}
+
+.feedback-admin-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.84rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.feedback-admin-card small,
+.feedback-admin-card > a {
+  overflow-wrap: anywhere;
+  color: hsl(var(--ink-muted));
+  font-size: 0.72rem;
+}
+
+.feedback-admin-card label {
+  display: grid;
+  gap: 0.35rem;
+  color: hsl(var(--ink-soft));
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.feedback-admin-card details {
+  color: hsl(var(--ink-soft));
+  font-size: 0.76rem;
+}
+
+.feedback-admin-card pre {
+  max-height: 12rem;
+  padding: 0.75rem;
+  overflow: auto;
+  border-radius: 0.65rem;
+  background: hsl(var(--surface-strong));
+  white-space: pre-wrap;
+}
+
+.feedback-delete-dialog-card {
+  display: grid;
+  width: min(30rem, calc(100vw - 2rem));
+  gap: 1rem;
+  padding: 1.5rem;
+  border: 0;
+  background: hsl(var(--surface));
+}
+
+.feedback-delete-dialog-card h2,
+.feedback-delete-dialog-card p {
+  margin: 0;
+}
+
+@media (max-width: 72rem) {
+  .feedback-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .feedback-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .feedback-toolbar > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 42rem) {
+  .feedback-summary,
+  .feedback-project-grid,
+  .feedback-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .feedback-toolbar > :first-child {
+    grid-column: auto;
+  }
+
+  .feedback-section-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feedback-kanban-column {
+    transition: none;
+  }
+}
+
 @media (max-width: 38rem) {
   .auth-card__icon {
     margin-bottom: 1rem;

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
   analyticsRangeSchema,
+  createFeedbackSchema,
   projectDashboardSchema,
   recoveryLoginSchema,
   requestCodeSchema,
@@ -21,6 +22,36 @@ describe('analytics range contracts', () => {
 
   test('includes range-owned npm analytics on project dashboards', () => {
     expect(projectDashboardSchema.shape.npmAnalytics).toBeDefined()
+  })
+})
+
+describe('feedback contracts', () => {
+  test('accepts website ideas and native diagnostic bug reports', () => {
+    expect(createFeedbackSchema.safeParse({
+      description: 'A detailed idea for the product roadmap.',
+      locale: 'en',
+      title: 'Add a calmer reminder',
+      type: 'idea'
+    }).success).toBe(true)
+
+    expect(createFeedbackSchema.safeParse({
+      description: 'The editor closes after choosing a photo.',
+      diagnosticReport: 'device=iPhone; build=1',
+      locale: 'en',
+      source: 'ios',
+      title: 'Editor closes unexpectedly',
+      type: 'bug'
+    }).success).toBe(true)
+  })
+
+  test('rejects diagnostics attached to public ideas', () => {
+    expect(createFeedbackSchema.safeParse({
+      description: 'A detailed idea for the product roadmap.',
+      diagnosticReport: 'private diagnostic data',
+      locale: 'en',
+      title: 'Add a calmer reminder',
+      type: 'idea'
+    }).success).toBe(false)
   })
 })
 

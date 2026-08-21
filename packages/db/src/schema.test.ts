@@ -4,6 +4,9 @@ import { describe, expect, test } from 'vitest'
 import {
   authAttempts,
   authCodes,
+  feedbackItems,
+  feedbackRateLimits,
+  feedbackVotes,
   npmDownloadSnapshots,
   passkeyChallenges,
   passkeyCredentials,
@@ -80,5 +83,12 @@ describe('observatory database schema', () => {
     expect(projectPreferences.websiteAnalyticsEnabled.name).toBe(
       'website_analytics_enabled'
     )
+  })
+
+  test('keeps project feedback, votes, and abuse controls separate', () => {
+    expect(getTableName(feedbackItems)).toBe('feedback_items')
+    expect(getTableName(feedbackVotes)).toBe('feedback_votes')
+    expect(getTableName(feedbackRateLimits)).toBe('feedback_rate_limits')
+    expect(feedbackItems.projectSlug.notNull).toBe(true)
   })
 })

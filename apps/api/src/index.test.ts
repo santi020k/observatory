@@ -46,4 +46,33 @@ describe('API request origin protection', () => {
       error: { code: 'INVALID_ORIGIN' }
     })
   })
+
+  test('allows registered product origins to reach project feedback routes', async () => {
+    const response = await app.request(
+      '/api/feedback/projects/postlens/config', {
+        headers: { Origin: 'https://postlens.santi020k.com' }
+      }, {
+        CORS_ORIGIN: 'https://observatory.example',
+        ENVIRONMENT: 'test'
+      }
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('access-control-allow-origin')).toBe(
+      'https://postlens.santi020k.com'
+    )
+  })
+
+  test('does not trust product origins for private Observatory mutations', async () => {
+    const response = await app.request(
+      '/sync', {
+        headers: { Origin: 'https://postlens.santi020k.com' },
+        method: 'POST'
+      }, {
+        CORS_ORIGIN: 'https://observatory.example'
+      }
+    )
+
+    expect(response.status).toBe(403)
+  })
 })

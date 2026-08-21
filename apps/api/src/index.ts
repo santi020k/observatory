@@ -2,6 +2,7 @@ import {
   analyticsRangeSchema,
   updateProjectSettingSchema
 } from '@santi020k/observatory-api-types'
+import { getFeedbackOrigins } from '@santi020k/observatory-catalog'
 import { createDb, setProjectPreference } from '@santi020k/observatory-db'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
@@ -20,6 +21,7 @@ import {
   buildProjectSettings
 } from './lib/dashboard'
 import { authRoutes } from './routes/auth'
+import { feedbackRoutes } from './routes/feedback'
 import type { Bindings, WorkerEnv } from './env'
 
 export const app = new Hono<WorkerEnv>()
@@ -41,10 +43,25 @@ const readCorsOrigin = (environment: unknown): string | null => {
   return environment.CORS_ORIGIN
 }
 
+const getAllowedOrigins = (
+  environment: unknown,
+  path: string
+): string[] => [
+  ...(readCorsOrigin(environment)
+    ?.split(',')
+    .map(origin => origin.trim()) ?? []),
+  ...(
+    path.startsWith('/feedback/projects/') ||
+    path.startsWith('/api/feedback/projects/') ?
+      getFeedbackOrigins() :
+      []
+  )
+]
+
 app.use('*', async (context, next) => {
   const method = context.req.method
   const origin = context.req.header('Origin')
-  const allowedOrigins = context.env.CORS_ORIGIN.split(',').map(value => value.trim())
+  const allowedOrigins = getAllowedOrigins(context.env, context.req.path)
 
   if (
     !['GET', 'HEAD', 'OPTIONS'].includes(method) &&
@@ -65,13 +82,11 @@ app.use('*', async (context, next) => {
 })
 
 app.use('*', cors({
-  allowHeaders: ['Content-Type'],
-  allowMethods: ['DELETE', 'GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'X-Feedback-Voter'],
+  allowMethods: ['DELETE', 'GET', 'PATCH', 'POST', 'OPTIONS'],
   credentials: true,
   origin: (origin, context) => {
-    const allowedOrigins = readCorsOrigin(context.env)
-      ?.split(',')
-      .map(allowedOrigin => allowedOrigin.trim()) ?? []
+    const allowedOrigins = getAllowedOrigins(context.env, context.req.path)
 
     return allowedOrigins.includes(origin) ? origin : null
   }
@@ -84,6 +99,10 @@ app.get('/health', context => context.json({
 }))
 
 app.route('/auth', authRoutes)
+
+app.route('/feedback', feedbackRoutes)
+
+app.route('/api/feedback', feedbackRoutes)
 
 const readRange = (value: string | undefined) => analyticsRangeSchema.catch('30d').parse(value)
 

@@ -1,8 +1,8 @@
 # Observatory
 
-Private project intelligence for Santiago Molina. Observatory turns public repository, package,
-and deployment signals into one decision-focused dashboard. It is intentionally owner-only and
-already separates public collection from the future private-project adapters.
+Private project intelligence and portfolio operations for Santiago Molina. Observatory turns public
+repository, package, deployment, and product-feedback signals into one decision-focused control room.
+The dashboard is owner-only; narrowly scoped public feedback routes serve each product's branded UI.
 
 ## What it measures
 
@@ -17,6 +17,7 @@ already separates public collection from the future private-project adapters.
 - Published website availability and response time
 - Cloudflare Web Analytics page views and visits, grouped hourly by project website
 - Attention signals for degraded, stale, or issue-heavy projects
+- Project-scoped public feedback, moderation, voting, and private delivery kanbans
 - Hourly D1 snapshots so trends can be added without changing providers
 
 The first successful public-project sync backfills up to one year of completed
@@ -84,11 +85,21 @@ pnpm --filter @santi020k/observatory-api exec wrangler secret put OWNER_EMAIL
 pnpm --filter @santi020k/observatory-api exec wrangler secret put RESEND_API_KEY
 pnpm --filter @santi020k/observatory-api exec wrangler secret put MAIL_FROM
 pnpm --filter @santi020k/observatory-api exec wrangler secret put GITHUB_TOKEN
+pnpm --filter @santi020k/observatory-api exec wrangler secret put FEEDBACK_HASH_SECRET
+pnpm --filter @santi020k/observatory-api exec wrangler secret put TURNSTILE_SITE_KEY
+pnpm --filter @santi020k/observatory-api exec wrangler secret put TURNSTILE_SECRET_KEY
 ```
 
 Set `CORS_ORIGIN` to the dashboard origin. Route `/api/*` to the API Worker and configure the web
 app with `PUBLIC_API_URL=/api`; use the Worker URL for `API_INTERNAL_URL` if server-side requests
 cannot follow the public route.
+
+The Worker also owns the specific product routes
+`postlens.santi020k.com/api/feedback/*` and
+`between.santi020k.com/api/feedback/*`. Product websites remain responsible for
+their branded forms and public roadmaps. Observatory validates each product's
+registered origins and locales before accepting a mutation. Apply D1 migration
+`0012_feedback_platform.sql` before enabling these routes.
 
 `GITHUB_TOKEN` is optional for public metadata, but required for repository traffic (views and
 clones) and strongly recommended for rate limits. Use the narrowest read-only repository scope.

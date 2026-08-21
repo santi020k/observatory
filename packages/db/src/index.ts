@@ -4,6 +4,9 @@ import { drizzle } from 'drizzle-orm/d1'
 import {
   authAttempts,
   authCodes,
+  feedbackItems,
+  feedbackRateLimits,
+  feedbackVotes,
   npmDownloadSnapshots,
   passkeyChallenges,
   passkeyCredentials,
@@ -91,7 +94,254 @@ export interface ProjectPreferenceWrite {
   websiteAnalyticsEnabled?: boolean
 }
 
+export interface FeedbackWrite {
+  contactEmail: string | null
+  createdAt: number
+  description: string
+  diagnosticReport: string | null
+  id: string
+  locale: string
+  projectSlug: string
+  source: 'android' | 'ios' | 'website'
+  title: string
+  type: 'idea' | 'bug' | 'message'
+  updatedAt: number
+}
+
+export interface FeedbackUpdate {
+  isPublic?: boolean
+  moderationStatus?: 'pending' | 'approved' | 'rejected'
+  status?: 'inbox' | 'under_review' | 'planned' | 'in_progress' | 'shipped' | 'closed'
+}
+
 export const createDb = (client: D1Database) => drizzle(client)
+
+export const createFeedbackItem = async (
+  db: ObservatoryDb,
+  values: FeedbackWrite
+): Promise<void> => {
+  await db.insert(feedbackItems).values({
+    ...values,
+    isPublic: values.type === 'idea'
+  })
+}
+
+export const listPublicFeedback = async (
+  db: ObservatoryDb,
+  projectSlug: string,
+  options: {
+    sort: 'new' | 'top'
+    status?: FeedbackUpdate['status']
+    voterHash?: string
+  }
+) => {
+  const conditions = [
+    eq(feedbackItems.projectSlug, projectSlug),
+    eq(feedbackItems.type, 'idea'),
+    eq(feedbackItems.moderationStatus, 'approved'),
+    eq(feedbackItems.isPublic, true)
+  ]
+
+  if (options.status) conditions.push(eq(feedbackItems.status, options.status))
+
+  const voterHash = options.voterHash ?? '__anonymous__'
+
+  const rows = await db
+    .select({
+      createdAt: feedbackItems.createdAt,
+      description: feedbackItems.description,
+      hasVoted: sql<boolean>`${feedbackVotes.itemId} is not null`,
+      id: feedbackItems.id,
+      locale: feedbackItems.locale,
+      status: feedbackItems.status,
+      title: feedbackItems.title,
+      updatedAt: feedbackItems.updatedAt,
+      voteCount: feedbackItems.voteCount
+    })
+    .from(feedbackItems)
+    .leftJoin(
+      feedbackVotes, and(
+        eq(feedbackVotes.itemId, feedbackItems.id), eq(feedbackVotes.voterHash, voterHash)
+      )
+    )
+    .where(and(...conditions))
+    .orderBy(
+      options.sort === 'new' ?
+        desc(feedbackItems.createdAt) :
+        desc(feedbackItems.voteCount), desc(feedbackItems.createdAt)
+    )
+    .limit(200)
+
+  return rows
+}
+
+export const listAdminFeedback = async (
+  db: ObservatoryDb,
+  projectSlug?: string
+) => {
+  const query = db.select().from(feedbackItems)
+
+  return projectSlug ?
+    query
+      .where(eq(feedbackItems.projectSlug, projectSlug))
+      .orderBy(desc(feedbackItems.updatedAt), desc(feedbackItems.createdAt))
+      .limit(500) :
+    query
+      .orderBy(desc(feedbackItems.updatedAt), desc(feedbackItems.createdAt))
+      .limit(500)
+}
+
+export const updateFeedbackItem = async (
+  db: ObservatoryDb,
+  projectSlug: string,
+  id: string,
+  values: FeedbackUpdate,
+  updatedAt: number
+) => {
+  const current = await db
+    .select()
+    .from(feedbackItems)
+    .where(and(
+      eq(feedbackItems.id, id), eq(feedbackItems.projectSlug, projectSlug)
+    ))
+    .limit(1)
+    .then(rows => rows[0] ?? null)
+
+  if (!current) return null
+
+  const isPublic = current.type === 'idea' ?
+    (values.isPublic ?? current.isPublic) :
+    false
+
+  await db
+    .update(feedbackItems)
+    .set({ ...values, isPublic, updatedAt })
+    .where(and(
+      eq(feedbackItems.id, id), eq(feedbackItems.projectSlug, projectSlug)
+    ))
+
+  return { ...current, ...values, isPublic, updatedAt }
+}
+
+export const deleteFeedbackItem = async (
+  db: ObservatoryDb,
+  projectSlug: string,
+  id: string
+): Promise<boolean> => {
+  const result = await db.delete(feedbackItems).where(and(
+    eq(feedbackItems.id, id), eq(feedbackItems.projectSlug, projectSlug)
+  ))
+
+  return result.meta.changes === 1
+}
+
+export const toggleFeedbackVote = async (
+  db: ObservatoryDb,
+  projectSlug: string,
+  itemId: string,
+  voterHash: string,
+  now: number
+): Promise<{ hasVoted: boolean, voteCount: number } | null> => {
+  const item = await db
+    .select({ id: feedbackItems.id, voteCount: feedbackItems.voteCount })
+    .from(feedbackItems)
+    .where(and(
+      eq(feedbackItems.id, itemId), eq(feedbackItems.projectSlug, projectSlug), eq(feedbackItems.type, 'idea'), eq(feedbackItems.moderationStatus, 'approved'), eq(feedbackItems.isPublic, true)
+    ))
+    .limit(1)
+    .then(rows => rows[0] ?? null)
+
+  if (!item) return null
+
+  const existing = await db
+    .select({ itemId: feedbackVotes.itemId })
+    .from(feedbackVotes)
+    .where(and(
+      eq(feedbackVotes.itemId, itemId), eq(feedbackVotes.voterHash, voterHash)
+    ))
+    .limit(1)
+    .then(rows => rows[0] ?? null)
+
+  const hasVoted = !existing
+
+  if (hasVoted) {
+    await db.insert(feedbackVotes).values({
+      createdAt: now,
+      itemId,
+      voterHash
+    }).onConflictDoNothing()
+
+    await db.update(feedbackItems).set({
+      updatedAt: now,
+      voteCount: sql`${feedbackItems.voteCount} + 1`
+    }).where(eq(feedbackItems.id, itemId))
+  } else {
+    await db.delete(feedbackVotes).where(and(
+      eq(feedbackVotes.itemId, itemId), eq(feedbackVotes.voterHash, voterHash)
+    ))
+
+    await db.update(feedbackItems).set({
+      updatedAt: now,
+      voteCount: sql`max(0, ${feedbackItems.voteCount} - 1)`
+    }).where(eq(feedbackItems.id, itemId))
+  }
+
+  return {
+    hasVoted,
+    voteCount: Math.max(0, item.voteCount + (hasVoted ? 1 : -1))
+  }
+}
+
+export const consumeFeedbackRateLimit = async (
+  db: ObservatoryDb,
+  values: {
+    action: string
+    keyHash: string
+    limit: number
+    windowStart: string
+  }
+): Promise<boolean> => {
+  await db
+    .insert(feedbackRateLimits)
+    .values({
+      action: values.action,
+      keyHash: values.keyHash,
+      requestCount: 1,
+      windowStart: values.windowStart
+    })
+    .onConflictDoUpdate({
+      set: { requestCount: sql`${feedbackRateLimits.requestCount} + 1` },
+      target: [
+        feedbackRateLimits.keyHash,
+        feedbackRateLimits.action,
+        feedbackRateLimits.windowStart
+      ]
+    })
+
+  const rateLimitConditions = [
+    eq(feedbackRateLimits.keyHash, values.keyHash),
+    eq(feedbackRateLimits.action, values.action),
+    eq(feedbackRateLimits.windowStart, values.windowStart)
+  ]
+
+  const count = await db
+    .select({ requestCount: feedbackRateLimits.requestCount })
+    .from(feedbackRateLimits)
+    .where(and(...rateLimitConditions))
+    .limit(1)
+    .then(rows => rows[0]?.requestCount ?? values.limit + 1)
+
+  return count <= values.limit
+}
+
+export const pruneFeedbackRateLimits = async (
+  db: ObservatoryDb,
+  before: string
+): Promise<void> => {
+  await db.delete(feedbackRateLimits).where(lt(
+    feedbackRateLimits.windowStart, before
+  ))
+}
 
 export const countRecentFailedAuthAttempts = async (
   db: ObservatoryDb,

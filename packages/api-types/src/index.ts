@@ -1,5 +1,99 @@
 import * as z from 'zod'
 
+export const feedbackStatusSchema = z.enum([
+  'inbox',
+  'under_review',
+  'planned',
+  'in_progress',
+  'shipped',
+  'closed'
+])
+
+export const feedbackTypeSchema = z.enum(['idea', 'bug', 'message'])
+export const feedbackModerationStatusSchema = z.enum([
+  'pending',
+  'approved',
+  'rejected'
+])
+
+const feedbackBaseSchema = z.object({
+  description: z.string().trim().min(20).max(2000),
+  email: z.string().trim().toLowerCase().pipe(z.email()).or(z.literal('')).optional(),
+  locale: z.string().trim().min(2).max(12),
+  title: z.string().trim().min(5).max(120),
+  type: feedbackTypeSchema
+})
+
+export const createFeedbackSchema = feedbackBaseSchema.extend({
+  diagnosticReport: z.string().trim().max(20_000).optional(),
+  source: z.enum(['android', 'ios', 'website']).default('website'),
+  turnstileToken: z.string().trim().optional(),
+  website: z.string().trim().max(0).optional()
+}).superRefine((value, context) => {
+  if (value.type === 'bug' && value.source !== 'website' && !value.diagnosticReport)
+    context.addIssue({
+      code: 'custom',
+      message: 'Native bug reports require diagnostics.',
+      path: ['diagnosticReport']
+    })
+
+  if (value.type !== 'bug' && value.diagnosticReport)
+    context.addIssue({
+      code: 'custom',
+      message: 'Diagnostics are accepted only for bug reports.',
+      path: ['diagnosticReport']
+    })
+})
+
+export const updateFeedbackSchema = z.object({
+  isPublic: z.boolean().optional(),
+  moderationStatus: feedbackModerationStatusSchema.optional(),
+  status: feedbackStatusSchema.optional()
+}).refine(
+  value => value.isPublic !== undefined ||
+    value.moderationStatus !== undefined || value.status !== undefined, { error: 'At least one feedback update is required.' }
+)
+
+export const publicFeedbackItemSchema = z.object({
+  createdAt: z.string().trim(),
+  description: z.string().trim(),
+  hasVoted: z.boolean(),
+  id: z.string().trim(),
+  locale: z.string().trim(),
+  status: feedbackStatusSchema,
+  title: z.string().trim(),
+  updatedAt: z.string().trim(),
+  voteCount: z.int().nonnegative()
+})
+
+export const adminFeedbackItemSchema = publicFeedbackItemSchema.omit({
+  hasVoted: true
+}).extend({
+  diagnosticReport: z.string().trim().nullable(),
+  email: z.string().trim().nullable(),
+  isPublic: z.boolean(),
+  moderationStatus: feedbackModerationStatusSchema,
+  projectSlug: z.string().trim(),
+  source: z.enum(['android', 'ios', 'website']),
+  type: feedbackTypeSchema
+})
+
+export const feedbackProjectSchema = z.object({
+  displayName: z.string().trim(),
+  locales: z.array(z.string().trim()),
+  slug: z.string().trim(),
+  turnstileEnabled: z.boolean(),
+  turnstileSiteKey: z.string().trim().nullable()
+})
+
+export type AdminFeedbackItem = z.infer<typeof adminFeedbackItemSchema>
+export type CreateFeedbackInput = z.infer<typeof createFeedbackSchema>
+export type FeedbackProject = z.infer<typeof feedbackProjectSchema>
+export type FeedbackStatus = z.infer<typeof feedbackStatusSchema>
+export type FeedbackType = z.infer<typeof feedbackTypeSchema>
+export type PublicFeedbackItem = z.infer<typeof publicFeedbackItemSchema>
+export type UpdateFeedbackInput = z.infer<typeof updateFeedbackSchema>
+
 export const requestCodeSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email())
 })

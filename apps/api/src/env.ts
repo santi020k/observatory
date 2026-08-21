@@ -6,10 +6,13 @@ export interface Bindings {
   CORS_ORIGIN: string
   DB: D1Database
   ENVIRONMENT: 'development' | 'production' | 'test'
+  FEEDBACK_HASH_SECRET?: string
   GITHUB_TOKEN?: string
   MAIL_FROM: string
   OWNER_EMAIL: string
   SITE_URL: string
+  TURNSTILE_SECRET_KEY?: string
+  TURNSTILE_SITE_KEY?: string
   RESEND_API_KEY?: string
 }
 
