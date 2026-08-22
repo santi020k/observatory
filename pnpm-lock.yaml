@@ -76,8 +76,8 @@ catalogs:
       specifier: ^10.7.0
       version: 10.7.0
     hono:
-      specifier: ^4.12.32
-      version: 4.12.32
+      specifier: ^4.12.34
+      version: 4.13.3
     husky:
       specifier: ^9.1.7
       version: 9.1.7
@@ -178,7 +178,7 @@ importers:
         version: 13.3.2
       hono:
         specifier: 'catalog:'
-        version: 4.12.32
+        version: 4.13.3
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -4845,8 +4845,8 @@ packages:
   hastscript@9.0.1:
     resolution: {integrity: sha512-g7df9rMFX/SPi34tyGCyUBREQoKkapwdY/T04Qn9TDWfHhAYt4/I0gMVirzK5wEzeUqIjEB+LXC/ypb7Aqno5w==}
 
-  hono@4.12.32:
-    resolution: {integrity: sha512-XcuyW9qE2kJn07PkecMOBd5Vq/hMy7mmGw+idz1yblbg9N17ijJODrvPkn7/dwL3Kulj8LcRJ69DLOWf91dRUg==}
+  hono@4.13.3:
+    resolution: {integrity: sha512-r8AO2mYHoLxSHkgafNeC/BXyb2vWRxD3jem4Ts+ptav8oTG5FIRifAjuJEmZI4bSvvc2ns0GxmIYiZnHqN3mMw==}
     engines: {node: '>=16.9.0'}
 
   hosted-git-info@7.0.2:
@@ -12024,7 +12024,7 @@ snapshots:
       property-information: 7.2.0
       space-separated-tokens: 2.0.2
 
-  hono@4.12.32: {}
+  hono@4.13.3: {}
 
   hosted-git-info@7.0.2:
     dependencies:
