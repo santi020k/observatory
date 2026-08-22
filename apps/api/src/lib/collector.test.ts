@@ -74,9 +74,22 @@ afterEach(() => {
 
 describe('public project collection', () => {
   test('collects mapped GitHub release assets by download channel', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve(Response.json([
-      {
-        assets: [
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = requestUrl(input)
+      const assets = url.includes('/quality/') ?
+        [
+          {
+            download_count: 8,
+            id: 201,
+            name: 'quality-aarch64-apple-darwin.tar.gz'
+          },
+          {
+            download_count: 8,
+            id: 202,
+            name: 'quality-aarch64-apple-darwin.tar.gz.sha256'
+          }
+        ] :
+        [
           { download_count: 5, id: 101, name: 'Coolstead.dmg' },
           {
             download_count: 3,
@@ -84,10 +97,10 @@ describe('public project collection', () => {
             name: 'Coolstead-1.0.0.dmg'
           },
           { download_count: 12, id: 103, name: 'appcast.xml' }
-        ],
-        tag_name: 'v1.0.0'
-      }
-    ])))
+        ]
+
+      return Promise.resolve(Response.json([{ assets, tag_name: 'v1.0.0' }]))
+    })
 
     vi.stubGlobal('fetch', fetchMock)
 
@@ -113,10 +126,18 @@ describe('public project collection', () => {
         downloads: 3,
         releaseTag: 'v1.0.0',
         slug: 'coolstead-releases'
+      }),
+      expect.objectContaining({
+        assetId: '201',
+        assetName: 'quality-aarch64-apple-darwin.tar.gz',
+        channel: 'direct',
+        downloads: 8,
+        releaseTag: 'v1.0.0',
+        slug: 'quality'
       })
     ])
 
-    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   test('paginates discovery and excludes forks and retired repositories', async () => {

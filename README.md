@@ -4,6 +4,11 @@ Private project intelligence and portfolio operations for Santiago Molina. Obser
 repository, package, deployment, and product-feedback signals into one decision-focused control room.
 The dashboard is owner-only; narrowly scoped public feedback routes serve each product's branded UI.
 
+[Dashboard](https://observatory.santi020k.com) · [Architecture](docs/architecture.md) ·
+[Feedback platform](docs/feedback-platform.md) ·
+[Private-project model](docs/private-projects.md) ·
+[Visualization roadmap](docs/visualization-roadmap.md)
+
 ## What it measures
 
 - Every non-fork public repository under `santi020k`, discovered automatically
@@ -149,3 +154,8 @@ and production builds.
 - Pages use `noindex, nofollow, noarchive`.
 - Provider secrets stay in Worker bindings and never reach the browser.
 - Private-source routes and storage will remain separate from public collection.
+
+## License
+
+This is private, proprietary source code. No license is granted to use, copy, modify, or distribute
+it. See [LICENSE](LICENSE).

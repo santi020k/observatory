@@ -91,7 +91,7 @@ export interface VscodeExtensionWrite {
 export interface ReleaseAssetWrite {
   assetId: string
   assetName: string
-  channel: 'homebrew' | 'homebrew-or-update' | 'update' | 'website'
+  channel: 'direct' | 'homebrew' | 'homebrew-or-update' | 'update' | 'website'
   collectedAt: number
   downloads: number
   id: string

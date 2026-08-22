@@ -29,7 +29,6 @@ catalog:
   eslint: ^10.7.0
   hono: '^4.12.32'
   jsdom: ^27.4.0
-  husky: ^9.1.7
   prettier: ^3.9.5
   prettier-plugin-astro: ^0.14.1
   turbo: ^2.10.6

@@ -17,6 +17,27 @@ describe('project catalog', () => {
     )
   })
 
+  test('registers OG and Quality with their published surfaces', () => {
+    expect(getCatalogOverride('og')).toMatchObject({
+      category: 'library',
+      displayName: 'OG',
+      npmPackages: ['@santi020k/og']
+    })
+    expect(getCatalogOverride('quality')).toMatchObject({
+      category: 'tool',
+      displayName: 'Quality'
+    })
+
+    expect(getGithubReleaseSources()).toContainEqual({
+      assets: [{
+        assetNamePattern: '^quality-.*\\.(?:tar\\.gz|zip)$',
+        channel: 'direct'
+      }],
+      repository: 'quality',
+      slug: 'quality'
+    })
+  })
+
   test('maps the theme repository only to its published packages', () => {
     expect(getCatalogOverride('santi020k-theme')?.npmPackages).toEqual([
       '@santi020k/theme',

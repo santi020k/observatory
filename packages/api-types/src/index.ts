@@ -253,6 +253,7 @@ export const npmAnalyticsSchema = z.object({
 export const releaseDownloadChannelSchema = z.enum([
   'homebrew',
   'homebrew-or-update',
+  'direct',
   'update',
   'website'
 ])

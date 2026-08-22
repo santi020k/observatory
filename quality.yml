@@ -28,3 +28,15 @@ tasks:
     - verify
     required: true
     parser: generic
+hooks:
+  commit-msg:
+    steps:
+      - name: Validate commit message
+        command: pnpm
+        args: [exec, commitprompt, validate, --input]
+        pass_hook_args: true
+  pre-push:
+    steps:
+      - name: Run repository verification
+        command: pnpm
+        args: [run, pre-push]

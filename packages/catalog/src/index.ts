@@ -11,6 +11,7 @@ export interface CatalogOverride {
 
 export type ReleaseDownloadChannel = 'homebrew' |
   'homebrew-or-update' |
+  'direct' |
   'update' |
   'website'
 
@@ -130,6 +131,17 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
       ],
       status: 'active'
     },
+    og: {
+      category: 'library',
+      displayName: 'OG',
+      npmPackages: ['@santi020k/og'],
+      status: 'active'
+    },
+    quality: {
+      category: 'tool',
+      displayName: 'Quality',
+      status: 'active'
+    },
     'santi020k-theme': {
       category: 'library',
       displayName: 'Santi020k Theme',
@@ -168,6 +180,16 @@ const githubReleaseSources: readonly GithubReleaseSource[] = [
     ],
     repository: 'coolstead-releases',
     slug: 'coolstead-releases'
+  },
+  {
+    assets: [
+      {
+        assetNamePattern: '^quality-.*\\.(?:tar\\.gz|zip)$',
+        channel: 'direct'
+      }
+    ],
+    repository: 'quality',
+    slug: 'quality'
   }
 ]
 
