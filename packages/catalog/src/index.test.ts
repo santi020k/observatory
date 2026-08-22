@@ -5,6 +5,7 @@ import {
   getCatalogOverride,
   getFeedbackOrigins,
   getFeedbackProject,
+  getGithubReleaseSources,
   getVscodeExtensionMappings,
   titleFromSlug
 } from './index'
@@ -38,6 +39,23 @@ describe('project catalog', () => {
       extensionId: 'santi020k.vscode-astro-doctor',
       slug: 'astro-doctor'
     })
+  })
+
+  test('maps Coolstead release assets to observable download channels', () => {
+    const source = getGithubReleaseSources().find(
+      candidate => candidate.repository === 'coolstead-releases'
+    )
+
+    expect(source?.slug).toBe('coolstead-releases')
+    expect(source?.assets.map(asset => asset.channel)).toEqual([
+      'website',
+      'update',
+      'homebrew-or-update'
+    ])
+
+    expect(getCatalogOverride('coolstead-releases')?.displayName).toBe(
+      'Coolstead'
+    )
   })
 
   test('registers project-scoped feedback surfaces and their trusted origins', () => {

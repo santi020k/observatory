@@ -9,6 +9,22 @@ export interface CatalogOverride {
   vscodeExtensions?: readonly string[]
 }
 
+export type ReleaseDownloadChannel = 'homebrew' |
+  'homebrew-or-update' |
+  'update' |
+  'website'
+
+export interface GithubReleaseAssetMapping {
+  assetNamePattern: string
+  channel: ReleaseDownloadChannel
+}
+
+export interface GithubReleaseSource {
+  assets: readonly GithubReleaseAssetMapping[]
+  repository: string
+  slug: string
+}
+
 export interface FeedbackProject {
   allowedOrigins: readonly string[]
   displayName: string
@@ -74,6 +90,11 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
       status: 'active',
       vscodeExtensions: ['santi020k.vscode-astro-doctor']
     },
+    'coolstead-releases': {
+      category: 'app',
+      displayName: 'Coolstead',
+      status: 'active'
+    },
     'dep-beacon': {
       category: 'tool',
       displayName: 'Dep Beacon',
@@ -128,6 +149,29 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
     }
   } satisfies Record<string, CatalogOverride>)
 )
+
+const githubReleaseSources: readonly GithubReleaseSource[] = [
+  {
+    assets: [
+      {
+        assetNamePattern: '^Coolstead\\.dmg$',
+        channel: 'website'
+      },
+      {
+        assetNamePattern: '^Coolstead-[0-9].*-sparkle\\.dmg$',
+        channel: 'update'
+      },
+      {
+        assetNamePattern: '^Coolstead-[0-9].*\\.dmg$',
+        channel: 'homebrew-or-update'
+      }
+    ],
+    repository: 'coolstead-releases',
+    slug: 'coolstead-releases'
+  }
+]
+
+export const getGithubReleaseSources = (): readonly GithubReleaseSource[] => githubReleaseSources
 
 export const getCatalogOverride = (
   repository: string

@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "santi-observatory-web",
+  "main": "@astrojs/cloudflare/entrypoints/server",
+  "compatibility_date": "2026-07-24",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "routes": [
+    {
+      "pattern": "observatory.santi020k.com",
+      "custom_domain": true,
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+}

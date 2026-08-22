@@ -1,6 +1,7 @@
 import {
   getCanonicalProjectSlug,
   getCatalogOverride,
+  getGithubReleaseSources,
   getVscodeExtensionMappings,
   githubOwner,
   type ProjectCategory,
@@ -13,9 +14,11 @@ import {
   getLatestNpmDownloadDates,
   getNpmDownloadsSince,
   getWebsiteAnalyticsSince,
+  insertReleaseAssetSnapshots,
   insertSnapshots,
   insertVscodeExtensionSnapshots,
   type NpmDownloadWrite,
+  type ReleaseAssetWrite,
   type SnapshotWrite,
   startSyncRun,
   upsertNpmDownloads,
@@ -41,6 +44,17 @@ interface GithubRepository {
 
 interface GithubTraffic {
   count: number
+}
+
+interface GithubRelease {
+  assets: GithubReleaseAsset[]
+  tag_name: string
+}
+
+interface GithubReleaseAsset {
+  download_count: number
+  id: number
+  name: string
 }
 
 interface PackageMetrics {
@@ -416,6 +430,53 @@ const collectGithubRepositories = async (
     getCanonicalProjectSlug(repository.name) === repository.name)
 }
 
+const collectGithubReleaseAssets = async (
+  collectedAt: number,
+  syncRunId: string,
+  token?: string
+): Promise<ReleaseAssetWrite[]> => {
+  const snapshots: ReleaseAssetWrite[] = []
+
+  for (const source of getGithubReleaseSources()) {
+    let page = 1
+    let releases: GithubRelease[]
+
+    do {
+      releases = await fetchJson<GithubRelease[]>(
+        `https://api.github.com/repos/${githubOwner}/${source.repository}/releases?per_page=100&page=${page}`,
+        githubHeaders(token)
+      )
+
+      snapshots.push(
+        ...releases.flatMap(release => release.assets.flatMap(asset => {
+          const mapping = source.assets.find(candidate => new RegExp(
+            candidate.assetNamePattern
+          ).test(asset.name))
+
+          if (!mapping) return []
+
+          return [{
+            assetId: String(asset.id),
+            assetName: asset.name,
+            channel: mapping.channel,
+            collectedAt,
+            downloads: asset.download_count,
+            id: crypto.randomUUID(),
+            releaseTag: release.tag_name,
+            repository: source.repository,
+            slug: source.slug,
+            syncRunId
+          }]
+        }))
+      )
+
+      page += 1
+    } while (releases.length === 100)
+  }
+
+  return snapshots
+}
+
 const collectTraffic = async (
   repository: string,
   metric: 'clones' | 'views',
@@ -766,6 +827,7 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
       latestNpmDownloadDates,
       cachedNpmDownloads,
       authorPackages,
+      releaseAssets,
       vscodeExtensions,
       openVsxExtensions
     ] = await Promise.all([
@@ -778,6 +840,7 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
         database, startedAt - relevanceWindowMilliseconds
       ),
       collectAuthorPackages(),
+      collectGithubReleaseAssets(startedAt, runId, env.GITHUB_TOKEN),
       collectVscodeExtensions(startedAt, runId),
       collectOpenVsxExtensions(startedAt, runId)
     ])
@@ -881,6 +944,8 @@ export const syncProjects = async (env: Bindings): Promise<number> => {
       database, [...vscodeExtensions, ...openVsxExtensions]
     )
 
+    await insertReleaseAssetSnapshots(database, releaseAssets)
+
     await completeSyncRun(database, runId, {
       completedAt: Date.now(),
       projectCount: snapshots.length,
@@ -905,6 +970,7 @@ export const collectorInternals = {
   checkWebsite,
   collectAuthorPackages,
   collectGithubRepositories,
+  collectGithubReleaseAssets,
   collectOpenVsxExtensions,
   collectPackageMetrics,
   collectVscodeExtensions,

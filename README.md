@@ -8,13 +8,15 @@ The dashboard is owner-only; narrowly scoped public feedback routes serve each p
 
 - Every non-fork public repository under `santi020k`, discovered automatically
 - GitHub stars, forks, open issues, recency, and repository traffic when `GITHUB_TOKEN` is set
+- GitHub release-asset downloads, channel totals, and cumulative growth for mapped products
 - Exact daily npm downloads, calendar rollups, and rankings across every
   package maintained by `santi020k`, plus current versions for mapped products
 - VS Code Marketplace downloads, current installs, versions, ratings, updates,
   and per-sync history for mapped extensions
 - Open VSX downloads, versions, ratings, reviews, publish times, and per-sync
   history, kept separate from Microsoft Marketplace counters
-- Published website availability and response time
+- Published website availability, p50/p95 response time, consecutive
+  failures, and outage/recovery observations
 - Cloudflare Web Analytics page views and visits, grouped hourly by project website
 - Attention signals for degraded, stale, or issue-heavy projects
 - Project-scoped public feedback, moderation, voting, and private delivery kanbans
@@ -26,6 +28,9 @@ persist new or recently revised npm days without rewriting the full history.
 VS Code Marketplace values are cumulative provider counters, so Observatory
 stores one source-specific snapshot per extension on every project sync.
 The same mapped extensions are queried independently from Open VSX.
+Mapped GitHub release assets are also stored as cumulative snapshots. Coolstead
+keeps direct website downloads separate while its current versioned asset is
+reported as the combined Homebrew-or-update channel.
 
 The private projects section is specified but not connected. See
 [`docs/private-projects.md`](docs/private-projects.md).
@@ -67,32 +72,43 @@ traffic metrics.
 
 ## Production configuration
 
-Create the D1 database and replace the placeholder `database_id` in
-`apps/api/wrangler.jsonc`:
+Production deploys run automatically after every push to `main`. GitHub Actions reads the
+`/apps/api` and `/apps/web` paths from Infisical's `prod` environment, applies pending D1
+migrations, deploys the API Worker, and then deploys the web Worker. The public entry point is
+`https://observatory.santi020k.com`; the API Worker is available at
+`https://api.observatory.santi020k.com`.
+
+The workflow stores only a read-only, production-scoped `INFISICAL_TOKEN` bootstrap credential in
+the GitHub `production` environment. Application and Cloudflare credentials remain in Infisical.
+Deployments are serialized so a newer push cannot interrupt a database migration or partially
+replace a release.
+
+Keep `CLOUDFLARE_API_TOKEN` scoped to runtime analytics reads. CI uses the separate
+`CLOUDFLARE_DEPLOY_API_TOKEN`, which needs Workers Scripts, Workers KV, and D1 edit permissions for
+the Observatory account. Routes are provisioned separately; CI publishes and promotes immutable
+Worker versions so routine deployments do not require zone-level route access.
+
+The production D1 binding is declared in `apps/api/wrangler.jsonc`. Apply migrations manually when
+needed with Infisical providing the Cloudflare credentials:
 
 ```bash
-pnpm --filter @santi020k/observatory-api exec wrangler d1 create observatory
-pnpm --filter @santi020k/observatory-api run db:migrate:remote
+infisical run --env=prod --path=/apps/api -- pnpm db:migrate:remote
 ```
 
-Set Worker secrets directly:
+For emergency manual deployment, inject the same production secrets and use the workspace scripts:
 
 ```bash
-pnpm --filter @santi020k/observatory-api exec wrangler secret put AUTH_SECRET
-pnpm --filter @santi020k/observatory-api exec wrangler secret put CLOUDFLARE_ACCOUNT_ID
-pnpm --filter @santi020k/observatory-api exec wrangler secret put CLOUDFLARE_API_TOKEN
-pnpm --filter @santi020k/observatory-api exec wrangler secret put OWNER_EMAIL
-pnpm --filter @santi020k/observatory-api exec wrangler secret put RESEND_API_KEY
-pnpm --filter @santi020k/observatory-api exec wrangler secret put MAIL_FROM
-pnpm --filter @santi020k/observatory-api exec wrangler secret put GITHUB_TOKEN
-pnpm --filter @santi020k/observatory-api exec wrangler secret put FEEDBACK_HASH_SECRET
-pnpm --filter @santi020k/observatory-api exec wrangler secret put TURNSTILE_SITE_KEY
-pnpm --filter @santi020k/observatory-api exec wrangler secret put TURNSTILE_SECRET_KEY
+infisical run --env=prod --path=/apps/api -- pnpm --filter @santi020k/observatory-api run deploy
+infisical run --env=prod --path=/apps/web -- pnpm --filter @santi020k/observatory-web build
+infisical run --env=prod --path=/apps/api -- pnpm --filter @santi020k/observatory-web run deploy
 ```
 
-Set `CORS_ORIGIN` to the dashboard origin. Route `/api/*` to the API Worker and configure the web
-app with `PUBLIC_API_URL=/api`; use the Worker URL for `API_INTERNAL_URL` if server-side requests
-cannot follow the public route.
+Set `CORS_ORIGIN` to the dashboard origin. Configure the web app with
+`PUBLIC_API_URL=https://api.observatory.santi020k.com`; use the same URL for `API_INTERNAL_URL` so
+server-side requests reach the API directly.
+
+Version tags matching `v*` are verified before GitHub publishes their release. Generated release
+notes are grouped by feature, fix, and maintenance labels using `.github/release.yml`.
 
 The Worker also owns the specific product routes
 `postlens.santi020k.com/api/feedback/*` and

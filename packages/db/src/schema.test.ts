@@ -12,6 +12,7 @@ import {
   passkeyCredentials,
   projectPreferences,
   projectSnapshots,
+  releaseAssetSnapshots,
   sessions,
   syncRuns,
   vscodeExtensionSnapshots,
@@ -25,6 +26,10 @@ describe('observatory database schema', () => {
     expect(getTableName(sessions)).toBe('sessions')
 
     expect(getTableName(projectSnapshots)).toBe('project_snapshots')
+
+    expect(getTableName(releaseAssetSnapshots)).toBe(
+      'release_asset_snapshots'
+    )
 
     expect(getTableName(npmDownloadSnapshots)).toBe('npm_download_snapshots')
 
@@ -57,6 +62,12 @@ describe('observatory database schema', () => {
     expect(vscodeExtensionSnapshots.provider.name).toBe('provider')
 
     expect(vscodeExtensionSnapshots.syncRunId.name).toBe('sync_run_id')
+  })
+
+  test('stores cumulative release downloads with channel identity', () => {
+    expect(releaseAssetSnapshots.assetId.name).toBe('asset_id')
+    expect(releaseAssetSnapshots.channel.name).toBe('channel')
+    expect(releaseAssetSnapshots.syncRunId.name).toBe('sync_run_id')
   })
 
   test('stores visibility on every project snapshot', () => {

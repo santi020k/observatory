@@ -73,6 +73,52 @@ afterEach(() => {
 })
 
 describe('public project collection', () => {
+  test('collects mapped GitHub release assets by download channel', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(Response.json([
+      {
+        assets: [
+          { download_count: 5, id: 101, name: 'Coolstead.dmg' },
+          {
+            download_count: 3,
+            id: 102,
+            name: 'Coolstead-1.0.0.dmg'
+          },
+          { download_count: 12, id: 103, name: 'appcast.xml' }
+        ],
+        tag_name: 'v1.0.0'
+      }
+    ])))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      collectorInternals.collectGithubReleaseAssets(
+        Date.parse('2026-08-21T12:00:00.000Z'),
+        'sync-run',
+        'github-token'
+      )
+    ).resolves.toEqual([
+      expect.objectContaining({
+        assetId: '101',
+        assetName: 'Coolstead.dmg',
+        channel: 'website',
+        downloads: 5,
+        releaseTag: 'v1.0.0',
+        slug: 'coolstead-releases'
+      }),
+      expect.objectContaining({
+        assetId: '102',
+        assetName: 'Coolstead-1.0.0.dmg',
+        channel: 'homebrew-or-update',
+        downloads: 3,
+        releaseTag: 'v1.0.0',
+        slug: 'coolstead-releases'
+      })
+    ])
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
   test('paginates discovery and excludes forks and retired repositories', async () => {
     const firstPage = Array.from({ length: 100 }, (_, index) => repository(`project-${index}`, index === 0))
 

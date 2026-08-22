@@ -1,7 +1,14 @@
 ---
 import Card from '@santi020k/lumen-astro/components/Card'
 import Icon from '@santi020k/lumen-astro/components/Icon'
+import Sparkline from '@santi020k/lumen-astro/components/Sparkline'
 import Stat from '@santi020k/lumen-astro/components/Stat'
+
+interface Trend {
+  label: string
+  tone?: 'accent' | 'brand' | 'danger' | 'neutral' | 'success' | 'warning'
+  values: readonly number[]
+}
 
 interface Props {
   context: string
@@ -18,14 +25,31 @@ interface Props {
     'star' |
     'users'
   label: string
+  trend?: Trend
   value: string
 }
 
-const { context, icon, label, value } = Astro.props
+const { context, icon, label, trend, value } = Astro.props
+const showTrend = trend && trend.values.length >= 2
 ---
 
 <Card class="metric-card">
-  <span class="metric-card__icon"><Icon aria-hidden="true" name={icon} /></span>
+  <div class="metric-card__top">
+    <span class="metric-card__icon">
+      <Icon aria-hidden="true" name={icon} />
+    </span>
+    {
+      showTrend && (
+        <Sparkline
+          area
+          class="metric-card__sparkline"
+          label={trend.label}
+          tone={trend.tone}
+          values={trend.values}
+        />
+      )
+    }
+  </div>
   <Stat label={label} value={value}>
     <p>{context}</p>
   </Stat>

@@ -1,0 +1,126 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Verify and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://observatory.santi020k.com
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Infisical CLI
+        run: npm install --global @infisical/cli@0.43.124
+
+      - name: Validate deployment credentials
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: >-
+          infisical run --env=prod --path=/apps/api --
+          sh -c 'test -n "$CLOUDFLARE_DEPLOY_API_TOKEN"
+          || { echo "::error::CLOUDFLARE_DEPLOY_API_TOKEN is missing in Infisical"; exit 1; }'
+
+      - name: Load production secrets and verify
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: >-
+          infisical run --env=prod --path=/apps/api --
+          infisical run --env=prod --path=/apps/web --
+          pnpm verify
+
+      - name: Apply database migrations
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: >-
+          infisical run --env=prod --path=/apps/api --
+          sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN"
+          pnpm --filter @santi020k/observatory-api run db:migrate:remote'
+
+      - name: Deploy API Worker
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: |
+          infisical run --silent --env=prod --path=/apps/api -- \
+            node --input-type=module -e '
+              const names = [
+                "AUTH_SECRET",
+                "CLOUDFLARE_ACCOUNT_ID",
+                "CLOUDFLARE_API_TOKEN",
+                "CORS_ORIGIN",
+                "FEEDBACK_HASH_SECRET",
+                "GITHUB_TOKEN",
+                "MAIL_FROM",
+                "OWNER_EMAIL",
+                "OWNER_PASSCODE",
+                "SITE_URL"
+              ]
+              const missing = names.filter(name => !process.env[name])
+
+              if (missing.length > 0)
+                throw new Error("Missing production secrets: " + missing.join(", "))
+
+              process.stdout.write(JSON.stringify(Object.fromEntries(
+                names.map(name => [name, process.env[name]])
+              )))
+            ' | infisical run --silent --env=prod --path=/apps/api -- \
+              sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+                pnpm --filter @santi020k/observatory-api exec wrangler secret bulk'
+          infisical run --env=prod --path=/apps/api -- sh -c '
+            set -eu
+            version_tag="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+              pnpm --filter @santi020k/observatory-api exec wrangler versions upload \
+                --tag "$version_tag" --message "GitHub $GITHUB_SHA"
+            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+              pnpm --filter @santi020k/observatory-api exec wrangler versions deploy \
+                --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"
+            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+              pnpm --filter @santi020k/observatory-api exec wrangler triggers deploy
+          '
+
+      - name: Deploy web Worker
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: >-
+          infisical run --env=prod --path=/apps/api --
+          infisical run --env=prod --path=/apps/web --
+          sh -c '
+            set -eu
+            pnpm --filter @santi020k/observatory-web build
+            version_tag="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+              pnpm --filter @santi020k/observatory-web exec wrangler versions upload \
+                --tag "$version_tag" --message "GitHub $GITHUB_SHA"
+            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+              pnpm --filter @santi020k/observatory-web exec wrangler versions deploy \
+                --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"
+            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+              pnpm --filter @santi020k/observatory-web exec wrangler triggers deploy
+          '

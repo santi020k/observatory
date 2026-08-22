@@ -12,6 +12,7 @@ import {
   passkeyCredentials,
   projectPreferences,
   projectSnapshots,
+  releaseAssetSnapshots,
   sessions,
   syncRuns,
   vscodeExtensionSnapshots,
@@ -85,6 +86,19 @@ export interface VscodeExtensionWrite {
   syncRunId: string
   updateCount: number
   version: string
+}
+
+export interface ReleaseAssetWrite {
+  assetId: string
+  assetName: string
+  channel: 'homebrew' | 'homebrew-or-update' | 'update' | 'website'
+  collectedAt: number
+  downloads: number
+  id: string
+  releaseTag: string
+  repository: string
+  slug: string
+  syncRunId: string
 }
 
 export interface ProjectPreferenceWrite {
@@ -651,6 +665,23 @@ export const getVscodeExtensionSnapshotsSince = async (
   .from(vscodeExtensionSnapshots)
   .where(gte(vscodeExtensionSnapshots.collectedAt, since))
   .orderBy(vscodeExtensionSnapshots.collectedAt)
+
+export const insertReleaseAssetSnapshots = async (
+  db: ObservatoryDb,
+  snapshots: readonly ReleaseAssetWrite[]
+): Promise<void> => {
+  for (const snapshot of snapshots)
+    await db.insert(releaseAssetSnapshots).values(snapshot)
+}
+
+export const getReleaseAssetSnapshotsSince = async (
+  db: ObservatoryDb,
+  since: number
+) => db
+  .select()
+  .from(releaseAssetSnapshots)
+  .where(gte(releaseAssetSnapshots.collectedAt, since))
+  .orderBy(releaseAssetSnapshots.collectedAt)
 
 export const getSnapshotsForSyncRun = async (
   db: ObservatoryDb,

@@ -155,6 +155,29 @@ export const vscodeExtensionSnapshots = sqliteTable(
   ]
 )
 
+export const releaseAssetSnapshots = sqliteTable(
+  'release_asset_snapshots', {
+    assetId: text('asset_id').notNull(),
+    assetName: text('asset_name').notNull(),
+    channel: text('channel').notNull(),
+    collectedAt: integer('collected_at').notNull(),
+    downloads: integer('downloads').notNull().default(0),
+    id: text('id').primaryKey(),
+    releaseTag: text('release_tag').notNull(),
+    repository: text('repository').notNull(),
+    slug: text('slug').notNull(),
+    syncRunId: text('sync_run_id').references(() => syncRuns.id)
+  }, table => [
+    index('release_asset_snapshots_collected_idx').on(table.collectedAt),
+    index('release_asset_snapshots_slug_collected_idx').on(
+      table.slug, table.collectedAt
+    ),
+    uniqueIndex('release_asset_snapshots_asset_run_idx').on(
+      table.repository, table.assetId, table.syncRunId
+    )
+  ]
+)
+
 export const projectPreferences = sqliteTable('project_preferences', {
   attentionMode: text('attention_mode').notNull().default('all'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),

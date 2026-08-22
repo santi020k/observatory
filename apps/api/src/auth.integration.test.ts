@@ -121,9 +121,13 @@ describe('owner authentication flow', () => {
 
     expect(mocks.insertSession).toHaveBeenCalledOnce()
 
-    expect(response.headers.get('set-cookie')).toMatch(
-      /^__Host-observatory_session=.*HttpOnly.*Secure.*SameSite=Lax/
-    )
+    const sessionCookie = response.headers.get('set-cookie')
+
+    expect(sessionCookie).toContain('__Secure-observatory_session=')
+    expect(sessionCookie).toContain('Domain=observatory.example')
+    expect(sessionCookie).toContain('HttpOnly')
+    expect(sessionCookie).toContain('Secure')
+    expect(sessionCookie).toContain('SameSite=Lax')
   })
 
   test('accepts the server-only recovery code without returning it', async () => {

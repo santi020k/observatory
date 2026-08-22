@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getNpmDownloadsSince: vi.fn(),
   getProjectPreferences: vi.fn(),
   getPublicSnapshotsSince: vi.fn(),
+  getReleaseAssetSnapshotsSince: vi.fn(),
   getSnapshotsForSyncRun: vi.fn(),
   getVscodeExtensionSnapshotsSince: vi.fn()
 }))
@@ -26,6 +27,7 @@ vi.mock('@santi020k/observatory-db', async importOriginal => ({
   getNpmDownloadsSince: mocks.getNpmDownloadsSince,
   getProjectPreferences: mocks.getProjectPreferences,
   getPublicSnapshotsSince: mocks.getPublicSnapshotsSince,
+  getReleaseAssetSnapshotsSince: mocks.getReleaseAssetSnapshotsSince,
   getSnapshotsForSyncRun: mocks.getSnapshotsForSyncRun,
   getVscodeExtensionSnapshotsSince: mocks.getVscodeExtensionSnapshotsSince
 }))
@@ -36,6 +38,8 @@ const {
   buildNpmAnalytics,
   buildProjectDashboard,
   buildProjectSettings,
+  buildOperationalHealth,
+  buildReleaseAnalytics,
   buildVscodeAnalytics
 } = await import('./dashboard')
 
@@ -96,12 +100,127 @@ beforeEach(() => {
 
   mocks.getNpmDownloadsSince.mockResolvedValue([])
 
+  mocks.getReleaseAssetSnapshotsSince.mockResolvedValue([])
+
   mocks.getVscodeExtensionSnapshotsSince.mockResolvedValue([])
 
   mocks.buildWebsiteAnalytics.mockResolvedValue({
     generatedAt: new Date(0).toISOString(),
     range: '30d',
     sites: []
+  })
+})
+
+describe('GitHub release download analytics', () => {
+  test('keeps channels separate and derives cumulative growth', () => {
+    const firstCollection = Date.UTC(2026, 7, 20)
+    const secondCollection = Date.UTC(2026, 7, 21)
+
+    const row = (
+      assetId: string,
+      assetName: string,
+      channel: string,
+      collectedAt: number,
+      downloads: number
+    ) => ({
+      assetId,
+      assetName,
+      channel,
+      collectedAt,
+      downloads,
+      id: `${assetId}-${collectedAt}`,
+      releaseTag: 'v1.0.0',
+      repository: 'coolstead-releases',
+      slug: 'coolstead-releases',
+      syncRunId: `sync-${collectedAt}`
+    })
+
+    const analytics = buildReleaseAnalytics([
+      row('website', 'Coolstead.dmg', 'website', firstCollection, 5),
+      row(
+        'versioned',
+        'Coolstead-1.0.0.dmg',
+        'homebrew-or-update',
+        firstCollection,
+        3
+      ),
+      row('website', 'Coolstead.dmg', 'website', secondCollection, 7),
+      row(
+        'versioned',
+        'Coolstead-1.0.0.dmg',
+        'homebrew-or-update',
+        secondCollection,
+        4
+      )
+    ])
+
+    expect(analytics).toMatchObject({
+      channels: [
+        { channel: 'website', downloads: 7 },
+        { channel: 'homebrew-or-update', downloads: 4 }
+      ],
+      downloadsGained: 3,
+      totalDownloads: 11
+    })
+    expect(analytics.history).toEqual([
+      {
+        collectedAt: new Date(firstCollection).toISOString(),
+        downloads: 8
+      },
+      {
+        collectedAt: new Date(secondCollection).toISOString(),
+        downloads: 11
+      }
+    ])
+  })
+})
+
+describe('operational health analytics', () => {
+  test('derives availability, latency percentiles, and incident transitions', () => {
+    const times = [1_000, 2_000, 3_000, 4_000]
+    const statuses = ['healthy', 'degraded', 'healthy', 'healthy'] as const
+    const responseTimes = [100, 500, 200, 300]
+    const rows = times.map((collectedAt, index) => ({
+      ...websiteSnapshot,
+      collectedAt,
+      healthStatus: statuses[index] ?? 'healthy',
+      id: `health-${collectedAt}`,
+      responseTimeMs: responseTimes[index] ?? null
+    }))
+
+    expect(buildOperationalHealth(rows, 'website')).toMatchObject({
+      availabilityPercent: 75,
+      availabilityTarget: 99.9,
+      consecutiveFailures: 0,
+      currentStatus: 'healthy',
+      failedChecks: 1,
+      healthyChecks: 3,
+      lastCheckedAt: new Date(4_000).toISOString(),
+      lastOutageStartedAt: new Date(2_000).toISOString(),
+      lastRecoveredAt: new Date(3_000).toISOString(),
+      latencyP50Ms: 200,
+      latencyP95Ms: 500,
+      meetsTarget: false,
+      observations: 4,
+      slug: 'website'
+    })
+  })
+
+  test('reports an active outage and excludes unknown checks', () => {
+    const rows = [
+      { ...websiteSnapshot, collectedAt: 1_000, healthStatus: 'unknown' },
+      { ...websiteSnapshot, collectedAt: 2_000, healthStatus: 'degraded' },
+      { ...websiteSnapshot, collectedAt: 3_000, healthStatus: 'degraded' }
+    ]
+
+    expect(buildOperationalHealth(rows, 'website')).toMatchObject({
+      availabilityPercent: 0,
+      consecutiveFailures: 2,
+      currentStatus: 'degraded',
+      lastOutageStartedAt: new Date(2_000).toISOString(),
+      lastRecoveredAt: null,
+      observations: 2
+    })
   })
 })
 
@@ -174,10 +293,12 @@ describe('npm download analytics', () => {
     ])
 
     expect(analytics.totalDownloads).toBe(100)
-    expect(analytics.daily).toEqual([{
-      downloads: 100,
-      periodStart: '2026-07-29T00:00:00.000Z'
-    }])
+    expect(analytics.daily).toEqual([
+      {
+        downloads: 100,
+        periodStart: '2026-07-29T00:00:00.000Z'
+      }
+    ])
     expect(analytics.packages).toHaveLength(3)
   })
 })
@@ -271,10 +392,12 @@ describe('VS Code Marketplace analytics', () => {
     ])
 
     expect(analytics).toMatchObject({
-      extensions: [{
-        downloads: 1_280,
-        extensionId: 'santi020k.vscode-astro-doctor'
-      }],
+      extensions: [
+        {
+          downloads: 1_280,
+          extensionId: 'santi020k.vscode-astro-doctor'
+        }
+      ],
       totalDownloads: 1_280
     })
   })
@@ -414,14 +537,15 @@ describe('dashboard snapshot selection', () => {
   test('hides a retired repository after it is merged into another project', async () => {
     mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
     mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
-    mocks.getSnapshotsForSyncRun.mockResolvedValue([{
-      ...websiteSnapshot,
-      id: 'retired-theme',
-      name: 'Santi020k Chrome Theme',
-      repositoryUrl:
-        'https://github.com/santi020k/santi020k-chrome-theme',
-      slug: 'santi020k-chrome-theme'
-    }])
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([
+      {
+        ...websiteSnapshot,
+        id: 'retired-theme',
+        name: 'Santi020k Chrome Theme',
+        repositoryUrl: 'https://github.com/santi020k/santi020k-chrome-theme',
+        slug: 'santi020k-chrome-theme'
+      }
+    ])
 
     const dashboard = await buildDashboard(environment)
 
@@ -446,7 +570,8 @@ describe('dashboard snapshot selection', () => {
     const dashboard = await buildDashboard(environment)
 
     expect(mocks.getSnapshotsForSyncRun).toHaveBeenCalledWith(
-      expect.anything(), 'successful-run'
+      expect.anything(),
+      'successful-run'
     )
 
     expect(dashboard.sync).toEqual({
@@ -467,23 +592,33 @@ describe('dashboard snapshot selection', () => {
     await buildDashboard(environment, '30d')
 
     expect(mocks.getPublicSnapshotsSince).toHaveBeenNthCalledWith(
-      1, expect.anything(), now - 5 * 24 * 60 * 60 * 1_000
+      1,
+      expect.anything(),
+      now - 5 * 24 * 60 * 60 * 1_000
     )
 
     expect(mocks.getPublicSnapshotsSince).toHaveBeenNthCalledWith(
-      2, expect.anything(), now - 30 * 24 * 60 * 60 * 1_000
+      2,
+      expect.anything(),
+      now - 30 * 24 * 60 * 60 * 1_000
     )
 
     expect(mocks.getNpmDownloadsSince).toHaveBeenNthCalledWith(
-      1, expect.anything(), todayStart - 5 * 24 * 60 * 60 * 1_000
+      1,
+      expect.anything(),
+      todayStart - 5 * 24 * 60 * 60 * 1_000
     )
 
     expect(mocks.getNpmDownloadsSince).toHaveBeenNthCalledWith(
-      2, expect.anything(), todayStart - 30 * 24 * 60 * 60 * 1_000
+      2,
+      expect.anything(),
+      todayStart - 30 * 24 * 60 * 60 * 1_000
     )
 
     expect(mocks.getVscodeExtensionSnapshotsSince).toHaveBeenNthCalledWith(
-      1, expect.anything(), now - 5 * 24 * 60 * 60 * 1_000
+      1,
+      expect.anything(),
+      now - 5 * 24 * 60 * 60 * 1_000
     )
 
     dateSpy.mockRestore()
@@ -537,6 +672,37 @@ describe('dashboard snapshot selection', () => {
       starsGained: 3,
       syncs: 3
     })
+
+    expect(dashboard.growth).toEqual([
+      expect.objectContaining({
+        downloadVelocityChange: 20,
+        downloadVelocityPercent: 200,
+        npmDownloads30dTrend: [10, 20, 30],
+        observations: 3,
+        signal: 'accelerating',
+        slug: 'website',
+        starsGained: 3
+      })
+    ])
+  })
+
+  test('reports sparse project growth honestly', async () => {
+    mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([websiteSnapshot])
+    mocks.getPublicSnapshotsSince.mockResolvedValue([websiteSnapshot])
+
+    const dashboard = await buildDashboard(environment, '30d')
+
+    expect(dashboard.growth).toEqual([
+      expect.objectContaining({
+        downloadVelocityPercent: null,
+        npmDownloads30dTrend: [0],
+        observations: 1,
+        signal: 'insufficient',
+        slug: 'website'
+      })
+    ])
   })
 
   test('does not let long-range chart buckets erase real growth', async () => {
@@ -574,6 +740,31 @@ describe('dashboard snapshot selection', () => {
       starsGained: 3,
       syncs: 2
     })
+
+    expect(dashboard.growth[0]?.npmDownloads30dTrend).toEqual([10, 30])
+  })
+
+  test('caps project growth trends while preserving their endpoints', async () => {
+    const snapshots = Array.from({ length: 30 }, (_, index) => ({
+      ...websiteSnapshot,
+      collectedAt: Date.UTC(2026, 6, index + 1),
+      id: `snapshot-${index}`,
+      npmDownloads30d: index * 10
+    }))
+
+    mocks.getLatestSyncRun.mockResolvedValue(successfulSync)
+    mocks.getLatestSuccessfulSyncRun.mockResolvedValue(successfulSync)
+    mocks.getSnapshotsForSyncRun.mockResolvedValue([
+      snapshots[snapshots.length - 1]
+    ])
+    mocks.getPublicSnapshotsSince.mockResolvedValue(snapshots)
+
+    const dashboard = await buildDashboard(environment, '5y')
+    const trend = dashboard.growth[0]?.npmDownloads30dTrend
+
+    expect(trend).toHaveLength(24)
+    expect(trend?.[0]).toBe(0)
+    expect(trend?.[23]).toBe(290)
   })
 
   test('uses weekly chart buckets for the 90-day range', async () => {
@@ -632,6 +823,12 @@ describe('dashboard snapshot selection', () => {
         }
       ],
       totalDownloads: 42
+    })
+
+    expect(dashboard?.growth).toMatchObject({
+      observations: 0,
+      signal: 'insufficient',
+      slug: 'website'
     })
   })
 })

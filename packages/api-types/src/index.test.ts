@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest'
 import {
   analyticsRangeSchema,
   createFeedbackSchema,
+  dashboardSchema,
   projectDashboardSchema,
   recoveryLoginSchema,
   requestCodeSchema,
@@ -22,36 +23,56 @@ describe('analytics range contracts', () => {
 
   test('includes range-owned npm analytics on project dashboards', () => {
     expect(projectDashboardSchema.shape.npmAnalytics).toBeDefined()
+    expect(projectDashboardSchema.shape.growth).toBeDefined()
+    expect(projectDashboardSchema.shape.releaseAnalytics).toBeDefined()
+    expect(projectDashboardSchema.shape.operationalHealth).toBeDefined()
+  })
+
+  test('exposes explainable per-project growth signals', () => {
+    const growthShape = dashboardSchema.shape.growth.element.shape
+
+    expect(growthShape.downloadVelocityChange).toBeDefined()
+    expect(growthShape.npmDownloads30dTrend).toBeDefined()
+    expect(growthShape.observations).toBeDefined()
+    expect(growthShape.signal).toBeDefined()
+    expect(growthShape.slug).toBeDefined()
+    expect(growthShape.starsGained).toBeDefined()
   })
 })
 
 describe('feedback contracts', () => {
   test('accepts website ideas and native diagnostic bug reports', () => {
-    expect(createFeedbackSchema.safeParse({
-      description: 'A detailed idea for the product roadmap.',
-      locale: 'en',
-      title: 'Add a calmer reminder',
-      type: 'idea'
-    }).success).toBe(true)
+    expect(
+      createFeedbackSchema.safeParse({
+        description: 'A detailed idea for the product roadmap.',
+        locale: 'en',
+        title: 'Add a calmer reminder',
+        type: 'idea'
+      }).success
+    ).toBe(true)
 
-    expect(createFeedbackSchema.safeParse({
-      description: 'The editor closes after choosing a photo.',
-      diagnosticReport: 'device=iPhone; build=1',
-      locale: 'en',
-      source: 'ios',
-      title: 'Editor closes unexpectedly',
-      type: 'bug'
-    }).success).toBe(true)
+    expect(
+      createFeedbackSchema.safeParse({
+        description: 'The editor closes after choosing a photo.',
+        diagnosticReport: 'device=iPhone; build=1',
+        locale: 'en',
+        source: 'ios',
+        title: 'Editor closes unexpectedly',
+        type: 'bug'
+      }).success
+    ).toBe(true)
   })
 
   test('rejects diagnostics attached to public ideas', () => {
-    expect(createFeedbackSchema.safeParse({
-      description: 'A detailed idea for the product roadmap.',
-      diagnosticReport: 'private diagnostic data',
-      locale: 'en',
-      title: 'Add a calmer reminder',
-      type: 'idea'
-    }).success).toBe(false)
+    expect(
+      createFeedbackSchema.safeParse({
+        description: 'A detailed idea for the product roadmap.',
+        diagnosticReport: 'private diagnostic data',
+        locale: 'en',
+        title: 'Add a calmer reminder',
+        type: 'idea'
+      }).success
+    ).toBe(false)
   })
 })
 
@@ -75,10 +96,12 @@ describe('authentication contracts', () => {
   })
 
   test('keeps recovery codes bounded without restricting symbols', () => {
-    expect(recoveryLoginSchema.safeParse({ passcode: 'private@@' }).success)
-      .toBe(true)
-    expect(recoveryLoginSchema.safeParse({ passcode: 'short' }).success)
-      .toBe(false)
+    expect(
+      recoveryLoginSchema.safeParse({ passcode: 'private@@' }).success
+    ).toBe(true)
+    expect(recoveryLoginSchema.safeParse({ passcode: 'short' }).success).toBe(
+      false
+    )
   })
 })
 

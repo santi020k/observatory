@@ -18,41 +18,57 @@ export const feedbackModerationStatusSchema = z.enum([
 
 const feedbackBaseSchema = z.object({
   description: z.string().trim().min(20).max(2000),
-  email: z.string().trim().toLowerCase().pipe(z.email()).or(z.literal('')).optional(),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .pipe(z.email())
+    .or(z.literal(''))
+    .optional(),
   locale: z.string().trim().min(2).max(12),
   title: z.string().trim().min(5).max(120),
   type: feedbackTypeSchema
 })
 
-export const createFeedbackSchema = feedbackBaseSchema.extend({
-  diagnosticReport: z.string().trim().max(20_000).optional(),
-  source: z.enum(['android', 'ios', 'website']).default('website'),
-  turnstileToken: z.string().trim().optional(),
-  website: z.string().trim().max(0).optional()
-}).superRefine((value, context) => {
-  if (value.type === 'bug' && value.source !== 'website' && !value.diagnosticReport)
-    context.addIssue({
-      code: 'custom',
-      message: 'Native bug reports require diagnostics.',
-      path: ['diagnosticReport']
-    })
+export const createFeedbackSchema = feedbackBaseSchema
+  .extend({
+    diagnosticReport: z.string().trim().max(20_000).optional(),
+    source: z.enum(['android', 'ios', 'website']).default('website'),
+    turnstileToken: z.string().trim().optional(),
+    website: z.string().trim().max(0).optional()
+  })
+  .superRefine((value, context) => {
+    if (
+      value.type === 'bug' &&
+      value.source !== 'website' &&
+      !value.diagnosticReport
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'Native bug reports require diagnostics.',
+        path: ['diagnosticReport']
+      })
 
-  if (value.type !== 'bug' && value.diagnosticReport)
-    context.addIssue({
-      code: 'custom',
-      message: 'Diagnostics are accepted only for bug reports.',
-      path: ['diagnosticReport']
-    })
-})
+    if (value.type !== 'bug' && value.diagnosticReport)
+      context.addIssue({
+        code: 'custom',
+        message: 'Diagnostics are accepted only for bug reports.',
+        path: ['diagnosticReport']
+      })
+  })
 
-export const updateFeedbackSchema = z.object({
-  isPublic: z.boolean().optional(),
-  moderationStatus: feedbackModerationStatusSchema.optional(),
-  status: feedbackStatusSchema.optional()
-}).refine(
-  value => value.isPublic !== undefined ||
-    value.moderationStatus !== undefined || value.status !== undefined, { error: 'At least one feedback update is required.' }
-)
+export const updateFeedbackSchema = z
+  .object({
+    isPublic: z.boolean().optional(),
+    moderationStatus: feedbackModerationStatusSchema.optional(),
+    status: feedbackStatusSchema.optional()
+  })
+  .refine(
+    value => value.isPublic !== undefined ||
+      value.moderationStatus !== undefined ||
+      value.status !== undefined,
+    { error: 'At least one feedback update is required.' }
+  )
 
 export const publicFeedbackItemSchema = z.object({
   createdAt: z.string().trim(),
@@ -66,17 +82,19 @@ export const publicFeedbackItemSchema = z.object({
   voteCount: z.int().nonnegative()
 })
 
-export const adminFeedbackItemSchema = publicFeedbackItemSchema.omit({
-  hasVoted: true
-}).extend({
-  diagnosticReport: z.string().trim().nullable(),
-  email: z.string().trim().nullable(),
-  isPublic: z.boolean(),
-  moderationStatus: feedbackModerationStatusSchema,
-  projectSlug: z.string().trim(),
-  source: z.enum(['android', 'ios', 'website']),
-  type: feedbackTypeSchema
-})
+export const adminFeedbackItemSchema = publicFeedbackItemSchema
+  .omit({
+    hasVoted: true
+  })
+  .extend({
+    diagnosticReport: z.string().trim().nullable(),
+    email: z.string().trim().nullable(),
+    isPublic: z.boolean(),
+    moderationStatus: feedbackModerationStatusSchema,
+    projectSlug: z.string().trim(),
+    source: z.enum(['android', 'ios', 'website']),
+    type: feedbackTypeSchema
+  })
 
 export const feedbackProjectSchema = z.object({
   displayName: z.string().trim(),
@@ -167,6 +185,44 @@ export const periodSummarySchema = z.object({
   syncs: z.int().nonnegative()
 })
 
+export const operationalHealthSchema = z.object({
+  availabilityPercent: z.number().min(0).max(100).nullable(),
+  availabilityTarget: z.number().min(0).max(100),
+  consecutiveFailures: z.int().nonnegative(),
+  currentStatus: z.enum(['degraded', 'healthy', 'unknown']),
+  failedChecks: z.int().nonnegative(),
+  healthyChecks: z.int().nonnegative(),
+  lastCheckedAt: z.string().trim().nullable(),
+  lastOutageStartedAt: z.string().trim().nullable(),
+  lastRecoveredAt: z.string().trim().nullable(),
+  latencyP50Ms: z.int().nonnegative().nullable(),
+  latencyP95Ms: z.int().nonnegative().nullable(),
+  meetsTarget: z.boolean().nullable(),
+  observations: z.int().nonnegative(),
+  slug: z.string().trim()
+})
+
+export const projectGrowthSignalSchema = z.enum([
+  'accelerating',
+  'growing',
+  'insufficient',
+  'slowing',
+  'steady'
+])
+
+export const projectGrowthSchema = z.object({
+  availableFrom: z.string().trim().nullable(),
+  availableTo: z.string().trim().nullable(),
+  downloadVelocityChange: z.int(),
+  downloadVelocityPercent: z.number().nullable(),
+  issueChange: z.int(),
+  npmDownloads30dTrend: z.array(z.int().nonnegative()).max(24),
+  observations: z.int().nonnegative(),
+  signal: projectGrowthSignalSchema,
+  slug: z.string().trim(),
+  starsGained: z.int()
+})
+
 export const syncStateSchema = z.object({
   completedAt: z.string().trim().nullable(),
   status: z.enum(['failed', 'idle', 'running', 'succeeded'])
@@ -192,6 +248,40 @@ export const npmAnalyticsSchema = z.object({
   totalDownloads: z.int().nonnegative(),
   weekly: z.array(npmDownloadPointSchema),
   yearly: z.array(npmDownloadPointSchema)
+})
+
+export const releaseDownloadChannelSchema = z.enum([
+  'homebrew',
+  'homebrew-or-update',
+  'update',
+  'website'
+])
+
+export const releaseAssetDownloadSchema = z.object({
+  assetName: z.string().trim(),
+  channel: releaseDownloadChannelSchema,
+  downloads: z.int().nonnegative(),
+  releaseTag: z.string().trim()
+})
+
+export const releaseChannelDownloadsSchema = z.object({
+  channel: releaseDownloadChannelSchema,
+  downloads: z.int().nonnegative()
+})
+
+export const releaseDownloadPointSchema = z.object({
+  collectedAt: z.string().trim(),
+  downloads: z.int().nonnegative()
+})
+
+export const releaseAnalyticsSchema = z.object({
+  assets: z.array(releaseAssetDownloadSchema),
+  availableFrom: z.string().trim().nullable(),
+  availableTo: z.string().trim().nullable(),
+  channels: z.array(releaseChannelDownloadsSchema),
+  downloadsGained: z.int().nonnegative(),
+  history: z.array(releaseDownloadPointSchema),
+  totalDownloads: z.int().nonnegative()
 })
 
 export const vscodeExtensionSchema = z.object({
@@ -242,12 +332,15 @@ export const vscodeAnalyticsSchema = z.object({
 
 export const dashboardSchema = z.object({
   generatedAt: z.string().trim(),
+  growth: z.array(projectGrowthSchema),
   history: z.array(historyPointSchema),
   npmAnalytics: npmAnalyticsSchema,
   openVsxAnalytics: openVsxAnalyticsSchema,
+  operationalHealth: z.array(operationalHealthSchema),
   period: periodSummarySchema,
   projects: z.array(projectMetricSchema),
   range: analyticsRangeSchema,
+  releaseAnalytics: releaseAnalyticsSchema,
   summary: z.object({
     activeProjects: z.int().nonnegative(),
     githubClones14d: z.int().nonnegative().nullable(),
@@ -290,10 +383,15 @@ export const updateProjectSettingSchema = z
     ({ attentionMode, enabled, pinned, websiteAnalyticsEnabled }) => attentionMode !== undefined ||
       enabled !== undefined ||
       pinned !== undefined ||
-      websiteAnalyticsEnabled !== undefined, { error: 'At least one project setting is required.' }
+      websiteAnalyticsEnabled !== undefined,
+    { error: 'At least one project setting is required.' }
   )
 
-const base64UrlSchema = z.string().trim().min(1).regex(/^[A-Za-z0-9_-]+$/)
+const base64UrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(/^[A-Za-z0-9_-]+$/)
 
 const authenticatorTransportSchema = z.enum([
   'ble',
@@ -388,12 +486,15 @@ export const websiteAnalyticsSchema = z.object({
 
 export const projectDashboardSchema = z.object({
   generatedAt: z.string().trim(),
+  growth: projectGrowthSchema,
   history: z.array(historyPointSchema),
   npmAnalytics: npmAnalyticsSchema,
   openVsxAnalytics: openVsxAnalyticsSchema,
+  operationalHealth: operationalHealthSchema,
   period: periodSummarySchema,
   project: projectMetricSchema,
   range: analyticsRangeSchema,
+  releaseAnalytics: releaseAnalyticsSchema,
   sync: syncStateSchema,
   vscodeAnalytics: vscodeAnalyticsSchema,
   websiteAnalytics: websiteAnalyticsSiteSchema.nullable()
@@ -402,6 +503,10 @@ export const projectDashboardSchema = z.object({
 export type Dashboard = z.infer<typeof dashboardSchema>
 export type AnalyticsRange = z.infer<typeof analyticsRangeSchema>
 export type ProjectDashboard = z.infer<typeof projectDashboardSchema>
+export type OperationalHealth = z.infer<typeof operationalHealthSchema>
+export type ReleaseAnalytics = z.infer<typeof releaseAnalyticsSchema>
+export type ProjectGrowth = z.infer<typeof projectGrowthSchema>
+export type ProjectGrowthSignal = z.infer<typeof projectGrowthSignalSchema>
 export type ProjectMetric = z.infer<typeof projectMetricSchema>
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>
 export type UpdateProjectSettingInput = z.infer<
