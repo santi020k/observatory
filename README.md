@@ -30,6 +30,13 @@ The same mapped extensions are queried independently from Open VSX.
 The private projects section is specified but not connected. See
 [`docs/private-projects.md`](docs/private-projects.md).
 
+## Deployment status
+
+Observatory v0.1 is an internal preview. The codebase builds and tests locally,
+but production is not deployable from this repository until the placeholder D1
+database ID, Cloudflare routes, and required secrets below are provisioned. No
+public homepage is advertised while those production dependencies are missing.
+
 ## Architecture
 
 ```text
@@ -125,6 +132,10 @@ pnpm verify
 This runs the Santi ESLint base configuration, Astro check, TypeScript checks, Vitest, Astro Doctor,
 and production builds.
 
+Pull requests run the same verification and a dependency audit in one
+read-only GitHub Actions job. GitHub does not repeat the suite after merge, and
+there are no scheduled workflows consuming private-repository minutes.
+
 ## Privacy
 
 - Login codes and session tokens are stored only as HMAC hashes.
@@ -133,3 +144,6 @@ and production builds.
 - Pages use `noindex, nofollow, noarchive`.
 - Provider secrets stay in Worker bindings and never reach the browser.
 - Private-source routes and storage will remain separate from public collection.
+
+Report suspected vulnerabilities through the repository's private security
+advisory flow or follow [the security policy](.github/SECURITY.md).
