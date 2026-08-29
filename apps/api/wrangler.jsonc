@@ -20,6 +20,10 @@
       "zone_name": "santi020k.com",
     },
     {
+      "pattern": "roadscore.santi020k.com/api/feedback/*",
+      "zone_name": "santi020k.com",
+    },
+    {
       "pattern": "between.santi020k.com/api/feedback/*",
       "zone_name": "santi020k.com",
     },

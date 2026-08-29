@@ -8,7 +8,7 @@ workflow.
 ## Registered projects
 
 Projects and their permitted browser origins and locales are declared in
-`packages/catalog`. The current projects are `postlens` and
+`packages/catalog`. The current projects are `postlens`, `roadscore`, and
 `between-contractions`. Adding another product requires a catalog entry and a
 branded client implementation; it does not require another admin application or
 database.
