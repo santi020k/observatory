@@ -63,6 +63,30 @@ describe('API request origin protection', () => {
     )
   })
 
+  test('allows RoadScore to reach only its own feedback routes', async () => {
+    const environment = {
+      CORS_ORIGIN: 'https://observatory.example',
+      ENVIRONMENT: 'test' as const
+    }
+    const roadscoreResponse = await app.request(
+      '/api/feedback/projects/roadscore/config', {
+        headers: { Origin: 'https://roadscore.santi020k.com' }
+      }, environment
+    )
+    const postlensResponse = await app.request(
+      '/api/feedback/projects/postlens/config', {
+        headers: { Origin: 'https://roadscore.santi020k.com' }
+      }, environment
+    )
+
+    expect(roadscoreResponse.status).toBe(200)
+    expect(roadscoreResponse.headers.get('access-control-allow-origin')).toBe(
+      'https://roadscore.santi020k.com'
+    )
+    expect(postlensResponse.status).toBe(200)
+    expect(postlensResponse.headers.get('access-control-allow-origin')).toBeNull()
+  })
+
   test('does not trust product origins for private Observatory mutations', async () => {
     const response = await app.request(
       '/sync', {

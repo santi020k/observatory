@@ -29,6 +29,18 @@ const feedbackProjects = new Map<string, FeedbackProject>([
     locales: ['en', 'es'],
     slug: 'postlens'
   }],
+  ['roadscore', {
+    allowedOrigins: [
+      'https://roadscore.santi020k.com',
+      'http://localhost:4321',
+      'http://127.0.0.1:4321',
+      'http://localhost:4322',
+      'http://127.0.0.1:4322'
+    ],
+    displayName: 'RoadScore',
+    locales: ['en', 'es'],
+    slug: 'roadscore'
+  }],
   ['between-contractions', {
     allowedOrigins: [
       'https://between.santi020k.com',
