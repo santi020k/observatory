@@ -131,8 +131,26 @@ jobs:
             CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
               pnpm --filter @santi020k/observatory-api exec wrangler versions deploy \
                 --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"
+
+            trigger_config="$RUNNER_TEMP/observatory-api-triggers.json"
+            pnpm --filter @santi020k/observatory-api exec node --input-type=module -e "
+              import { writeFileSync } from \"node:fs\"
+              import { experimental_readRawConfig } from \"wrangler\"
+
+              const { rawConfig } = experimental_readRawConfig({ config: \"wrangler.jsonc\" })
+              const crons = rawConfig.triggers?.crons
+
+              if (!rawConfig.name || !Array.isArray(crons))
+                throw new Error(\"The API Wrangler config must define a name and cron trigger list.\")
+
+              writeFileSync(
+                process.argv[1],
+                JSON.stringify({ name: rawConfig.name, triggers: { crons } })
+              )
+            " "$trigger_config"
             CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-api exec wrangler triggers deploy
+              pnpm --filter @santi020k/observatory-api exec wrangler triggers deploy \
+                --config "$trigger_config"
           '
 
       - name: Deploy web Worker
@@ -151,6 +169,4 @@ jobs:
             CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
               pnpm --filter @santi020k/observatory-web exec wrangler versions deploy \
                 --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"
-            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-web exec wrangler triggers deploy
           '
