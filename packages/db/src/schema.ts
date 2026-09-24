@@ -178,6 +178,57 @@ export const releaseAssetSnapshots = sqliteTable(
   ]
 )
 
+export const storeMetricPoints = sqliteTable(
+  'store_metric_points', {
+    appSlug: text('app_slug').notNull(),
+    collectedAt: integer('collected_at').notNull(),
+    dimension: text('dimension', {
+      enum: ['appVersion', 'country', 'device', 'osVersion', 'overall']
+    }).notNull(),
+    dimensionValue: text('dimension_value').notNull(),
+    id: text('id').primaryKey(),
+    metric: text('metric').notNull(),
+    periodStart: integer('period_start').notNull(),
+    provider: text('provider', { enum: ['apple', 'google'] }).notNull(),
+    source: text('source').notNull(),
+    value: real('value').notNull()
+  }, table => [
+    index('store_metric_points_app_period_idx').on(
+      table.appSlug, table.periodStart
+    ),
+    index('store_metric_points_provider_period_idx').on(
+      table.provider, table.periodStart
+    ),
+    uniqueIndex('store_metric_points_fact_idx').on(
+      table.appSlug,
+      table.provider,
+      table.periodStart,
+      table.metric,
+      table.dimension,
+      table.dimensionValue
+    )
+  ]
+)
+
+export const storeSyncRuns = sqliteTable(
+  'store_sync_runs', {
+    appSlug: text('app_slug').notNull(),
+    completedAt: integer('completed_at'),
+    errorCode: text('error_code'),
+    id: text('id').primaryKey(),
+    provider: text('provider', { enum: ['apple', 'google'] }).notNull(),
+    records: integer('records').notNull().default(0),
+    startedAt: integer('started_at').notNull(),
+    status: text('status', {
+      enum: ['failed', 'skipped', 'succeeded']
+    }).notNull()
+  }, table => [
+    index('store_sync_runs_app_provider_started_idx').on(
+      table.appSlug, table.provider, table.startedAt
+    )
+  ]
+)
+
 export const projectPreferences = sqliteTable('project_preferences', {
   attentionMode: text('attention_mode').notNull().default('all'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),

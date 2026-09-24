@@ -485,6 +485,77 @@ export const websiteAnalyticsSchema = z.object({
   sites: z.array(websiteAnalyticsSiteSchema)
 })
 
+export const storeProviderSchema = z.enum(['apple', 'google'])
+export const storeMetricDimensionSchema = z.enum([
+  'appVersion',
+  'country',
+  'device',
+  'osVersion',
+  'overall'
+])
+
+export const storeMetricNameSchema = z.enum([
+  'activeDevices',
+  'anrs',
+  'crashes',
+  'currentDeviceInstalls',
+  'currentUserInstalls',
+  'dailyDeviceInstalls',
+  'dailyDeviceUninstalls',
+  'dailyDeviceUpgrades',
+  'dailyUserInstalls',
+  'dailyUserUninstalls',
+  'deletions',
+  'firstTimeDownloads',
+  'installations',
+  'redownloads',
+  'sessions',
+  'totalDownloads',
+  'totalUserInstalls'
+])
+
+export const storeMetricTotalsSchema = z.partialRecord(
+  storeMetricNameSchema,
+  z.number().nonnegative()
+)
+
+export const storeHistoryPointSchema = z.object({
+  metrics: storeMetricTotalsSchema,
+  periodStart: z.string().trim()
+})
+
+export const storeBreakdownValueSchema = z.object({
+  label: z.string().trim(),
+  metrics: storeMetricTotalsSchema
+})
+
+export const storeBreakdownSchema = z.object({
+  dimension: storeMetricDimensionSchema.exclude(['overall']),
+  values: z.array(storeBreakdownValueSchema)
+})
+
+export const storeProviderAnalyticsSchema = z.object({
+  breakdowns: z.array(storeBreakdownSchema),
+  history: z.array(storeHistoryPointSchema),
+  lastCollectedAt: z.string().trim().nullable(),
+  lastSyncAt: z.string().trim().nullable(),
+  metrics: storeMetricTotalsSchema,
+  provider: storeProviderSchema,
+  status: z.enum(['available', 'awaiting_data', 'failed', 'not_configured'])
+})
+
+export const publishedAppAnalyticsSchema = z.object({
+  displayName: z.string().trim(),
+  providers: z.array(storeProviderAnalyticsSchema),
+  slug: z.string().trim()
+})
+
+export const storeAnalyticsSchema = z.object({
+  apps: z.array(publishedAppAnalyticsSchema),
+  generatedAt: z.string().trim(),
+  range: analyticsRangeSchema
+})
+
 export const projectDashboardSchema = z.object({
   generatedAt: z.string().trim(),
   growth: projectGrowthSchema,
@@ -516,6 +587,10 @@ export type UpdateProjectSettingInput = z.infer<
 export type WebsiteAnalytics = z.infer<typeof websiteAnalyticsSchema>
 export type WebsiteAnalyticsPoint = z.infer<typeof websiteAnalyticsPointSchema>
 export type WebsiteAnalyticsSite = z.infer<typeof websiteAnalyticsSiteSchema>
+export type StoreAnalytics = z.infer<typeof storeAnalyticsSchema>
+export type StoreMetricName = z.infer<typeof storeMetricNameSchema>
+export type StoreMetricTotals = z.infer<typeof storeMetricTotalsSchema>
+export type StoreProvider = z.infer<typeof storeProviderSchema>
 export type RequestCodeInput = z.infer<typeof requestCodeSchema>
 export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>
 export type PasskeyCredential = z.infer<typeof passkeyCredentialSchema>

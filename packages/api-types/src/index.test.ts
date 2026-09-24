@@ -7,6 +7,7 @@ import {
   projectDashboardSchema,
   recoveryLoginSchema,
   requestCodeSchema,
+  storeAnalyticsSchema,
   updateProjectSettingSchema,
   verifyCodeSchema,
   websiteAnalyticsSchema
@@ -160,5 +161,33 @@ describe('website analytics contracts', () => {
         ]
       }).success
     ).toBe(true)
+  })
+})
+
+describe('store analytics contracts', () => {
+  test('keeps provider meanings and device breakdowns explicit', () => {
+    expect(storeAnalyticsSchema.safeParse({
+      apps: [{
+        displayName: 'PostLens',
+        providers: [{
+          breakdowns: [{
+            dimension: 'device',
+            values: [{ label: 'iPhone', metrics: { installations: 4 } }]
+          }],
+          history: [{
+            metrics: { firstTimeDownloads: 3, installations: 4 },
+            periodStart: '2026-09-22T00:00:00.000Z'
+          }],
+          lastCollectedAt: '2026-09-23T00:00:00.000Z',
+          lastSyncAt: '2026-09-23T00:00:00.000Z',
+          metrics: { firstTimeDownloads: 3, installations: 4 },
+          provider: 'apple',
+          status: 'available'
+        }],
+        slug: 'postlens'
+      }],
+      generatedAt: '2026-09-23T00:00:00.000Z',
+      range: '30d'
+    }).success).toBe(true)
   })
 })

@@ -19,6 +19,10 @@ if (!existsSync(apiEnvironmentPath)) {
   writeFileSync(
     apiEnvironmentPath,
     [
+      'APP_STORE_CONNECT_ISSUER_ID=',
+      'APP_STORE_CONNECT_KEY_ID=',
+      'APP_STORE_CONNECT_PRIVATE_KEY=',
+      'APP_STORE_CONNECT_REPORT_REQUESTS_JSON=',
       `AUTH_SECRET=${secret}`,
       'CLOUDFLARE_ACCOUNT_ID=',
       'CLOUDFLARE_API_TOKEN=',
@@ -31,6 +35,8 @@ if (!existsSync(apiEnvironmentPath)) {
       'TURNSTILE_SITE_KEY=',
       'TURNSTILE_SECRET_KEY=',
       'GITHUB_TOKEN=',
+      'GOOGLE_PLAY_REPORT_BUCKET=',
+      'GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=',
       '',
     ].join('\n'),
   )

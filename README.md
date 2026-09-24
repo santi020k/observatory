@@ -23,6 +23,8 @@ The dashboard is owner-only; narrowly scoped public feedback routes serve each p
 - Published website availability, p50/p95 response time, consecutive
   failures, and outage/recovery observations
 - Cloudflare Web Analytics page views and visits, grouped hourly by project website
+- Aggregate App Store and Google Play acquisition, install-base, device,
+  version, operating-system, territory, crash, and ANR reports for published apps
 - Attention signals for degraded, stale, or issue-heavy projects
 - Project-scoped public feedback, moderation, voting, and private delivery kanbans
 - Hourly D1 snapshots so trends can be added without changing providers
@@ -136,6 +138,44 @@ The owner-authenticated API exposes `GET /analytics/websites?range=30d` and acce
 `90d`, `1y`, or `5y`. `POST /sync/cloudflare` runs the collector manually. Cloudflare currently retains Web
 Analytics source data for a shorter period, but Observatory's hourly D1 snapshots can accumulate
 longer history from the point collection is enabled.
+
+### Published app analytics
+
+The owner-only `/store/` dashboard keeps each provider's definitions separate.
+Apple downloads, Apple opt-in installations, and Google Play's active-device
+install base are not added together or presented as unique users. Device data is
+an aggregate model or family breakdown; Observatory never receives a list of
+individual customer devices.
+
+Store collection runs daily at `17:37 UTC` and can also be started with the
+owner-authenticated `POST /sync/stores` endpoint. `GET /analytics/apps?range=30d`
+accepts the same analytics ranges as the other dashboards. Provider failures
+are recorded as safe error codes while previously collected facts remain intact.
+
+App Store collection requires these server-only values in Infisical's
+`/apps/api` path:
+
+- `APP_STORE_CONNECT_ISSUER_ID`
+- `APP_STORE_CONNECT_KEY_ID`
+- `APP_STORE_CONNECT_PRIVATE_KEY`
+- `APP_STORE_CONNECT_REPORT_REQUESTS_JSON`, mapping `postlens` and
+  `betweencontractions` to existing `ONGOING` Analytics Reports request IDs
+
+Use an App Store Connect API key with only the reporting access required to
+download Analytics Reports. Observatory deliberately does not create or delete
+Analytics Report requests; create each ongoing request as a separate,
+account-holder-authorized setup action before adding its identifier.
+
+Google Play collection requires `GOOGLE_PLAY_REPORT_BUCKET` and
+`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. Grant the service account only read access
+to Play Console bulk reports. Observatory reads install and crash CSV exports
+from the private reporting bucket; it does not change releases, listings, or
+reviews.
+
+The first configured sync backfills up to one year. Apple can omit low-volume
+usage rows for privacy, and Google Play monthly CSVs can arrive several days
+after activity. The dashboard represents those states as unavailable or
+awaiting data rather than displaying a misleading zero.
 
 ## Quality
 

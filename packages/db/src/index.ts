@@ -14,6 +14,8 @@ import {
   projectSnapshots,
   releaseAssetSnapshots,
   sessions,
+  storeMetricPoints,
+  storeSyncRuns,
   syncRuns,
   vscodeExtensionSnapshots,
   websiteAnalyticsSnapshots
@@ -99,6 +101,35 @@ export interface ReleaseAssetWrite {
   repository: string
   slug: string
   syncRunId: string
+}
+
+export type StoreMetricDimension = 'appVersion' | 'country' | 'device' |
+  'osVersion' | 'overall'
+
+export type StoreMetricProvider = 'apple' | 'google'
+
+export interface StoreMetricWrite {
+  appSlug: string
+  collectedAt: number
+  dimension: StoreMetricDimension
+  dimensionValue: string
+  id: string
+  metric: string
+  periodStart: number
+  provider: StoreMetricProvider
+  source: string
+  value: number
+}
+
+export interface StoreSyncRunWrite {
+  appSlug: string
+  completedAt: number | null
+  errorCode: string | null
+  id: string
+  provider: StoreMetricProvider
+  records: number
+  startedAt: number
+  status: 'failed' | 'skipped' | 'succeeded'
 }
 
 export interface ProjectPreferenceWrite {
@@ -803,3 +834,53 @@ export const getWebsiteAnalyticsSince = async (
   .from(websiteAnalyticsSnapshots)
   .where(gte(websiteAnalyticsSnapshots.periodStart, since))
   .orderBy(websiteAnalyticsSnapshots.periodStart)
+
+export const upsertStoreMetrics = async (
+  db: ObservatoryDb,
+  points: readonly StoreMetricWrite[]
+): Promise<void> => {
+  const batchSize = 40
+
+  for (let index = 0; index < points.length; index += batchSize) {
+    const batch = points.slice(index, index + batchSize)
+
+    if (batch.length === 0) continue
+
+    await db.insert(storeMetricPoints).values(batch).onConflictDoUpdate({
+      set: {
+        collectedAt: sql`excluded.collected_at`,
+        source: sql`excluded.source`,
+        value: sql`excluded.value`
+      },
+      target: [
+        storeMetricPoints.appSlug,
+        storeMetricPoints.provider,
+        storeMetricPoints.periodStart,
+        storeMetricPoints.metric,
+        storeMetricPoints.dimension,
+        storeMetricPoints.dimensionValue
+      ]
+    })
+  }
+}
+
+export const insertStoreSyncRun = async (
+  db: ObservatoryDb,
+  run: StoreSyncRunWrite
+): Promise<void> => {
+  await db.insert(storeSyncRuns).values(run)
+}
+
+export const getStoreMetricsSince = async (
+  db: ObservatoryDb,
+  since: number
+) => db
+  .select()
+  .from(storeMetricPoints)
+  .where(gte(storeMetricPoints.periodStart, since))
+  .orderBy(storeMetricPoints.periodStart)
+
+export const getLatestStoreSyncRuns = async (db: ObservatoryDb) => db
+  .select()
+  .from(storeSyncRuns)
+  .orderBy(desc(storeSyncRuns.startedAt))

@@ -1,8 +1,5 @@
 ---
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import Button from '@santi020k/lumen-astro/components/Button'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
+import { Badge, Button, Icon, ThemeToggle } from '@santi020k/lumen-astro'
 
 interface Props {
   apiUrl: string
@@ -14,16 +11,18 @@ const { apiUrl, lastSync, syncStatus } = Astro.props
 ---
 
 <header class="app-header" data-api-url={apiUrl}>
-  <button
+  <Button
     aria-controls="app-sidebar"
     aria-expanded="false"
     aria-label="Open navigation"
     class="sidebar-trigger"
     data-sidebar-trigger
+    size="icon"
     type="button"
+    variant="ghost"
   >
     <Icon aria-hidden="true" name="menu" />
-  </button>
+  </Button>
   <div class="app-header__workspace">
     <span class="app-header__context">Observatory</span>
     <Badge variant="outline"><span class="status-dot"></span> Private workspace

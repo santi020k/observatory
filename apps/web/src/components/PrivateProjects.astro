@@ -1,8 +1,5 @@
 ---
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import Button from '@santi020k/lumen-astro/components/Button'
-import Card from '@santi020k/lumen-astro/components/Card'
-import Icon from '@santi020k/lumen-astro/components/Icon'
+import { Badge, Button, Callout, Card, Icon } from '@santi020k/lumen-astro'
 ---
 
 <section
@@ -64,7 +61,7 @@ import Icon from '@santi020k/lumen-astro/components/Icon'
     </Card>
   </div>
 
-  <div class="private-callout">
+  <Callout class="private-callout">
     <Icon aria-hidden="true" name="shield-check" />
     <p>
       Private metrics will use separate encrypted credentials and API routes.
@@ -77,5 +74,5 @@ import Icon from '@santi020k/lumen-astro/components/Icon'
     >Connect private sources
     </Button
     >
-  </div>
+  </Callout>
 </section>

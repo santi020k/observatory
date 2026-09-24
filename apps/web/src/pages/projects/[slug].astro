@@ -24,14 +24,17 @@ import {
 } from '@/lib/format'
 import { aggregateWebsiteAnalytics } from '@/lib/website-analytics'
 
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
-import Card from '@santi020k/lumen-astro/components/Card'
-import Empty from '@santi020k/lumen-astro/components/Empty'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import LineChart from '@santi020k/lumen-astro/components/LineChart'
-import Table from '@santi020k/lumen-astro/components/Table'
-import Tabs from '@santi020k/lumen-astro/components/Tabs'
+import {
+  Badge,
+  Breadcrumb,
+  ButtonLink,
+  Card,
+  Empty,
+  Icon,
+  LineChart,
+  Table,
+  Tabs
+} from '@santi020k/lumen-astro'
 import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
 
 const slug = Astro.params.slug
@@ -366,11 +369,11 @@ const growthGuidance = (() => {
       />
 
       <main class="dashboard project-dashboard" id="main-content">
-        <nav aria-label="Breadcrumb" class="breadcrumb">
+        <Breadcrumb class="breadcrumb">
           <a href={`/dashboard/?range=${dashboard.range}`}>Overview</a>
           <Icon aria-hidden="true" name="chevron-right" />
           <span aria-current="page">{project.name}</span>
-        </nav>
+        </Breadcrumb>
 
         <section class="hero-row" aria-labelledby="project-title">
           <div>

@@ -23,19 +23,21 @@ import {
 } from '@/lib/format'
 import { buildGrowthMap } from '@/lib/growth-map'
 
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import BarChart from '@santi020k/lumen-astro/components/BarChart'
-import Button from '@santi020k/lumen-astro/components/Button'
-import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
-import Card from '@santi020k/lumen-astro/components/Card'
-import Empty from '@santi020k/lumen-astro/components/Empty'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import LineChart from '@santi020k/lumen-astro/components/LineChart'
-import NativeSelect from '@santi020k/lumen-astro/components/NativeSelect'
-import SearchField from '@santi020k/lumen-astro/components/SearchField'
-import Sparkline from '@santi020k/lumen-astro/components/Sparkline'
-import Table from '@santi020k/lumen-astro/components/Table'
-import Tabs from '@santi020k/lumen-astro/components/Tabs'
+import {
+  Badge,
+  BarChart,
+  Button,
+  ButtonLink,
+  Card,
+  Empty,
+  Icon,
+  LineChart,
+  NativeSelect,
+  SearchField,
+  Sparkline,
+  Table,
+  Tabs
+} from '@santi020k/lumen-astro'
 
 const response = await getDashboard(Astro.request, Astro.url)
 
@@ -924,13 +926,9 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                     Run the first sync to collect GitHub, npm, and website health
                     metrics.
                   </p>
-                  <button
-                    class="ui-button ui-button--default"
-                    data-sync-button
-                    type="button"
-                  >
+                  <Button data-sync-button type="button">
                     Sync public projects
-                  </button>
+                  </Button>
                 </Empty>
               ) :
               (

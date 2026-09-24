@@ -6,20 +6,23 @@ import AppLayout from '@/layouts/AppLayout.astro'
 import { getBrowserApiUrl, getProjectSettings } from '@/lib/api'
 import { formatRelativeDate } from '@/lib/format'
 
-import Accordion from '@santi020k/lumen-astro/components/Accordion'
-import Alert from '@santi020k/lumen-astro/components/Alert'
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import Button from '@santi020k/lumen-astro/components/Button'
-import Card from '@santi020k/lumen-astro/components/Card'
-import Empty from '@santi020k/lumen-astro/components/Empty'
-import Field from '@santi020k/lumen-astro/components/Field'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import Input from '@santi020k/lumen-astro/components/Input'
-import Label from '@santi020k/lumen-astro/components/Label'
-import NativeSelect from '@santi020k/lumen-astro/components/NativeSelect'
-import SearchField from '@santi020k/lumen-astro/components/SearchField'
-import Switch from '@santi020k/lumen-astro/components/Switch'
-import Tabs from '@santi020k/lumen-astro/components/Tabs'
+import {
+  Accordion,
+  Alert,
+  Badge,
+  Button,
+  Callout,
+  Card,
+  Empty,
+  Field,
+  Icon,
+  Input,
+  Label,
+  NativeSelect,
+  SearchField,
+  Switch,
+  Tabs
+} from '@santi020k/lumen-astro'
 
 const response = await getProjectSettings(Astro.request, Astro.url)
 
@@ -139,14 +142,14 @@ const getCategoryIcon = (
               </Badge>
             </div>
 
-            <div class="settings-callout">
+            <Callout class="settings-callout">
               <Icon aria-hidden="true" name="info" />
               <p>
                 Disabled projects continue collecting snapshots so they can be
                 restored without losing history. Their data is excluded from
                 analysis while disabled.
               </p>
-            </div>
+            </Callout>
 
             {
               settings.projects.length === 0 ?
@@ -547,13 +550,13 @@ const getCategoryIcon = (
               </form>
             </Card>
 
-            <div class="settings-callout">
+            <Callout class="settings-callout">
               <Icon aria-hidden="true" name="life-buoy" />
               <p>
                 Your private recovery code remains available if a trusted
                 device is lost. Observatory never displays or returns it.
               </p>
-            </div>
+            </Callout>
           </section>
 
           <section data-value="privacy" hidden role="tabpanel">

@@ -12,7 +12,7 @@
     },
   ],
   "triggers": {
-    "crons": ["17 * * * *"],
+    "crons": ["17 * * * *", "37 17 * * *"],
   },
   "routes": [
     {
@@ -21,6 +21,10 @@
     },
     {
       "pattern": "postlens.santi020k.com/api/feedback/*",
+      "zone_name": "santi020k.com",
+    },
+    {
+      "pattern": "roadscore.santi020k.com/api/feedback/*",
       "zone_name": "santi020k.com",
     },
     {

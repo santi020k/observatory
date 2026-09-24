@@ -1,8 +1,5 @@
 ---
-import Card from '@santi020k/lumen-astro/components/Card'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import Sparkline from '@santi020k/lumen-astro/components/Sparkline'
-import Stat from '@santi020k/lumen-astro/components/Stat'
+import { Card, Icon, Sparkline, Stat } from '@santi020k/lumen-astro'
 
 interface Trend {
   label: string
@@ -31,6 +28,7 @@ interface Props {
 
 const { context, icon, label, trend, value } = Astro.props
 const showTrend = trend && trend.values.length >= 2
+const trendTone = trend?.tone ? { tone: trend.tone } : {}
 ---
 
 <Card class="metric-card">
@@ -44,7 +42,7 @@ const showTrend = trend && trend.values.length >= 2
           area
           class="metric-card__sparkline"
           label={trend.label}
-          tone={trend.tone}
+          {...trendTone}
           values={trend.values}
         />
       )

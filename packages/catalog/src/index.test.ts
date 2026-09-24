@@ -6,6 +6,7 @@ import {
   getFeedbackOrigins,
   getFeedbackProject,
   getGithubReleaseSources,
+  getPublishedApps,
   getVscodeExtensionMappings,
   titleFromSlug
 } from './index'
@@ -85,6 +86,24 @@ describe('project catalog', () => {
       locales: ['en', 'es']
     })
     expect(getFeedbackProject('between-contractions')).toBeDefined()
+    expect(getFeedbackProject('roadscore')).toMatchObject({
+      displayName: 'RoadScore',
+      locales: ['en', 'es']
+    })
     expect(getFeedbackOrigins()).toContain('https://between.santi020k.com')
+    expect(getFeedbackOrigins()).toContain('https://roadscore.santi020k.com')
+  })
+
+  test('registers published native apps and their store identities', () => {
+    const postLens = getPublishedApps().find(app => app.slug === 'postlens')
+    const between = getPublishedApps().find(
+      app => app.slug === 'betweencontractions'
+    )
+
+    expect(postLens?.apple?.appId).toBe('6804601300')
+    expect(between?.apple?.appId).toBe('6802499436')
+    expect(between?.google?.packageName).toBe(
+      'com.santi020k.betweencontractions'
+    )
   })
 })

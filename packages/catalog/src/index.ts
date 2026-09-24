@@ -33,6 +33,22 @@ export interface FeedbackProject {
   slug: string
 }
 
+export interface AppleStoreListing {
+  appId: string
+  bundleId: string
+}
+
+export interface GooglePlayListing {
+  packageName: string
+}
+
+export interface PublishedApp {
+  apple?: AppleStoreListing
+  displayName: string
+  google?: GooglePlayListing
+  slug: string
+}
+
 const feedbackProjects = new Map<string, FeedbackProject>([
   ['postlens', {
     allowedOrigins: [
@@ -45,6 +61,18 @@ const feedbackProjects = new Map<string, FeedbackProject>([
     displayName: 'PostLens',
     locales: ['en', 'es'],
     slug: 'postlens'
+  }],
+  ['roadscore', {
+    allowedOrigins: [
+      'https://roadscore.santi020k.com',
+      'http://localhost:4321',
+      'http://127.0.0.1:4321',
+      'http://localhost:4322',
+      'http://127.0.0.1:4322'
+    ],
+    displayName: 'RoadScore',
+    locales: ['en', 'es'],
+    slug: 'roadscore'
   }],
   ['between-contractions', {
     allowedOrigins: [
@@ -71,6 +99,30 @@ export const getFeedbackProjects = (): FeedbackProject[] => [
 export const getFeedbackOrigins = (): string[] => [
   ...new Set(getFeedbackProjects().flatMap(project => project.allowedOrigins))
 ]
+
+const publishedApps: readonly PublishedApp[] = [
+  {
+    apple: {
+      appId: '6804601300',
+      bundleId: 'com.santi020k.PostLens'
+    },
+    displayName: 'PostLens',
+    slug: 'postlens'
+  },
+  {
+    apple: {
+      appId: '6802499436',
+      bundleId: 'com.santi020k.betweencontractions'
+    },
+    displayName: 'Between Contractions',
+    google: {
+      packageName: 'com.santi020k.betweencontractions'
+    },
+    slug: 'betweencontractions'
+  }
+]
+
+export const getPublishedApps = (): readonly PublishedApp[] => publishedApps
 
 export const githubOwner = 'santi020k'
 

@@ -14,6 +14,8 @@ import {
   projectSnapshots,
   releaseAssetSnapshots,
   sessions,
+  storeMetricPoints,
+  storeSyncRuns,
   syncRuns,
   vscodeExtensionSnapshots,
   websiteAnalyticsSnapshots
@@ -42,6 +44,9 @@ describe('observatory database schema', () => {
     expect(getTableName(websiteAnalyticsSnapshots)).toBe(
       'website_analytics_snapshots'
     )
+
+    expect(getTableName(storeMetricPoints)).toBe('store_metric_points')
+    expect(getTableName(storeSyncRuns)).toBe('store_sync_runs')
   })
 
   test('keeps passkey material and one-time challenges separate', () => {
@@ -68,6 +73,14 @@ describe('observatory database schema', () => {
     expect(releaseAssetSnapshots.assetId.name).toBe('asset_id')
     expect(releaseAssetSnapshots.channel.name).toBe('channel')
     expect(releaseAssetSnapshots.syncRunId.name).toBe('sync_run_id')
+  })
+
+  test('stores normalized store metrics without conflating dimensions', () => {
+    expect(storeMetricPoints.provider.notNull).toBe(true)
+    expect(storeMetricPoints.metric.notNull).toBe(true)
+    expect(storeMetricPoints.dimension.name).toBe('dimension')
+    expect(storeMetricPoints.dimensionValue.name).toBe('dimension_value')
+    expect(storeSyncRuns.errorCode.name).toBe('error_code')
   })
 
   test('stores visibility on every project snapshot', () => {
