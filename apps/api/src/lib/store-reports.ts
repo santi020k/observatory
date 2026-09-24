@@ -178,7 +178,7 @@ const addAppleDownloadMetric = (
   row: ReadonlyMap<string, string>,
   metrics: StoreMetricTotals
 ): void => {
-  const downloads = parseNumber(getColumn(row, ['Downloads']))
+  const downloads = parseNumber(getColumn(row, ['Counts', 'Downloads']))
 
   if (downloads === null) return
 
@@ -187,12 +187,29 @@ const addAppleDownloadMetric = (
 
   if (downloadType?.includes('first')) metrics.firstTimeDownloads = downloads
   else if (downloadType?.includes('redownload')) metrics.redownloads = downloads
-  else metrics.totalDownloads = downloads
+  else if (!downloadType) metrics.totalDownloads = downloads
 }
+
+const addAppleInstallationMetric = (
+  row: ReadonlyMap<string, string>,
+  metrics: StoreMetricTotals
+): void => {
+  const counts = parseNumber(getColumn(row, ['Counts']))
+
+  if (counts === null) return
+
+  const event = getColumn(row, ['Event'])?.toLocaleLowerCase('en')
+
+  if (event === 'install') metrics.installations = counts
+  else if (event === 'delete') metrics.deletions = counts
+}
+
+const isAppleReport = (source: string, reportName: string): boolean => source === reportName || source === `${reportName} Standard`
 
 const getMetrics = (
   row: ReadonlyMap<string, string>,
-  provider: StoreMetricProvider
+  provider: StoreMetricProvider,
+  source: string
 ): StoreMetricTotals => {
   const metrics: StoreMetricTotals = {}
 
@@ -205,7 +222,13 @@ const getMetrics = (
     if (value !== null) metrics[metric] = value
   }
 
-  if (provider === 'apple') addAppleDownloadMetric(row, metrics)
+  if (provider === 'apple') {
+    if (isAppleReport(source, 'App Store Downloads'))
+      addAppleDownloadMetric(row, metrics)
+
+    if (isAppleReport(source, 'App Store Installations and Deletions'))
+      addAppleInstallationMetric(row, metrics)
+  }
 
   return metrics
 }
@@ -371,7 +394,7 @@ export const parseStoreReport = ({
 
     if (periodStart === null) continue
 
-    const metrics = getMetrics(row, provider)
+    const metrics = getMetrics(row, provider, source)
 
     addRowFacts({
       appSlug,

@@ -158,7 +158,7 @@ App Store collection requires these server-only values in Infisical's
 - `APP_STORE_CONNECT_ISSUER_ID`
 - `APP_STORE_CONNECT_KEY_ID`
 - `APP_STORE_CONNECT_PRIVATE_KEY`
-- `APP_STORE_CONNECT_REPORT_REQUESTS_JSON`, mapping `postlens` and
+- `APP_STORE_CONNECT_REPORT_REQUESTS_JSON`, mapping `lumen`, `postlens`, and
   `betweencontractions` to existing `ONGOING` Analytics Reports request IDs
 
 Use an App Store Connect API key with only the reporting access required to
@@ -166,16 +166,26 @@ download Analytics Reports. Observatory deliberately does not create or delete
 Analytics Report requests; create each ongoing request as a separate,
 account-holder-authorized setup action before adding its identifier.
 
-Google Play collection requires `GOOGLE_PLAY_REPORT_BUCKET` and
-`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. Grant the service account only read access
-to Play Console bulk reports. Observatory reads install and crash CSV exports
-from the private reporting bucket; it does not change releases, listings, or
-reviews.
+Google Play collection is available for future catalog entries that declare a
+published Play listing; none of the three current apps has a verified public
+Google Play listing. It requires `GOOGLE_PLAY_REPORT_BUCKET` and
+`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. Add the service-account email to Play
+Console with global `View app information` access only. Observatory reads
+install and crash CSV exports from the private reporting bucket; it does not
+change releases, listings, or reviews.
 
-The first configured sync backfills up to one year. Apple can omit low-volume
-usage rows for privacy, and Google Play monthly CSVs can arrive several days
-after activity. The dashboard represents those states as unavailable or
-awaiting data rather than displaying a misleading zero.
+Apple collection reads the newest daily instance for each report. Apple places
+complete late-arriving partitions and corrections in newer instances, so older
+instances must not be added to them. Report instances expire after 35 days;
+historical data beyond that window requires an explicitly authorized one-time
+snapshot request, which Observatory does not create automatically.
+
+Google collection refreshes the current and previous monthly exports on every
+run and rotates one older month per day. This progressively backfills up to one
+year without exceeding a typical Worker invocation's provider-request budget.
+Apple can omit low-volume usage rows for privacy, and Google Play monthly CSVs
+can arrive several days after activity. The dashboard represents those states
+as unavailable or awaiting data rather than displaying a misleading zero.
 
 ## Quality
 

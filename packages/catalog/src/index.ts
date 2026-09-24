@@ -103,6 +103,14 @@ export const getFeedbackOrigins = (): string[] => [
 const publishedApps: readonly PublishedApp[] = [
   {
     apple: {
+      appId: '6805250815',
+      bundleId: 'com.santi020k.lumen.playground.apple'
+    },
+    displayName: 'Lumen Playground',
+    slug: 'lumen'
+  },
+  {
+    apple: {
       appId: '6804601300',
       bundleId: 'com.santi020k.PostLens'
     },
@@ -115,9 +123,6 @@ const publishedApps: readonly PublishedApp[] = [
       bundleId: 'com.santi020k.betweencontractions'
     },
     displayName: 'Between Contractions',
-    google: {
-      packageName: 'com.santi020k.betweencontractions'
-    },
     slug: 'betweencontractions'
   }
 ]

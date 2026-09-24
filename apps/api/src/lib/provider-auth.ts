@@ -1,4 +1,5 @@
 const textEncoder = new TextEncoder()
+const googleTokenUri = 'https://oauth2.googleapis.com/token'
 
 const base64Url = (value: Uint8Array | string): string => {
   const bytes = typeof value === 'string' ? textEncoder.encode(value) : value
@@ -88,7 +89,10 @@ export const parseGoogleServiceAccount = (
 
   const tokenUri = 'token_uri' in parsed && typeof parsed.token_uri === 'string' ?
     parsed.token_uri :
-    'https://oauth2.googleapis.com/token'
+    googleTokenUri
+
+  if (tokenUri !== googleTokenUri)
+    throw new Error('Google Play service account token URI is invalid.')
 
   return {
     clientEmail: parsed.client_email,

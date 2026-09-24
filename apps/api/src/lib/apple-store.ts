@@ -31,12 +31,18 @@ interface AppleSegmentAttributes {
   url: string
 }
 
-const reportNames = new Set([
+const reportNames = [
   'App Crashes',
   'App Sessions',
   'App Store Downloads',
   'App Store Installations and Deletions'
-])
+] as const
+
+const supportedReportNames = new Set<string>(reportNames.flatMap(
+  reportName => [reportName, `${reportName} Standard`]
+))
+
+export const isSupportedAppleReportName = (name: string): boolean => supportedReportNames.has(name)
 
 const apiOrigin = 'https://api.appstoreconnect.apple.com'
 const requestTimeoutMilliseconds = 20_000
@@ -96,6 +102,37 @@ const isRecentInstance = (
   const processingDate = Date.parse(instance.attributes.processingDate ?? '')
 
   return !Number.isFinite(processingDate) || processingDate >= since
+}
+
+const getProcessingTime = (
+  instance: AppleResource<AppleInstanceAttributes>
+): number => {
+  const processingTime = Date.parse(instance.attributes.processingDate ?? '')
+
+  return Number.isFinite(processingTime) ? processingTime : 0
+}
+
+export const selectLatestAppleInstancePoints = (
+  instanceGroups: readonly (readonly StoreMetricWrite[])[]
+): StoreMetricWrite[] => {
+  const latestByPeriod = new Map<number, readonly StoreMetricWrite[]>()
+
+  for (const group of instanceGroups) {
+    const pointsByPeriod = new Map<number, StoreMetricWrite[]>()
+
+    for (const point of group) {
+      const points = pointsByPeriod.get(point.periodStart) ?? []
+
+      points.push(point)
+
+      pointsByPeriod.set(point.periodStart, points)
+    }
+
+    for (const [periodStart, points] of pointsByPeriod)
+      latestByPeriod.set(periodStart, points)
+  }
+
+  return [...latestByPeriod.values()].flat()
 }
 
 export interface AppleStoreConfiguration {
@@ -158,23 +195,30 @@ export const collectAppleStoreMetrics = async (
   const groups: StoreMetricWrite[][] = []
 
   for (const report of reports) {
-    if (!reportNames.has(report.attributes.name)) continue
+    if (!isSupportedAppleReportName(report.attributes.name)) continue
 
-    const instances = await fetchCollection<AppleInstanceAttributes>(
+    const instances = (await fetchCollection<AppleInstanceAttributes>(
       `${apiOrigin}/v1/analyticsReports/${encodeURIComponent(report.id)}/instances?limit=200`,
       token,
       fetcher
-    )
+    ))
+      .filter(candidate => isRecentInstance(
+        candidate,
+        options.since - 7 * 24 * 60 * 60 * 1_000
+      ))
+      .sort((left, right) => getProcessingTime(left) - getProcessingTime(right))
+      .slice(-1)
 
-    for (const instance of instances.filter(candidate => isRecentInstance(
-      candidate,
-      options.since - 7 * 24 * 60 * 60 * 1_000
-    ))) {
+    const instanceGroups: StoreMetricWrite[][] = []
+
+    for (const instance of instances) {
       const segments = await fetchCollection<AppleSegmentAttributes>(
         `${apiOrigin}/v1/analyticsReportInstances/${encodeURIComponent(instance.id)}/segments?limit=200`,
         token,
         fetcher
       )
+
+      const segmentGroups: StoreMetricWrite[][] = []
 
       for (const segment of segments) {
         const response = await fetcher(segment.attributes.url, {
@@ -184,7 +228,7 @@ export const collectAppleStoreMetrics = async (
         if (!response.ok)
           throw new Error(`Apple report download failed with ${response.status}.`)
 
-        groups.push(parseStoreReport({
+        segmentGroups.push(parseStoreReport({
           appSlug: app.slug,
           collectedAt: now,
           delimiter: '\t',
@@ -193,7 +237,11 @@ export const collectAppleStoreMetrics = async (
           text: await decodeSegment(response)
         }))
       }
+
+      instanceGroups.push(mergeStoreMetricPoints(segmentGroups))
     }
+
+    groups.push(selectLatestAppleInstancePoints(instanceGroups))
   }
 
   return mergeStoreMetricPoints(groups)

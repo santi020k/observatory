@@ -416,16 +416,17 @@ const emptyStatusMessage = (
             <Icon aria-hidden="true" name="package" />
           </span>
           <div>
-            <span class="eyebrow">Lumen UI</span>
-            <h2>Package reach stays in package analytics</h2>
+            <span class="eyebrow">Lumen ecosystem</span>
+            <h2>Playground installs and package reach stay distinct</h2>
             <p>
-              npm reports tarball downloads, not unique installations or
-              developer devices. Observatory already keeps Lumen’s package
-              history separate from native app-store metrics.
+              Lumen Playground is tracked above through App Store reports.
+              npm still reports tarball downloads—not unique installations or
+              developer devices—so library adoption remains in Lumen’s package
+              analytics.
             </p>
           </div>
           <ButtonLink href={`/projects/lumen/?range=${analytics.range}`} variant="secondary">
-            View Lumen analytics
+            View package analytics
             <Icon aria-hidden="true" name="arrow-right" />
           </ButtonLink>
         </Card>

@@ -96,15 +96,18 @@ describe('project catalog', () => {
   })
 
   test('registers published native apps and their store identities', () => {
+    const lumen = getPublishedApps().find(app => app.slug === 'lumen')
     const postLens = getPublishedApps().find(app => app.slug === 'postlens')
     const between = getPublishedApps().find(
       app => app.slug === 'betweencontractions'
     )
 
+    expect(lumen?.apple).toEqual({
+      appId: '6805250815',
+      bundleId: 'com.santi020k.lumen.playground.apple'
+    })
     expect(postLens?.apple?.appId).toBe('6804601300')
     expect(between?.apple?.appId).toBe('6802499436')
-    expect(between?.google?.packageName).toBe(
-      'com.santi020k.betweencontractions'
-    )
+    expect(between?.google).toBeUndefined()
   })
 })

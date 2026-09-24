@@ -13,7 +13,7 @@ interface GoogleTokenResponse {
   access_token?: string
 }
 
-interface GoogleStorageObject {
+export interface GoogleStorageObject {
   name: string
 }
 
@@ -24,7 +24,19 @@ interface GoogleStorageListResponse {
 
 const storageScope = 'https://www.googleapis.com/auth/devstorage.read_only'
 const requestTimeoutMilliseconds = 20_000
+const dayMilliseconds = 24 * 60 * 60 * 1_000
 const dimensionSuffixPattern = /_(?:app_version|carrier|country|device|language|os_version)\.csv$/u
+const supportedDimensionSuffixPattern = /_(?:app_version|country|device|os_version)\.csv$/u
+
+export const shouldIncludeGoogleOverall = (name: string): boolean => {
+  if (!dimensionSuffixPattern.test(name)) return true
+
+  if (name.includes('/installs/')) return name.endsWith('_country.csv')
+
+  if (name.includes('/crashes/')) return name.endsWith('_app_version.csv')
+
+  return false
+}
 
 type Fetcher = (
   input: Request | string | URL,
@@ -118,12 +130,18 @@ const listObjects = async (
   return objects
 }
 
-const decodeGoogleCsv = (bytes: Uint8Array): string => {
+export const decodeGoogleCsv = (bytes: Uint8Array): string => {
   if (bytes[0] === 0xff && bytes[1] === 0xfe)
     return new TextDecoder('utf-16le').decode(bytes.subarray(2))
 
   if (bytes[0] === 0xfe && bytes[1] === 0xff)
     return new TextDecoder('utf-16be').decode(bytes.subarray(2))
+
+  if (bytes[1] === 0x00 && bytes[3] === 0x00)
+    return new TextDecoder('utf-16le').decode(bytes)
+
+  if (bytes[0] === 0x00 && bytes[2] === 0x00)
+    return new TextDecoder('utf-16be').decode(bytes)
 
   return new TextDecoder().decode(bytes)
 }
@@ -137,6 +155,57 @@ const getReportMonth = (name: string): number | null => {
   const month = Number(match[2])
 
   return month >= 1 && month <= 12 ? Date.UTC(year, month - 1, 1) : null
+}
+
+export const selectGoogleReportObjects = (
+  objects: readonly GoogleStorageObject[],
+  since: number,
+  now: number
+): GoogleStorageObject[] => {
+  const nowDate = new Date(now)
+
+  const currentMonth = Date.UTC(
+    nowDate.getUTCFullYear(),
+    nowDate.getUTCMonth(),
+    1
+  )
+
+  const previousMonth = Date.UTC(
+    nowDate.getUTCFullYear(),
+    nowDate.getUTCMonth() - 1,
+    1
+  )
+
+  const historicalOffset = 2 + Math.floor(now / dayMilliseconds) % 10
+
+  const historicalMonth = Date.UTC(
+    nowDate.getUTCFullYear(),
+    nowDate.getUTCMonth() - historicalOffset,
+    1
+  )
+
+  const sinceDate = new Date(since)
+
+  const sinceMonth = Date.UTC(
+    sinceDate.getUTCFullYear(),
+    sinceDate.getUTCMonth(),
+    1
+  )
+
+  const selectedMonths = new Set([
+    currentMonth,
+    previousMonth,
+    historicalMonth
+  ])
+
+  return objects.filter(object => {
+    const month = getReportMonth(object.name)
+
+    return month !== null &&
+      month >= sinceMonth &&
+      selectedMonths.has(month) &&
+      supportedDimensionSuffixPattern.test(object.name)
+  })
 }
 
 const downloadObject = async (
@@ -189,21 +258,11 @@ export const collectGooglePlayMetrics = async (
     ))
   )
 
-  const objects = objectGroups
-    .flat()
-    .filter(object => object.name.endsWith('.csv'))
-    .filter(object => {
-      const month = getReportMonth(object.name)
-      const sinceDate = new Date(options.since)
-
-      const sinceMonth = Date.UTC(
-        sinceDate.getUTCFullYear(),
-        sinceDate.getUTCMonth(),
-        1
-      )
-
-      return month === null || month >= sinceMonth
-    })
+  const objects = selectGoogleReportObjects(
+    objectGroups.flat(),
+    options.since,
+    now
+  )
 
   const groups: StoreMetricWrite[][] = []
 
@@ -219,7 +278,7 @@ export const collectGooglePlayMetrics = async (
       appSlug: app.slug,
       collectedAt: now,
       delimiter: ',',
-      includeOverall: !dimensionSuffixPattern.test(object.name),
+      includeOverall: shouldIncludeGoogleOverall(object.name),
       provider: 'google',
       source: object.name,
       text
