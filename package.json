@@ -12,6 +12,7 @@
   "scripts": {
     "build": "turbo run build",
     "check": "turbo run check",
+    "check:security": "pnpm audit --prod",
     "clean": "turbo run clean",
     "commit": "commitprompt",
     "db:migrate:local": "pnpm --filter @santi020k/observatory-api run db:migrate:local",
@@ -23,11 +24,12 @@
     "lint:fix": "pnpm run lint:repo:fix && turbo run lint:fix",
     "lint:repo": "eslint . --cache --no-warn-ignored --max-warnings=0",
     "lint:repo:fix": "eslint . --cache --fix --no-warn-ignored --max-warnings=0",
+    "release:validate-tag": "node scripts/validate-release-tag.mjs",
     "setup:github": "node scripts/setup-github-token.mjs",
     "setup:local": "node scripts/setup-local.mjs",
-    "test": "turbo run test",
+    "test": "turbo run test && node --test scripts/*.test.mjs",
     "type-check": "turbo run type-check",
-    "verify": "pnpm run lint && pnpm run check && pnpm run type-check && pnpm run test && pnpm run doctor && pnpm run build",
+    "verify": "pnpm run lint && pnpm run check && pnpm run type-check && pnpm run test && pnpm run doctor && pnpm run check:security && pnpm run build",
     "hooks:install": "quality hooks install",
     "pre-push": "pnpm run verify"
   },

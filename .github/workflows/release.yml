@@ -21,6 +21,9 @@ jobs:
         with:
           node-version-file: .node-version
 
+      - name: Validate release tag
+        run: pnpm release:validate-tag -- "$GITHUB_REF_NAME"
+
       - name: Verify release
         run: pnpm verify
 
