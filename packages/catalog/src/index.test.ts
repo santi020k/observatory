@@ -90,6 +90,7 @@ describe('project catalog', () => {
       locales: ['en', 'es']
     })
     expect(getFeedbackProject('between-contractions')).toBeDefined()
+    expect(getFeedbackOrigins()).toContain('https://roadscore.santi020k.com')
     expect(getFeedbackOrigins()).toContain('https://between.santi020k.com')
     expect(getFeedbackOrigins()).toContain('https://roadscore.santi020k.com')
   })
