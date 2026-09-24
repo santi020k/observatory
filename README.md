@@ -114,8 +114,11 @@ Set `CORS_ORIGIN` to the dashboard origin. Configure the web app with
 `PUBLIC_API_URL=https://api.observatory.santi020k.com`; use the same URL for `API_INTERNAL_URL` so
 server-side requests reach the API directly.
 
-Version tags matching `v*` are verified before GitHub publishes their release. Generated release
-notes are grouped by feature, fix, and maintenance labels using `.github/release.yml`.
+After a release pull request is merged and its production deployment passes, dispatch the
+`Publish release` workflow from `main` with the workspace's semantic version. GitHub Actions
+verifies the release, creates the matching `v<semver>` tag at the dispatched `main` commit, and
+publishes the GitHub release. Generated release notes are grouped by feature, fix, and maintenance
+labels using `.github/release.yml`.
 
 The Worker also owns the specific product routes
 `postlens.santi020k.com/api/feedback/*` and
