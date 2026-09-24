@@ -140,8 +140,8 @@ jobs:
               const { rawConfig } = experimental_readRawConfig({ config: \"wrangler.jsonc\" })
               const crons = rawConfig.triggers?.crons
 
-              if (!rawConfig.name || !Array.isArray(crons) || crons.length === 0)
-                throw new Error(\"The API Wrangler config must define a name and cron triggers.\")
+              if (!rawConfig.name || !Array.isArray(crons))
+                throw new Error(\"The API Wrangler config must define a name and cron trigger list.\")
 
               writeFileSync(
                 process.argv[1],
