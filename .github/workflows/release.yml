@@ -45,6 +45,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
             tag_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
             if [ "$tag_sha" != "$GITHUB_SHA" ]; then
