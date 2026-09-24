@@ -6,6 +6,8 @@
 
 - Replaced the production deployment's long-lived Infisical token with short-lived GitHub OIDC
   authentication through the shared read-only machine identity.
+- Use the Infisical CLI for OIDC exchange so deployment remains compatible with the repository's
+  restricted GitHub Actions allowlist.
 
 ### Security
 
