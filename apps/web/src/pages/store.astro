@@ -219,7 +219,9 @@ const emptyStatusMessage = (
         lastSync={latestStoreSync ?
           formatRelativeDate(latestStoreSync) :
           'awaiting store setup'}
+        syncPath="/sync/stores"
         syncStatus={storeSyncStatus}
+        syncSubject="App Store and Google Play analytics data"
       />
 
       <main class="dashboard store-dashboard" id="main-content">

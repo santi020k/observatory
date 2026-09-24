@@ -4,13 +4,26 @@ import { Badge, Button, Icon, ThemeToggle } from '@santi020k/lumen-astro'
 interface Props {
   apiUrl: string
   lastSync: string
+  syncPath?: '/sync' | '/sync/stores'
   syncStatus: 'failed' | 'idle' | 'running' | 'succeeded'
+  syncSubject?: string
 }
 
-const { apiUrl, lastSync, syncStatus } = Astro.props
+const {
+  apiUrl,
+  lastSync,
+  syncPath = '/sync',
+  syncStatus,
+  syncSubject = 'project and website analytics data'
+} = Astro.props
 ---
 
-<header class="app-header" data-api-url={apiUrl}>
+<header
+  class="app-header"
+  data-api-url={apiUrl}
+  data-sync-path={syncPath}
+  data-sync-subject={syncSubject}
+>
   <Button
     aria-controls="app-sidebar"
     aria-expanded="false"
@@ -75,6 +88,11 @@ const logoutButton = document.querySelector<HTMLButtonElement>(
 
 const header = document.querySelector<HTMLElement>('.app-header')
 const apiUrl = header?.dataset.apiUrl ?? '/api'
+const syncPath = header?.dataset.syncPath ?? '/sync'
+
+const syncSubject =
+  header?.dataset.syncSubject ?? 'project and website analytics data'
+
 const sidebar = document.querySelector<HTMLElement>('[data-app-sidebar]')
 
 const sidebarTrigger = document.querySelector<HTMLButtonElement>(
@@ -211,10 +229,10 @@ for (const syncButton of syncButtons) {
     }
 
     if (headerStatus)
-      headerStatus.textContent = 'Syncing project and website analytics data.'
+      headerStatus.textContent = `Syncing ${syncSubject}.`
 
     try {
-      const response = await fetch(`${apiUrl}/sync`, {
+      const response = await fetch(`${apiUrl}${syncPath}`, {
         credentials: 'include',
         method: 'POST'
       })
