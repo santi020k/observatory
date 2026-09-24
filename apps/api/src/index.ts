@@ -251,10 +251,12 @@ export default {
   ) => {
     executionContext.waitUntil(
       (async () => {
-        if (controller.cron === '37 17 * * *') await syncStoreAnalytics(env)
-        else await syncDashboardData(env)
-
-        await cleanupAuth(env)
+        try {
+          if (controller.cron === '37 17 * * *') await syncStoreAnalytics(env)
+          else await syncDashboardData(env)
+        } finally {
+          await cleanupAuth(env)
+        }
       })()
     )
   }

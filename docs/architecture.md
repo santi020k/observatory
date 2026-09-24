@@ -46,12 +46,18 @@ GitHub App / commercial sources
 
 ## Authentication
 
-1. The browser submits an email to `/auth/request-code`.
-2. The API always returns a generic accepted message to prevent owner-email discovery.
-3. For the configured owner, a random six-digit code is HMAC-hashed and stored for ten minutes.
-4. Resend delivers the code. Local development returns it only when no Resend key is configured.
-5. A verified code is consumed and exchanged for a 30-day opaque session.
-6. Only a hash of the session token is stored. The raw token lives in an HttpOnly cookie.
+1. Email code is the primary sign-in path; passkeys and the server-only recovery code remain
+   available as alternatives.
+2. The browser submits an email to `/auth/request-code`.
+3. The API always returns a generic accepted message to prevent owner-email discovery.
+4. Requests are bounded by authorized email and by an HMAC-hashed client identity. New login and
+   recovery rate-limit records never store raw IP addresses. Legacy recovery-attempt identities
+   created before 0.3.0 age out after 24 hours, and scheduled cleanup runs even when collection
+   fails.
+5. For the configured owner, a random six-digit code is HMAC-hashed and stored for ten minutes.
+6. Resend delivers the code. Local development returns it only when no Resend key is configured.
+7. A verified code is consumed and exchanged for a 30-day opaque session.
+8. Only a hash of the session token is stored. The raw token lives in an HttpOnly cookie.
 
 ## Collection cadence
 

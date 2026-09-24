@@ -1,5 +1,6 @@
 import {
   cleanupExpiredAuth,
+  consumeAuthCode,
   countRecentAuthCodes,
   countRecentFailedAuthAttempts,
   createDb,
@@ -9,7 +10,8 @@ import {
   insertAuthCode,
   insertSession,
   recordAuthAttempt,
-  recordCodeAttempt
+  recordCodeAttempt,
+  tryInsertAuthCodeRequest
 } from '@santi020k/observatory-db'
 import type { Context, MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
@@ -23,6 +25,7 @@ const CODE_LIFETIME_MS = 10 * 60 * 1000
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
 const REQUEST_WINDOW_MS = 10 * 60 * 1000
 const MAX_CODES_PER_WINDOW = 3
+const MAX_CODE_REQUESTS_PER_IDENTITY = 8
 const MAX_RECOVERY_ATTEMPTS = 5
 const RECOVERY_ATTEMPT_WINDOW_MS = 15 * 60 * 1000
 
@@ -38,6 +41,14 @@ const getSessionCookieDomain = (
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase()
 
+const getClientIdentity = (context: Context<WorkerEnv>): string => {
+  const cloudflareIp = context.req.header('CF-Connecting-IP')
+
+  if (cloudflareIp) return cloudflareIp
+
+  return context.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ?? 'local'
+}
+
 export const requestLoginCode = async (
   context: Context<WorkerEnv>,
   email: string
@@ -48,16 +59,25 @@ export const requestLoginCode = async (
   const message =
     'If this address is authorized, a verification code is on its way.'
 
-  if (normalizedEmail !== ownerEmail) return { message }
-
   const database = createDb(context.env.DB)
   const now = Date.now()
+
+  const identityHash = await hashValue(
+    context.env.AUTH_SECRET, `auth-code-request:${getClientIdentity(context)}`
+  )
+
+  const requestAccepted = await tryInsertAuthCodeRequest(database, {
+    createdAt: now,
+    expiresAt: now + REQUEST_WINDOW_MS,
+    id: crypto.randomUUID(),
+    identityHash
+  }, now - REQUEST_WINDOW_MS, MAX_CODE_REQUESTS_PER_IDENTITY)
+
+  if (!requestAccepted) return { message }
 
   const recentCount = await countRecentAuthCodes(
     database, normalizedEmail, now - REQUEST_WINDOW_MS
   )
-
-  if (recentCount >= MAX_CODES_PER_WINDOW) return { message }
 
   const code = generateCode()
 
@@ -65,17 +85,34 @@ export const requestLoginCode = async (
     context.env.AUTH_SECRET, `${normalizedEmail}:${code}`
   )
 
-  await insertAuthCode(database, {
-    codeHash,
-    createdAt: now,
-    email: normalizedEmail,
-    expiresAt: now + CODE_LIFETIME_MS,
-    id: crypto.randomUUID()
-  })
+  const authorized =
+    normalizedEmail === ownerEmail && recentCount < MAX_CODES_PER_WINDOW
 
-  const result = await sendLoginCode(context.env, normalizedEmail, code)
+  const storeAndSendCode = async () => {
+    await insertAuthCode(database, {
+      codeHash,
+      createdAt: now,
+      email: normalizedEmail,
+      expiresAt: now + CODE_LIFETIME_MS,
+      id: crypto.randomUUID()
+    })
 
-  return { ...result, message }
+    return sendLoginCode(context.env, normalizedEmail, code)
+  }
+
+  if (context.env.ENVIRONMENT === 'development') {
+    if (!authorized) return { message }
+
+    const result = await storeAndSendCode()
+
+    return { ...result, message }
+  }
+
+  context.executionCtx.waitUntil(
+    authorized ? storeAndSendCode() : Promise.resolve()
+  )
+
+  return { message }
 }
 
 export const createOwnerSession = async (
@@ -112,36 +149,35 @@ export const verifyLoginCode = async (
   code: string
 ): Promise<boolean> => {
   const normalizedEmail = normalizeEmail(email)
-
-  if (normalizedEmail !== normalizeEmail(context.env.OWNER_EMAIL)) return false
-
   const database = createDb(context.env.DB)
   const now = Date.now()
   const record = await findLatestUsableCode(database, normalizedEmail, now)
-
-  if (!record) return false
 
   const candidateHash = await hashValue(
     context.env.AUTH_SECRET, `${normalizedEmail}:${code}`
   )
 
-  const valid = safeEqual(record.codeHash, candidateHash)
+  if (!record) {
+    await recordCodeAttempt(database, crypto.randomUUID())
 
-  await recordCodeAttempt(database, record.id, valid ? now : undefined)
+    return false
+  }
 
-  if (!valid) return false
+  const valid =
+    normalizedEmail === normalizeEmail(context.env.OWNER_EMAIL) &&
+    safeEqual(record.codeHash, candidateHash)
+
+  if (!valid) {
+    await recordCodeAttempt(database, record.id)
+
+    return false
+  }
+
+  if (!(await consumeAuthCode(database, record.id, now))) return false
 
   await createOwnerSession(context)
 
   return true
-}
-
-const getClientIdentity = (context: Context<WorkerEnv>): string => {
-  const cloudflareIp = context.req.header('CF-Connecting-IP')
-
-  if (cloudflareIp) return cloudflareIp
-
-  return context.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ?? 'local'
 }
 
 export const verifyRecoveryPasscode = async (
@@ -150,7 +186,10 @@ export const verifyRecoveryPasscode = async (
 ): Promise<'invalid' | 'limited' | 'valid'> => {
   const database = createDb(context.env.DB)
   const now = Date.now()
-  const identity = getClientIdentity(context)
+
+  const identity = await hashValue(
+    context.env.AUTH_SECRET, `recovery-attempt:${getClientIdentity(context)}`
+  )
 
   const recentFailures = await countRecentFailedAuthAttempts(
     database, identity, now - RECOVERY_ATTEMPT_WINDOW_MS

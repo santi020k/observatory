@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 
 import {
   authAttempts,
+  authCodeRequests,
   authCodes,
   feedbackItems,
   feedbackRateLimits,
@@ -512,6 +513,26 @@ export const insertAuthCode = async (
   await db.insert(authCodes).values(values)
 }
 
+export const tryInsertAuthCodeRequest = async (
+  db: ObservatoryDb,
+  values: typeof authCodeRequests.$inferInsert,
+  since: number,
+  limit: number
+): Promise<boolean> => {
+  const result = await db.run(sql`
+    INSERT INTO auth_code_requests (id, identity_hash, created_at, expires_at)
+    SELECT ${values.id}, ${values.identityHash}, ${values.createdAt}, ${values.expiresAt}
+    WHERE (
+      SELECT count(*)
+      FROM auth_code_requests
+      WHERE identity_hash = ${values.identityHash}
+        AND created_at > ${since}
+    ) < ${limit}
+  `)
+
+  return result.meta.changes === 1
+}
+
 export const countRecentAuthCodes = async (
   db: ObservatoryDb,
   email: string,
@@ -555,6 +576,27 @@ export const recordCodeAttempt = async (
     .where(eq(authCodes.id, id))
 }
 
+export const consumeAuthCode = async (
+  db: ObservatoryDb,
+  id: string,
+  now: number
+): Promise<boolean> => {
+  const result = await db
+    .update(authCodes)
+    .set({
+      attempts: sql`${authCodes.attempts} + 1`,
+      usedAt: now
+    })
+    .where(and(
+      eq(authCodes.id, id),
+      isNull(authCodes.usedAt),
+      gt(authCodes.expiresAt, now),
+      lt(authCodes.attempts, 5)
+    ))
+
+  return result.meta.changes === 1
+}
+
 export const insertSession = async (
   db: ObservatoryDb,
   values: typeof sessions.$inferInsert
@@ -585,6 +627,8 @@ export const cleanupExpiredAuth = async (
   now: number
 ): Promise<void> => {
   await db.delete(authCodes).where(lt(authCodes.expiresAt, now))
+
+  await db.delete(authCodeRequests).where(lt(authCodeRequests.expiresAt, now))
 
   await db.delete(sessions).where(lt(sessions.expiresAt, now))
 

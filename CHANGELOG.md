@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0 - 2026-09-24
+
+### Added
+
+- Made single-use email verification codes the primary Observatory sign-in path while preserving
+  passkey and recovery-code alternatives.
+- Added per-client request throttling backed by hashed identities so new login and recovery
+  rate-limit records do not persist raw IP addresses.
+
+### Changed
+
+- Mask the authorized email address on the code verification screen and clarify the 30-day session
+  behavior.
+
+### Security
+
+- Count both authorized and unauthorized code requests without revealing which email owns the
+  Observatory account.
+- Ensure legacy recovery-attempt identities age out after 24 hours even when a scheduled analytics
+  collection fails.
+
 ## 0.2.1 - 2026-09-24
 
 ### Changed

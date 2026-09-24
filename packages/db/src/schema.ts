@@ -17,6 +17,20 @@ export const authCodes = sqliteTable('auth_codes', {
   usedAt: integer('used_at')
 })
 
+export const authCodeRequests = sqliteTable(
+  'auth_code_requests', {
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    id: text('id').primaryKey(),
+    identityHash: text('identity_hash').notNull()
+  }, table => [
+    index('auth_code_requests_identity_created_idx').on(
+      table.identityHash, table.createdAt
+    ),
+    index('auth_code_requests_expires_idx').on(table.expiresAt)
+  ]
+)
+
 export const sessions = sqliteTable('sessions', {
   createdAt: integer('created_at').notNull(),
   email: text('email').notNull(),
