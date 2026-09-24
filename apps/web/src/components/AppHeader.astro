@@ -50,7 +50,13 @@ const {
     }
     <div class="app-header__sync">
       <span class="sync-meta">Updated {lastSync}</span>
-      <Button data-sync-button size="sm" variant="outline">
+      <Button
+        aria-label={`Sync ${syncSubject}`}
+        data-sync-button
+        size="sm"
+        title="Sync now"
+        variant="outline"
+      >
         <Icon aria-hidden="true" name="refresh-cw" />
         <span data-sync-label>Sync now</span>
       </Button>
@@ -212,12 +218,21 @@ const setSyncButtonLabel = (button: HTMLButtonElement, label: string) => {
 
   if (labelElement) labelElement.textContent = label
   else button.textContent = label
+
+  button.setAttribute('aria-label', label)
 }
 
 for (const syncButton of syncButtons) {
   syncButton.addEventListener('click', async () => {
     const originalContents = new Map(
       [...syncButtons].map(button => [button, button.innerHTML])
+    )
+
+    const originalLabels = new Map(
+      [...syncButtons].map(button => [
+        button,
+        button.getAttribute('aria-label') ?? 'Sync now'
+      ])
     )
 
     for (const button of syncButtons) {
@@ -253,6 +268,10 @@ for (const syncButton of syncButtons) {
       window.setTimeout(() => {
         for (const button of syncButtons) {
           button.innerHTML = originalContents.get(button) ?? 'Sync now'
+
+          button.setAttribute(
+            'aria-label', originalLabels.get(button) ?? 'Sync now'
+          )
 
           button.disabled = false
 

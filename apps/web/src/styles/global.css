@@ -679,6 +679,7 @@ p {
 .panel-heading {
   display: flex;
   align-items: flex-end;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 2rem;
 }
@@ -708,6 +709,7 @@ p {
 
 .hero-controls {
   display: grid;
+  max-width: 100%;
   justify-items: end;
   gap: 0.75rem;
 }
@@ -715,13 +717,12 @@ p {
 .range-picker {
   display: inline-flex;
   max-width: min(100%, 32rem);
+  flex-wrap: wrap;
   gap: 0.2rem;
   padding: 0.25rem;
-  overflow-x: auto;
   border: 1px solid hsl(var(--line));
   border-radius: 0.75rem;
   background: hsl(var(--surface));
-  scrollbar-width: thin;
 }
 
 .range-picker a {
