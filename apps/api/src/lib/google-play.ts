@@ -194,8 +194,15 @@ export const collectGooglePlayMetrics = async (
     .filter(object => object.name.endsWith('.csv'))
     .filter(object => {
       const month = getReportMonth(object.name)
+      const sinceDate = new Date(options.since)
 
-      return month === null || month >= options.since
+      const sinceMonth = Date.UTC(
+        sinceDate.getUTCFullYear(),
+        sinceDate.getUTCMonth(),
+        1
+      )
+
+      return month === null || month >= sinceMonth
     })
 
   const groups: StoreMetricWrite[][] = []

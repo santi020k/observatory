@@ -99,7 +99,10 @@ const saveProviderMetrics = async (
   collect: () => Promise<StoreMetricWrite[]>,
   configured: boolean,
   now: number
-): Promise<number> => {
+): Promise<{
+  points: number
+  status: 'failed' | 'skipped' | 'succeeded'
+}> => {
   if (!configured) {
     await recordSync(
       env,
@@ -112,7 +115,7 @@ const saveProviderMetrics = async (
       now
     )
 
-    return 0
+    return { points: 0, status: 'skipped' }
   }
 
   try {
@@ -130,7 +133,7 @@ const saveProviderMetrics = async (
       null
     )
 
-    return points.length
+    return { points: points.length, status: 'succeeded' }
   } catch (error) {
     const errorCode = safeErrorCode(error)
 
@@ -144,78 +147,157 @@ const saveProviderMetrics = async (
       errorCode
     )
 
-    return 0
+    return { points: 0, status: 'failed' }
   }
+}
+
+type ProviderSyncResult = Awaited<ReturnType<typeof saveProviderMetrics>>
+
+const syncAppleApp = async (
+  env: Bindings,
+  app: PublishedApp,
+  now: number,
+  since: number
+): Promise<ProviderSyncResult> => {
+  let configuration: ReturnType<typeof readAppleStoreConfiguration> = null
+
+  try {
+    configuration = readAppleStoreConfiguration(env, app.slug)
+  } catch {
+    return saveProviderMetrics(
+      env,
+      app,
+      'apple',
+      () => Promise.reject(new Error('Apple store configuration is invalid.')),
+      true,
+      now
+    )
+  }
+
+  if (!configuration)
+    return saveProviderMetrics(
+      env,
+      app,
+      'apple',
+      () => Promise.resolve([]),
+      false,
+      now
+    )
+
+  return saveProviderMetrics(
+    env,
+    app,
+    'apple',
+    () => collectAppleStoreMetrics(app, configuration, { now, since }),
+    true,
+    now
+  )
+}
+
+interface GoogleConfigurationState {
+  configuration: ReturnType<typeof readGooglePlayConfiguration>
+  failed: boolean
+}
+
+const syncGoogleApp = async (
+  env: Bindings,
+  app: PublishedApp,
+  configurationState: GoogleConfigurationState,
+  now: number,
+  since: number
+): Promise<ProviderSyncResult> => {
+  const configuration = configurationState.configuration
+
+  if (configurationState.failed)
+    return saveProviderMetrics(
+      env,
+      app,
+      'google',
+      () => Promise.reject(new Error('Google Play configuration is invalid.')),
+      true,
+      now
+    )
+
+  if (!configuration)
+    return saveProviderMetrics(
+      env,
+      app,
+      'google',
+      () => Promise.resolve([]),
+      false,
+      now
+    )
+
+  return saveProviderMetrics(
+    env,
+    app,
+    'google',
+    () => collectGooglePlayMetrics(
+      app,
+      configuration,
+      { now, since }
+    ),
+    true,
+    now
+  )
 }
 
 export const syncStoreAnalytics = async (
   env: Bindings,
   now: number = Date.now()
-): Promise<{ points: number }> => {
+): Promise<{
+  failed: number
+  points: number
+  skipped: number
+  succeeded: number
+}> => {
   const apps = getPublishedApps()
   const since = now - backfillMilliseconds
   let points = 0
-  let googleConfiguration: ReturnType<typeof readGooglePlayConfiguration> = null
+  let failed = 0
+  let skipped = 0
+  let succeeded = 0
+
+  const googleConfigurationState: GoogleConfigurationState = {
+    configuration: null,
+    failed: false
+  }
 
   try {
-    googleConfiguration = readGooglePlayConfiguration(env)
+    googleConfigurationState.configuration = readGooglePlayConfiguration(env)
   } catch {
-    googleConfiguration = null
+    googleConfigurationState.failed = true
+  }
+
+  const recordResult = (result: Awaited<ReturnType<typeof saveProviderMetrics>>) => {
+    points += result.points
+
+    if (result.status === 'failed') failed += 1
+    else if (result.status === 'skipped') skipped += 1
+    else succeeded += 1
   }
 
   for (const app of apps) {
     if (app.apple) {
-      let configuration: ReturnType<typeof readAppleStoreConfiguration> = null
+      const result = await syncAppleApp(env, app, now, since)
 
-      try {
-        configuration = readAppleStoreConfiguration(env, app.slug)
-      } catch {
-        configuration = null
-      }
-
-      points += configuration ?
-        await saveProviderMetrics(
-          env,
-          app,
-          'apple',
-          () => collectAppleStoreMetrics(app, configuration, { now, since }),
-          true,
-          now
-        ) :
-        await saveProviderMetrics(
-          env,
-          app,
-          'apple',
-          () => Promise.resolve([]),
-          false,
-          now
-        )
+      recordResult(result)
     }
 
-    if (app.google)
-      points += googleConfiguration ?
-        await saveProviderMetrics(
-          env,
-          app,
-          'google',
-          () => collectGooglePlayMetrics(app, googleConfiguration, {
-            now,
-            since
-          }),
-          true,
-          now
-        ) :
-        await saveProviderMetrics(
-          env,
-          app,
-          'google',
-          () => Promise.resolve([]),
-          false,
-          now
-        )
+    if (app.google) {
+      const result = await syncGoogleApp(
+        env,
+        app,
+        googleConfigurationState,
+        now,
+        since
+      )
+
+      recordResult(result)
+    }
   }
 
-  return { points }
+  return { failed, points, skipped, succeeded }
 }
 
 type StorePoint = Awaited<ReturnType<typeof getStoreMetricsSince>>[number]

@@ -210,7 +210,10 @@ app.post('/sync/cloudflare', requireAuth, async context => {
 app.post('/sync/stores', requireAuth, async context => {
   const result = await syncStoreAnalytics(context.env)
 
-  return context.json({ ...result, status: 'succeeded' })
+  return context.json({
+    ...result,
+    status: result.failed > 0 ? 'failed' : 'succeeded'
+  })
 })
 
 app.notFound(context => context.json(
