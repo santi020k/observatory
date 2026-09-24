@@ -1,0 +1,28 @@
+name: Quality
+
+on:
+  pull_request: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up pnpm workspace
+        uses: santi020k/quality/actions/setup-pnpm@eec1701b98bcc0b76d36af288ee78a0369cd84cc # v1
+        with:
+          node-version-file: .node-version
+
+      - name: Generate Astro types
+        run: pnpm --filter @santi020k/observatory-web exec astro sync
+
+      - name: Verify repository
+        run: pnpm verify

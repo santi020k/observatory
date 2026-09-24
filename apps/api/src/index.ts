@@ -2,7 +2,7 @@ import {
   analyticsRangeSchema,
   updateProjectSettingSchema
 } from '@santi020k/observatory-api-types'
-import { getFeedbackOrigins } from '@santi020k/observatory-catalog'
+import { getFeedbackProject } from '@santi020k/observatory-catalog'
 import { createDb, setProjectPreference } from '@santi020k/observatory-db'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
@@ -47,6 +47,16 @@ const readCorsOrigin = (environment: unknown): string | null => {
   return environment.CORS_ORIGIN
 }
 
+const feedbackProjectPath = /^\/(?:api\/)?feedback\/projects\/([^/]+)/
+
+const getFeedbackOriginsForPath = (path: string): readonly string[] => {
+  const projectSlug = feedbackProjectPath.exec(path)?.[1]
+
+  if (!projectSlug) return []
+
+  return getFeedbackProject(projectSlug)?.allowedOrigins ?? []
+}
+
 const getAllowedOrigins = (
   environment: unknown,
   path: string
@@ -54,12 +64,7 @@ const getAllowedOrigins = (
   ...(readCorsOrigin(environment)
     ?.split(',')
     .map(origin => origin.trim()) ?? []),
-  ...(
-    path.startsWith('/feedback/projects/') ||
-    path.startsWith('/api/feedback/projects/') ?
-      getFeedbackOrigins() :
-      []
-  )
+  ...getFeedbackOriginsForPath(path)
 ]
 
 app.use('*', async (context, next) => {
