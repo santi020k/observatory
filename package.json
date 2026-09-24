@@ -24,13 +24,14 @@
     "lint:fix": "pnpm run lint:repo:fix && turbo run lint:fix",
     "lint:repo": "eslint . --cache --no-warn-ignored --max-warnings=0",
     "lint:repo:fix": "eslint . --cache --fix --no-warn-ignored --max-warnings=0",
+    "prepare": "pnpm run hooks:install",
     "release:validate-tag": "node scripts/validate-release-tag.mjs",
     "setup:github": "node scripts/setup-github-token.mjs",
     "setup:local": "node scripts/setup-local.mjs",
     "test": "turbo run test && node --test scripts/*.test.mjs",
     "type-check": "turbo run type-check",
     "verify": "pnpm run lint && pnpm run check && pnpm run type-check && pnpm run test && pnpm run doctor && pnpm run check:security && pnpm run build",
-    "hooks:install": "quality hooks install",
+    "hooks:install": "node scripts/install-quality-hooks.mjs",
     "pre-push": "pnpm run verify"
   },
   "devDependencies": {

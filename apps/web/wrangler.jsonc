@@ -4,6 +4,10 @@
   "main": "@astrojs/cloudflare/entrypoints/server",
   "compatibility_date": "2026-07-24",
   "compatibility_flags": ["global_fetch_strictly_public"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist",
+  },
   "routes": [
     {
       "pattern": "observatory.santi020k.com",
