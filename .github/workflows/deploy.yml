@@ -24,17 +24,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - name: Set up pnpm workspace
+        uses: santi020k/quality/actions/setup-pnpm@eec1701b98bcc0b76d36af288ee78a0369cd84cc # v1.1.1
         with:
           node-version-file: .node-version
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Install Infisical CLI
         run: npm install --global @infisical/cli@0.43.124
@@ -42,10 +35,12 @@ jobs:
       - name: Validate deployment credentials
         env:
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
-        run: >-
-          infisical run --env=prod --path=/apps/api --
-          sh -c 'test -n "$CLOUDFLARE_DEPLOY_API_TOKEN"
-          || { echo "::error::CLOUDFLARE_DEPLOY_API_TOKEN is missing in Infisical"; exit 1; }'
+        run: |
+          # The nested shell expands Infisical-injected values.
+          # shellcheck disable=SC2016
+          infisical run --env=prod --path=/apps/api -- \
+            sh -c 'test -n "$CLOUDFLARE_DEPLOY_API_TOKEN" \
+              || { echo "::error::CLOUDFLARE_DEPLOY_API_TOKEN is missing in Infisical"; exit 1; }'
 
       - name: Load production secrets and verify
         env:
@@ -58,15 +53,19 @@ jobs:
       - name: Apply database migrations
         env:
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
-        run: >-
-          infisical run --env=prod --path=/apps/api --
-          sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN"
-          pnpm --filter @santi020k/observatory-api run db:migrate:remote'
+        run: |
+          # The nested shell expands Infisical-injected values.
+          # shellcheck disable=SC2016
+          infisical run --env=prod --path=/apps/api -- \
+            sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+              pnpm --filter @santi020k/observatory-api run db:migrate:remote'
 
       - name: Deploy API Worker
         env:
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
         run: |
+          # Nested processes expand Infisical-injected values.
+          # shellcheck disable=SC2016
           infisical run --silent --env=prod --path=/apps/api -- \
             node --input-type=module -e '
               const names = [
@@ -92,6 +91,8 @@ jobs:
             ' | infisical run --silent --env=prod --path=/apps/api -- \
               sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
                 pnpm --filter @santi020k/observatory-api exec wrangler secret bulk'
+          # The nested shell expands Infisical-injected values.
+          # shellcheck disable=SC2016
           infisical run --env=prod --path=/apps/api -- sh -c '
             set -eu
             version_tag="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -108,9 +109,11 @@ jobs:
       - name: Deploy web Worker
         env:
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
-        run: >-
-          infisical run --env=prod --path=/apps/api --
-          infisical run --env=prod --path=/apps/web --
+        run: |
+          # The nested shell expands Infisical-injected values.
+          # shellcheck disable=SC2016
+          infisical run --env=prod --path=/apps/api -- \
+          infisical run --env=prod --path=/apps/web -- \
           sh -c '
             set -eu
             pnpm --filter @santi020k/observatory-web build
