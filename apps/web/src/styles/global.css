@@ -258,20 +258,56 @@ p {
 
 .verify-shell {
   min-height: 100vh;
+  min-height: 100svh;
   align-content: center;
-  gap: 2rem;
+  gap: clamp(1.25rem, 3vw, 2rem);
 }
 
 .verify-card {
+  width: min(100%, 28rem);
+  padding: clamp(1.5rem, 4vw, 2.25rem);
   text-align: center;
 }
 
 .verify-card .auth-card__icon {
+  width: 2.75rem;
+  margin-bottom: 1.1rem;
   margin-inline: auto;
+  border-radius: 0.85rem;
+}
+
+.verify-card__intro {
+  display: grid;
+  justify-items: center;
+}
+
+.verify-card__intro .eyebrow {
+  margin-bottom: 0.55rem;
+}
+
+.verify-card__intro h1 {
+  margin-bottom: 0.65rem;
+}
+
+.verify-card__intro p {
+  max-width: 23rem;
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  text-wrap: balance;
+}
+
+.verify-card form {
+  gap: 1rem;
+  margin-top: 1.4rem;
+}
+
+.verify-card .ui-field {
+  justify-items: center;
 }
 
 .verify-card .ui-button-link {
-  margin-top: 1rem;
+  margin-top: 0.8rem;
 }
 
 .app-shell {

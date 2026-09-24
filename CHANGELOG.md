@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 - 2026-09-24
+
+### Changed
+
+- Tightened the verification screen hierarchy and spacing across desktop and mobile layouts.
+- Reworded the verification actions to make the next step and alternate-email path clearer.
+- Replaced the sign-in email placeholder with a neutral example address.
+
 ## 0.3.0 - 2026-09-24
 
 ### Added

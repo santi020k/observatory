@@ -28,13 +28,14 @@ const apiUrl = getBrowserApiUrl()
       <span class="auth-card__icon"><Icon aria-hidden="true" name="mail-check" />
       </span
       >
-      <span class="eyebrow">Check your inbox</span>
-      <h1>Enter your code</h1>
-      <p>
-        We sent a six-digit code to
-        <strong data-masked-email>your authorized email</strong>. It expires in
-        ten minutes.
-      </p>
+      <div class="verify-card__intro">
+        <span class="eyebrow">Check your inbox</span>
+        <h1>Enter your code</h1>
+        <p>
+          Sent to <strong data-masked-email>your authorized email</strong>. The
+          code expires in 10 minutes.
+        </p>
+      </div>
 
       <Alert data-development-code-alert hidden variant="default">
         Local development code: <strong data-development-code></strong>
@@ -58,13 +59,13 @@ const apiUrl = getBrowserApiUrl()
           <InputOTP id="code" name="code" length={6} required />
         </Field>
         <Button size="lg" type="submit">
-          <span data-submit-label>Open Observatory</span>
+          <span data-submit-label>Verify and continue</span>
           <Icon aria-hidden="true" name="arrow-right" />
         </Button>
       </form>
       <ButtonLink href="/login/" variant="inline">
         <Icon aria-hidden="true" name="arrow-left" />
-        Use a different email
+        Use another email
       </ButtonLink>
     </Card>
   </main>
@@ -138,7 +139,7 @@ const apiUrl = getBrowserApiUrl()
 
       if (buttonLabel)
         buttonLabel.textContent =
-          submitting ? 'Verifying…' : 'Open Observatory'
+          submitting ? 'Verifying…' : 'Verify and continue'
     }
   }
 
