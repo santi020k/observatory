@@ -78,7 +78,10 @@ jobs:
                 "MAIL_FROM",
                 "OWNER_EMAIL",
                 "OWNER_PASSCODE",
-                "SITE_URL"
+                "RESEND_API_KEY",
+                "SITE_URL",
+                "TURNSTILE_SECRET_KEY",
+                "TURNSTILE_SITE_KEY"
               ]
               const optionalNames = [
                 "APP_STORE_CONNECT_ISSUER_ID",
