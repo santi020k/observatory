@@ -1,6 +1,6 @@
-import { defineMiddleware } from 'astro:middleware'
+import type { MiddlewareHandler } from 'astro'
 
-export const onRequest = defineMiddleware(async (_context, next) => {
+export const onRequest: MiddlewareHandler = async (_context, next) => {
   const response = await next()
 
   response.headers.set('Content-Signal', 'search=no, ai-input=no, ai-train=no')
@@ -8,4 +8,4 @@ export const onRequest = defineMiddleware(async (_context, next) => {
   response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
 
   return response
-})
+}

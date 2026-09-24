@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1 - 2026-09-24
+
+### Changed
+
+- Replaced the production deployment's long-lived Infisical token with short-lived GitHub OIDC
+  authentication through the shared read-only machine identity.
+
+### Security
+
+- Removed the GitHub-hosted Infisical bootstrap credential from the deployment path.
+
 ## 0.2.0 - 2026-09-24
 
 ### Added

@@ -85,10 +85,10 @@ migrations, deploys the API Worker, and then deploys the web Worker. The public 
 `https://observatory.santi020k.com`; the API Worker is available at
 `https://api.observatory.santi020k.com`.
 
-The workflow stores only a read-only, production-scoped `INFISICAL_TOKEN` bootstrap credential in
-the GitHub `production` environment. Application and Cloudflare credentials remain in Infisical.
-Deployments are serialized so a newer push cannot interrupt a database migration or partially
-replace a release.
+The workflow authenticates to Infisical with GitHub OIDC through the read-only
+`github-actions-apps` machine identity. No long-lived Infisical credential is stored in GitHub;
+application and Cloudflare credentials remain in Infisical. Deployments are serialized so a newer
+push cannot interrupt a database migration or partially replace a release.
 
 Keep `CLOUDFLARE_API_TOKEN` scoped to runtime analytics reads. CI uses the separate
 `CLOUDFLARE_DEPLOY_API_TOKEN`, which needs Workers Scripts, Workers KV, and D1 edit permissions for
@@ -114,8 +114,11 @@ Set `CORS_ORIGIN` to the dashboard origin. Configure the web app with
 `PUBLIC_API_URL=https://api.observatory.santi020k.com`; use the same URL for `API_INTERNAL_URL` so
 server-side requests reach the API directly.
 
-Version tags matching `v*` are verified before GitHub publishes their release. Generated release
-notes are grouped by feature, fix, and maintenance labels using `.github/release.yml`.
+After a release pull request is merged and its production deployment passes, dispatch the
+`Publish release` workflow from `main` with the workspace's semantic version. GitHub Actions
+verifies the release, creates the matching `v<semver>` tag at the dispatched `main` commit, and
+publishes the GitHub release. Generated release notes are grouped by feature, fix, and maintenance
+labels using `.github/release.yml`.
 
 The Worker also owns the specific product routes
 `postlens.santi020k.com/api/feedback/*` and
