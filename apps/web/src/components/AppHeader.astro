@@ -1,29 +1,41 @@
 ---
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import Button from '@santi020k/lumen-astro/components/Button'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
+import { Badge, Button, Icon, ThemeToggle } from '@santi020k/lumen-astro'
 
 interface Props {
   apiUrl: string
   lastSync: string
+  syncPath?: '/sync' | '/sync/stores'
   syncStatus: 'failed' | 'idle' | 'running' | 'succeeded'
+  syncSubject?: string
 }
 
-const { apiUrl, lastSync, syncStatus } = Astro.props
+const {
+  apiUrl,
+  lastSync,
+  syncPath = '/sync',
+  syncStatus,
+  syncSubject = 'project and website analytics data'
+} = Astro.props
 ---
 
-<header class="app-header" data-api-url={apiUrl}>
-  <button
+<header
+  class="app-header"
+  data-api-url={apiUrl}
+  data-sync-path={syncPath}
+  data-sync-subject={syncSubject}
+>
+  <Button
     aria-controls="app-sidebar"
     aria-expanded="false"
     aria-label="Open navigation"
     class="sidebar-trigger"
     data-sidebar-trigger
+    size="icon"
     type="button"
+    variant="ghost"
   >
     <Icon aria-hidden="true" name="menu" />
-  </button>
+  </Button>
   <div class="app-header__workspace">
     <span class="app-header__context">Observatory</span>
     <Badge variant="outline"><span class="status-dot"></span> Private workspace
@@ -38,7 +50,13 @@ const { apiUrl, lastSync, syncStatus } = Astro.props
     }
     <div class="app-header__sync">
       <span class="sync-meta">Updated {lastSync}</span>
-      <Button data-sync-button size="sm" variant="outline">
+      <Button
+        aria-label={`Sync ${syncSubject}`}
+        data-sync-button
+        size="sm"
+        title="Sync now"
+        variant="outline"
+      >
         <Icon aria-hidden="true" name="refresh-cw" />
         <span data-sync-label>Sync now</span>
       </Button>
@@ -76,6 +94,11 @@ const logoutButton = document.querySelector<HTMLButtonElement>(
 
 const header = document.querySelector<HTMLElement>('.app-header')
 const apiUrl = header?.dataset.apiUrl ?? '/api'
+const syncPath = header?.dataset.syncPath ?? '/sync'
+
+const syncSubject =
+  header?.dataset.syncSubject ?? 'project and website analytics data'
+
 const sidebar = document.querySelector<HTMLElement>('[data-app-sidebar]')
 
 const sidebarTrigger = document.querySelector<HTMLButtonElement>(
@@ -195,12 +218,21 @@ const setSyncButtonLabel = (button: HTMLButtonElement, label: string) => {
 
   if (labelElement) labelElement.textContent = label
   else button.textContent = label
+
+  button.setAttribute('aria-label', label)
 }
 
 for (const syncButton of syncButtons) {
   syncButton.addEventListener('click', async () => {
     const originalContents = new Map(
       [...syncButtons].map(button => [button, button.innerHTML])
+    )
+
+    const originalLabels = new Map(
+      [...syncButtons].map(button => [
+        button,
+        button.getAttribute('aria-label') ?? 'Sync now'
+      ])
     )
 
     for (const button of syncButtons) {
@@ -212,10 +244,10 @@ for (const syncButton of syncButtons) {
     }
 
     if (headerStatus)
-      headerStatus.textContent = 'Syncing project and website analytics data.'
+      headerStatus.textContent = `Syncing ${syncSubject}.`
 
     try {
-      const response = await fetch(`${apiUrl}/sync`, {
+      const response = await fetch(`${apiUrl}${syncPath}`, {
         credentials: 'include',
         method: 'POST'
       })
@@ -236,6 +268,10 @@ for (const syncButton of syncButtons) {
       window.setTimeout(() => {
         for (const button of syncButtons) {
           button.innerHTML = originalContents.get(button) ?? 'Sync now'
+
+          button.setAttribute(
+            'aria-label', originalLabels.get(button) ?? 'Sync now'
+          )
 
           button.disabled = false
 

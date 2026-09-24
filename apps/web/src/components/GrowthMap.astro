@@ -1,0 +1,192 @@
+---
+import type { GrowthMapPoint } from '@/lib/growth-map'
+
+import Badge from '@santi020k/lumen-astro/components/Badge'
+import Chart from '@santi020k/lumen-astro/components/Chart'
+
+interface Props {
+  points: readonly GrowthMapPoint[]
+  range: string
+  rangeLabel: string
+  reachDividerX: number
+}
+
+const { points, range, rangeLabel, reachDividerX } = Astro.props
+const width = 640
+const height = 360
+const plot = { bottom: 306, left: 64, right: 612, top: 34 }
+const xFor = (point: GrowthMapPoint): number => plot.left + (point.x / 100) * (plot.right - plot.left)
+const yFor = (point: GrowthMapPoint): number => plot.top + (point.y / 100) * (plot.bottom - plot.top)
+const dividerX = plot.left + (reachDividerX / 100) * (plot.right - plot.left)
+
+const getBadgeVariant = (
+  signal: GrowthMapPoint['signal']
+): 'secondary' | 'success' | 'warning' => {
+  if (signal === 'accelerating' || signal === 'growing') return 'success'
+
+  if (signal === 'slowing') return 'warning'
+
+  return 'secondary'
+}
+
+const formatMomentum = (value: number): string => `${value > 0 ? '+' : ''}${new Intl.NumberFormat('en', {
+  maximumFractionDigits: 1
+}).format(value)}%`
+---
+
+<Chart
+  aria-label={`npm project reach and momentum for ${rangeLabel}`}
+  caption={`Current rolling 30-day npm reach on a logarithmic horizontal scale, compared with download-velocity change during ${rangeLabel}.`}
+  class="growth-map"
+  presentation="bare"
+>
+  <div
+    aria-label="Scrollable npm reach and momentum plot"
+    class="growth-map__plot"
+    role="region"
+    tabindex="0"
+  >
+    <svg
+      aria-hidden="true"
+      preserveAspectRatio="xMidYMid meet"
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      <rect
+        class="growth-map__zone growth-map__zone--emerging"
+        height={(plot.bottom - plot.top) / 2}
+        width={dividerX - plot.left}
+        x={plot.left}
+        y={plot.top}
+      />
+      <rect
+        class="growth-map__zone growth-map__zone--scale"
+        height={(plot.bottom - plot.top) / 2}
+        width={plot.right - dividerX}
+        x={dividerX}
+        y={plot.top}
+      />
+      <rect
+        class="growth-map__zone growth-map__zone--explore"
+        height={(plot.bottom - plot.top) / 2}
+        width={dividerX - plot.left}
+        x={plot.left}
+        y={(plot.top + plot.bottom) / 2}
+      />
+      <rect
+        class="growth-map__zone growth-map__zone--recover"
+        height={(plot.bottom - plot.top) / 2}
+        width={plot.right - dividerX}
+        x={dividerX}
+        y={(plot.top + plot.bottom) / 2}
+      />
+
+      <g class="growth-map__grid">
+        <line
+          x1={dividerX}
+          x2={dividerX}
+          y1={plot.top}
+          y2={plot.bottom}
+        />
+        <line
+          x1={plot.left}
+          x2={plot.right}
+          y1={(plot.top + plot.bottom) / 2}
+          y2={(plot.top + plot.bottom) / 2}
+        />
+      </g>
+
+      <g class="growth-map__zone-labels">
+        <text x={plot.left + 14} y={plot.top + 22}>Emerging</text>
+        <text text-anchor="end" x={plot.right - 14} y={plot.top + 22}>
+          Scale
+        </text>
+        <text x={plot.left + 14} y={plot.bottom - 12}>Explore</text>
+        <text text-anchor="end" x={plot.right - 14} y={plot.bottom - 12}>
+          Recover
+        </text>
+      </g>
+
+      <g class="growth-map__axis-labels">
+        <text
+          text-anchor="middle"
+          transform={`rotate(-90 16 ${(plot.top + plot.bottom) / 2})`}
+          x="16"
+          y={(plot.top + plot.bottom) / 2}
+        >
+          Momentum · slowing to growing
+        </text>
+        <text text-anchor="middle" x={(plot.left + plot.right) / 2} y="346">
+          Current npm reach · lower to higher (log scale)
+        </text>
+      </g>
+
+      <g class="growth-map__points">
+        {
+          points.map(point => (
+            <circle
+              class={`growth-map__point growth-map__point--${point.signal}`}
+              cx={xFor(point)}
+              cy={yFor(point)}
+              r="7"
+            >
+              <title>
+                {`${point.name}: ${formatMomentum(point.momentumPercent)} momentum, ${new Intl.NumberFormat('en').format(point.reach)} rolling 30-day downloads`}
+              </title>
+            </circle>
+          ))
+        }
+      </g>
+    </svg>
+  </div>
+
+  <ul aria-label="Plotted npm projects" class="growth-map__legend">
+    {
+      points.map(point => (
+        <li>
+          <span
+            aria-hidden="true"
+            class={`growth-map__legend-dot growth-map__legend-dot--${point.signal}`}
+          />
+          <a href={`/projects/${point.slug}/?range=${range}`}>{point.name}</a>
+          <strong>{formatMomentum(point.momentumPercent)}</strong>
+        </li>
+      ))
+    }
+  </ul>
+
+  <details class="growth-map__data">
+    <summary>View project positions</summary>
+    <div>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Project</th>
+            <th scope="col">Momentum</th>
+            <th scope="col">Reach</th>
+            <th scope="col">Zone</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            points.map(point => (
+              <tr>
+                <th scope="row">
+                  <a href={`/projects/${point.slug}/?range=${range}`}>
+                    {point.name}
+                  </a>
+                </th>
+                <td>{formatMomentum(point.momentumPercent)}</td>
+                <td>{new Intl.NumberFormat('en').format(point.reach)}</td>
+                <td>
+                  <Badge variant={getBadgeVariant(point.signal)}>
+                    {point.quadrant}
+                  </Badge>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </details>
+</Chart>

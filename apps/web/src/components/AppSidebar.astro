@@ -1,7 +1,5 @@
 ---
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import Sidebar from '@santi020k/lumen-astro/components/Sidebar'
+import { Badge, Button, Icon, Sidebar } from '@santi020k/lumen-astro'
 import type {
   AnalyticsRange,
   ProjectSettings
@@ -49,14 +47,16 @@ const getCategoryIcon = (
 >
   <div class="app-sidebar__brand">
     <Brand />
-    <button
+    <Button
       aria-label="Close navigation"
       class="sidebar-close"
       data-sidebar-close
+      size="icon"
       type="button"
+      variant="ghost"
     >
       <Icon aria-hidden="true" name="x" />
-    </button>
+    </Button>
   </div>
 
   <nav aria-label="Primary navigation" class="sidebar-nav">
@@ -81,6 +81,18 @@ const getCategoryIcon = (
       <span>
         <strong>Feedback operations</strong>
         <small>Inbox and kanbans</small>
+      </span>
+    </a>
+
+    <a
+      aria-current={currentPath === '/store/' ? 'page' : undefined}
+      class="sidebar-link sidebar-link--overview"
+      href={`/store/?range=${range}`}
+    >
+      <Icon aria-hidden="true" name="download" />
+      <span>
+        <strong>Published apps</strong>
+        <small>Installs and store health</small>
       </span>
     </a>
 

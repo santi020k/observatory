@@ -27,8 +27,14 @@ const MAX_RECOVERY_ATTEMPTS = 5
 const RECOVERY_ATTEMPT_WINDOW_MS = 15 * 60 * 1000
 
 const getSessionCookieName = (environment: string): string => environment === 'production' ?
-  '__Host-observatory_session' :
+  '__Secure-observatory_session' :
   'observatory_session'
+
+const getSessionCookieDomain = (
+  environment: WorkerEnv['Bindings']
+): string | undefined => environment.ENVIRONMENT === 'production' ?
+  new URL(environment.SITE_URL).hostname :
+  undefined
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase()
 
@@ -79,6 +85,7 @@ export const createOwnerSession = async (
   const now = Date.now()
   const token = generateToken()
   const tokenHash = await hashValue(context.env.AUTH_SECRET, token)
+  const cookieDomain = getSessionCookieDomain(context.env)
 
   await insertSession(database, {
     createdAt: now,
@@ -90,6 +97,7 @@ export const createOwnerSession = async (
   })
 
   setCookie(context, getSessionCookieName(context.env.ENVIRONMENT), token, {
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
     httpOnly: true,
     maxAge: SESSION_LIFETIME_MS / 1000,
     path: '/',
@@ -206,6 +214,7 @@ export const requireAuth: MiddlewareHandler<WorkerEnv> = async (
 
 export const logout = async (context: Context<WorkerEnv>): Promise<void> => {
   const cookieName = getSessionCookieName(context.env.ENVIRONMENT)
+  const cookieDomain = getSessionCookieDomain(context.env)
   const token = getCookie(context, cookieName)
 
   if (token) {
@@ -215,7 +224,10 @@ export const logout = async (context: Context<WorkerEnv>): Promise<void> => {
     await deleteSession(database, tokenHash)
   }
 
-  deleteCookie(context, cookieName, { path: '/' })
+  deleteCookie(context, cookieName, {
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
+    path: '/'
+  })
 }
 
 export const cleanupAuth = async (

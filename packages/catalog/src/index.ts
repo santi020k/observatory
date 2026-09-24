@@ -9,10 +9,43 @@ export interface CatalogOverride {
   vscodeExtensions?: readonly string[]
 }
 
+export type ReleaseDownloadChannel = 'homebrew' |
+  'homebrew-or-update' |
+  'direct' |
+  'update' |
+  'website'
+
+export interface GithubReleaseAssetMapping {
+  assetNamePattern: string
+  channel: ReleaseDownloadChannel
+}
+
+export interface GithubReleaseSource {
+  assets: readonly GithubReleaseAssetMapping[]
+  repository: string
+  slug: string
+}
+
 export interface FeedbackProject {
   allowedOrigins: readonly string[]
   displayName: string
   locales: readonly string[]
+  slug: string
+}
+
+export interface AppleStoreListing {
+  appId: string
+  bundleId: string
+}
+
+export interface GooglePlayListing {
+  packageName: string
+}
+
+export interface PublishedApp {
+  apple?: AppleStoreListing
+  displayName: string
+  google?: GooglePlayListing
   slug: string
 }
 
@@ -67,6 +100,35 @@ export const getFeedbackOrigins = (): string[] => [
   ...new Set(getFeedbackProjects().flatMap(project => project.allowedOrigins))
 ]
 
+const publishedApps: readonly PublishedApp[] = [
+  {
+    apple: {
+      appId: '6805250815',
+      bundleId: 'com.santi020k.lumen.playground.apple'
+    },
+    displayName: 'Lumen Playground',
+    slug: 'lumen'
+  },
+  {
+    apple: {
+      appId: '6804601300',
+      bundleId: 'com.santi020k.PostLens'
+    },
+    displayName: 'PostLens',
+    slug: 'postlens'
+  },
+  {
+    apple: {
+      appId: '6802499436',
+      bundleId: 'com.santi020k.betweencontractions'
+    },
+    displayName: 'Between Contractions',
+    slug: 'betweencontractions'
+  }
+]
+
+export const getPublishedApps = (): readonly PublishedApp[] => publishedApps
+
 export const githubOwner = 'santi020k'
 
 const projectAliases = new Map<string, string>([
@@ -85,6 +147,11 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
       ],
       status: 'active',
       vscodeExtensions: ['santi020k.vscode-astro-doctor']
+    },
+    'coolstead-releases': {
+      category: 'app',
+      displayName: 'Coolstead',
+      status: 'active'
     },
     'dep-beacon': {
       category: 'tool',
@@ -121,6 +188,17 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
       ],
       status: 'active'
     },
+    og: {
+      category: 'library',
+      displayName: 'OG',
+      npmPackages: ['@santi020k/og'],
+      status: 'active'
+    },
+    quality: {
+      category: 'tool',
+      displayName: 'Quality',
+      status: 'active'
+    },
     'santi020k-theme': {
       category: 'library',
       displayName: 'Santi020k Theme',
@@ -140,6 +218,39 @@ export const catalogOverrides = new Map<string, CatalogOverride>(
     }
   } satisfies Record<string, CatalogOverride>)
 )
+
+const githubReleaseSources: readonly GithubReleaseSource[] = [
+  {
+    assets: [
+      {
+        assetNamePattern: '^Coolstead\\.dmg$',
+        channel: 'website'
+      },
+      {
+        assetNamePattern: '^Coolstead-[0-9].*-sparkle\\.dmg$',
+        channel: 'update'
+      },
+      {
+        assetNamePattern: '^Coolstead-[0-9].*\\.dmg$',
+        channel: 'homebrew-or-update'
+      }
+    ],
+    repository: 'coolstead-releases',
+    slug: 'coolstead-releases'
+  },
+  {
+    assets: [
+      {
+        assetNamePattern: '^quality-.*\\.(?:tar\\.gz|zip)$',
+        channel: 'direct'
+      }
+    ],
+    repository: 'quality',
+    slug: 'quality'
+  }
+]
+
+export const getGithubReleaseSources = (): readonly GithubReleaseSource[] => githubReleaseSources
 
 export const getCatalogOverride = (
   repository: string

@@ -7,14 +7,18 @@
     {
       "binding": "DB",
       "database_name": "observatory",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "4cc1ece3-cd43-4916-b9b5-12c73343c81b",
       "migrations_dir": "migrations",
     },
   ],
   "triggers": {
-    "crons": ["17 * * * *"],
+    "crons": ["17 * * * *", "37 17 * * *"],
   },
   "routes": [
+    {
+      "pattern": "api.observatory.santi020k.com",
+      "custom_domain": true,
+    },
     {
       "pattern": "postlens.santi020k.com/api/feedback/*",
       "zone_name": "santi020k.com",

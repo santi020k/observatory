@@ -12,7 +12,10 @@ import {
   passkeyCredentials,
   projectPreferences,
   projectSnapshots,
+  releaseAssetSnapshots,
   sessions,
+  storeMetricPoints,
+  storeSyncRuns,
   syncRuns,
   vscodeExtensionSnapshots,
   websiteAnalyticsSnapshots
@@ -85,6 +88,50 @@ export interface VscodeExtensionWrite {
   syncRunId: string
   updateCount: number
   version: string
+}
+
+export interface ReleaseAssetWrite {
+  assetId: string
+  assetName: string
+  channel: 'direct' | 'homebrew' | 'homebrew-or-update' | 'update' | 'website'
+  collectedAt: number
+  downloads: number
+  id: string
+  releaseTag: string
+  repository: string
+  slug: string
+  syncRunId: string
+}
+
+export type StoreMetricDimension = 'appVersion' | 'country' | 'device' |
+  'osVersion' | 'overall'
+
+export type StoreMetricProvider = 'apple' | 'google'
+
+export interface StoreMetricWrite {
+  appSlug: string
+  collectedAt: number
+  dimension: StoreMetricDimension
+  dimensionValue: string
+  id: string
+  metric: string
+  periodStart: number
+  provider: StoreMetricProvider
+  source: string
+  value: number
+}
+
+export const storeMetricWriteColumnCount = 10
+
+export interface StoreSyncRunWrite {
+  appSlug: string
+  completedAt: number | null
+  errorCode: string | null
+  id: string
+  provider: StoreMetricProvider
+  records: number
+  startedAt: number
+  status: 'failed' | 'skipped' | 'succeeded'
 }
 
 export interface ProjectPreferenceWrite {
@@ -652,6 +699,23 @@ export const getVscodeExtensionSnapshotsSince = async (
   .where(gte(vscodeExtensionSnapshots.collectedAt, since))
   .orderBy(vscodeExtensionSnapshots.collectedAt)
 
+export const insertReleaseAssetSnapshots = async (
+  db: ObservatoryDb,
+  snapshots: readonly ReleaseAssetWrite[]
+): Promise<void> => {
+  for (const snapshot of snapshots)
+    await db.insert(releaseAssetSnapshots).values(snapshot)
+}
+
+export const getReleaseAssetSnapshotsSince = async (
+  db: ObservatoryDb,
+  since: number
+) => db
+  .select()
+  .from(releaseAssetSnapshots)
+  .where(gte(releaseAssetSnapshots.collectedAt, since))
+  .orderBy(releaseAssetSnapshots.collectedAt)
+
 export const getSnapshotsForSyncRun = async (
   db: ObservatoryDb,
   syncRunId: string
@@ -772,3 +836,55 @@ export const getWebsiteAnalyticsSince = async (
   .from(websiteAnalyticsSnapshots)
   .where(gte(websiteAnalyticsSnapshots.periodStart, since))
   .orderBy(websiteAnalyticsSnapshots.periodStart)
+
+export const upsertStoreMetrics = async (
+  db: ObservatoryDb,
+  points: readonly StoreMetricWrite[]
+): Promise<void> => {
+  // A store metric binds every table column. D1 accepts at most 100 bound
+  // parameters per statement, so this is the largest safe batch.
+  const batchSize = Math.floor(100 / storeMetricWriteColumnCount)
+
+  for (let index = 0; index < points.length; index += batchSize) {
+    const batch = points.slice(index, index + batchSize)
+
+    if (batch.length === 0) continue
+
+    await db.insert(storeMetricPoints).values(batch).onConflictDoUpdate({
+      set: {
+        collectedAt: sql`excluded.collected_at`,
+        source: sql`excluded.source`,
+        value: sql`excluded.value`
+      },
+      target: [
+        storeMetricPoints.appSlug,
+        storeMetricPoints.provider,
+        storeMetricPoints.periodStart,
+        storeMetricPoints.metric,
+        storeMetricPoints.dimension,
+        storeMetricPoints.dimensionValue
+      ]
+    })
+  }
+}
+
+export const insertStoreSyncRun = async (
+  db: ObservatoryDb,
+  run: StoreSyncRunWrite
+): Promise<void> => {
+  await db.insert(storeSyncRuns).values(run)
+}
+
+export const getStoreMetricsSince = async (
+  db: ObservatoryDb,
+  since: number
+) => db
+  .select()
+  .from(storeMetricPoints)
+  .where(gte(storeMetricPoints.periodStart, since))
+  .orderBy(storeMetricPoints.periodStart)
+
+export const getLatestStoreSyncRuns = async (db: ObservatoryDb) => db
+  .select()
+  .from(storeSyncRuns)
+  .orderBy(desc(storeSyncRuns.startedAt))

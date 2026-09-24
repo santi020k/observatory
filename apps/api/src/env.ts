@@ -1,4 +1,8 @@
 export interface Bindings {
+  APP_STORE_CONNECT_ISSUER_ID?: string
+  APP_STORE_CONNECT_KEY_ID?: string
+  APP_STORE_CONNECT_PRIVATE_KEY?: string
+  APP_STORE_CONNECT_REPORT_REQUESTS_JSON?: string
   AUTH_SECRET: string
   OWNER_PASSCODE: string
   CLOUDFLARE_ACCOUNT_ID?: string
@@ -8,6 +12,8 @@ export interface Bindings {
   ENVIRONMENT: 'development' | 'production' | 'test'
   FEEDBACK_HASH_SECRET?: string
   GITHUB_TOKEN?: string
+  GOOGLE_PLAY_REPORT_BUCKET?: string
+  GOOGLE_PLAY_SERVICE_ACCOUNT_JSON?: string
   MAIL_FROM: string
   OWNER_EMAIL: string
   SITE_URL: string

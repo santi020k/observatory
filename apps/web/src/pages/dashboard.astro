@@ -1,6 +1,7 @@
 ---
 import AppHeader from '@/components/AppHeader.astro'
 import AppSidebar from '@/components/AppSidebar.astro'
+import GrowthMap from '@/components/GrowthMap.astro'
 import MetricCard from '@/components/MetricCard.astro'
 import RangePicker from '@/components/RangePicker.astro'
 import StatusBadge from '@/components/StatusBadge.astro'
@@ -20,19 +21,23 @@ import {
   formatNumber,
   formatRelativeDate
 } from '@/lib/format'
+import { buildGrowthMap } from '@/lib/growth-map'
 
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import BarChart from '@santi020k/lumen-astro/components/BarChart'
-import Button from '@santi020k/lumen-astro/components/Button'
-import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
-import Card from '@santi020k/lumen-astro/components/Card'
-import Empty from '@santi020k/lumen-astro/components/Empty'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import LineChart from '@santi020k/lumen-astro/components/LineChart'
-import NativeSelect from '@santi020k/lumen-astro/components/NativeSelect'
-import SearchField from '@santi020k/lumen-astro/components/SearchField'
-import Table from '@santi020k/lumen-astro/components/Table'
-import Tabs from '@santi020k/lumen-astro/components/Tabs'
+import {
+  Badge,
+  BarChart,
+  Button,
+  ButtonLink,
+  Card,
+  Empty,
+  Icon,
+  LineChart,
+  NativeSelect,
+  SearchField,
+  Sparkline,
+  Table,
+  Tabs
+} from '@santi020k/lumen-astro'
 
 const response = await getDashboard(Astro.request, Astro.url)
 
@@ -47,7 +52,9 @@ const rangeMeta = analyticsRangeMeta[dashboard.range]
 const rangeLabel = rangeMeta.longLabel
 
 const historyCoverage = getHistoryCoverage(
-  dashboard.period.availableFrom, dashboard.period.availableTo, dashboard.range
+  dashboard.period.availableFrom,
+  dashboard.period.availableTo,
+  dashboard.range
 )
 
 const downloadsByProject = dashboard.npmAnalytics.packages.reduce<
@@ -158,22 +165,23 @@ const npmChartSeries = toNpmSeries(npmChart.points, npmChart.cadence)
 const npmTopPackage = dashboard.npmAnalytics.packages[0]
 
 const npmRawDownloads = dashboard.npmAnalytics.packages.reduce(
-  (total, packageDownloads) => total + packageDownloads.downloads, 0
+  (total, packageDownloads) => total + packageDownloads.downloads,
+  0
 )
+
+const npmLast7Days =
+  dashboard.npmAnalytics.daily.length >= 7 ?
+    dashboard.npmAnalytics.daily
+      .slice(-7)
+      .reduce((total, point) => total + point.downloads, 0) :
+    null
 
 const npmPeakDay = dashboard.npmAnalytics.daily.reduce<
   (typeof dashboard.npmAnalytics.daily)[number] | null
 >(
-  (peak, point) => (!peak || point.downloads > peak.downloads ? point : peak), null
+  (peak, point) => (!peak || point.downloads > peak.downloads ? point : peak),
+  null
 )
-
-const npmAveragePerDay =
-  dashboard.npmAnalytics.daily.length > 0 ?
-    Math.round(
-      dashboard.npmAnalytics.totalDownloads /
-      dashboard.npmAnalytics.daily.length
-    ) :
-    0
 
 const projectNameBySlug = new Map(
   dashboard.projects.map(project => [project.slug, project.name])
@@ -254,12 +262,190 @@ const attentionProjects = dashboard.projects
   .sort((left, right) => right.openIssues - left.openIssues)
   .slice(0, 5)
 
+const growthSignalPriority = {
+  accelerating: 4,
+  growing: 3,
+  steady: 2,
+  slowing: 1,
+  insufficient: 0
+} as const
+
+const growthBySlug = new Map(
+  dashboard.growth.map(growth => [growth.slug, growth])
+)
+
+const operationalHealth = [...dashboard.operationalHealth].sort(
+  (left, right) => Number(right.currentStatus === 'degraded') -
+    Number(left.currentStatus === 'degraded') ||
+    (left.availabilityPercent ?? Number.POSITIVE_INFINITY) -
+    (right.availabilityPercent ?? Number.POSITIVE_INFINITY)
+)
+
+const observedHealth = operationalHealth.filter(
+  health => health.observations > 0
+)
+
+const portfolioHealthChecks = observedHealth.reduce(
+  (total, health) => total + health.observations,
+  0
+)
+
+const portfolioHealthyChecks = observedHealth.reduce(
+  (total, health) => total + health.healthyChecks,
+  0
+)
+
+const portfolioAvailability = portfolioHealthChecks === 0 ?
+  null :
+  (portfolioHealthyChecks / portfolioHealthChecks) * 100
+
+const activeIncidents = observedHealth.filter(
+  health => health.currentStatus === 'degraded'
+).length
+
+const missedAvailabilityTargets = observedHealth.filter(
+  health => health.meetsTarget === false
+).length
+
+const formatAvailability = (value: number | null): string => value === null ?
+  '—' :
+  `${value.toFixed(value === 100 ? 0 : 2)}%`
+
+const getHealthBadgeVariant = (
+  status: (typeof operationalHealth)[number]['currentStatus']
+): 'outline' | 'success' | 'warning' => {
+  if (status === 'healthy') return 'success'
+
+  if (status === 'degraded') return 'warning'
+
+  return 'outline'
+}
+
+const npmGrowthMap = buildGrowthMap(
+  dashboard.projects
+    .filter(project => project.sources.npm.length > 0)
+    .map(project => {
+      const growth = growthBySlug.get(project.slug)
+
+      return {
+        momentumPercent: growth?.downloadVelocityPercent ?? null,
+        name: project.name,
+        observations: growth?.observations ?? 0,
+        reach: project.npmDownloads30d,
+        signal: growth?.signal ?? 'insufficient',
+        slug: project.slug
+      }
+    })
+)
+
+const scaleProjects = npmGrowthMap.points.filter(
+  point => point.quadrant === 'scale'
+)
+
+const growthMapTakeaway = (() => {
+  if (scaleProjects.length > 0)
+    return `${scaleProjects.map(point => point.name).join(', ')} ${scaleProjects.length === 1 ? 'combines' : 'combine'} above-median npm reach with positive momentum.`
+
+  const strongestProject = npmGrowthMap.points[0]
+
+  if (strongestProject)
+    return `${strongestProject.name} has the strongest comparable npm momentum, but no project is in the scale zone yet.`
+
+  return 'The map needs at least two observations and a non-zero npm baseline per project.'
+})()
+
+const rankedGrowth = dashboard.growth
+  .flatMap(growth => {
+    const project = dashboard.projects.find(
+      candidate => candidate.slug === growth.slug
+    )
+
+    return project ? [{ growth, project }] : []
+  })
+  .sort(
+    (left, right) => growthSignalPriority[right.growth.signal] -
+      growthSignalPriority[left.growth.signal] ||
+      right.growth.downloadVelocityChange -
+      left.growth.downloadVelocityChange ||
+      right.growth.starsGained - left.growth.starsGained
+  )
+
+const observedGrowth = rankedGrowth.filter(
+  item => item.growth.observations >= 2
+)
+
+const growthLeader =
+  observedGrowth.find(
+    item => item.growth.signal === 'accelerating' || item.growth.signal === 'growing'
+  ) ?? observedGrowth[0]
+
+const formatGrowthPercent = (value: number | null): string | null => value === null ?
+  null :
+  `${new Intl.NumberFormat('en', {
+    maximumFractionDigits: 1,
+    signDisplay: 'exceptZero'
+  }).format(value)}%`
+
+const getGrowthBadgeVariant = (
+  signal: (typeof dashboard.growth)[number]['signal']
+): 'outline' | 'secondary' | 'success' | 'warning' => {
+  if (signal === 'accelerating' || signal === 'growing') return 'success'
+
+  if (signal === 'slowing') return 'warning'
+
+  if (signal === 'steady') return 'secondary'
+
+  return 'outline'
+}
+
+const getGrowthTrendTone = (
+  signal: (typeof dashboard.growth)[number]['signal']
+): 'danger' | 'neutral' | 'success' | 'warning' => {
+  if (signal === 'accelerating' || signal === 'growing') return 'success'
+
+  if (signal === 'slowing') return 'warning'
+
+  return 'neutral'
+}
+
+const getGrowthAction = (
+  signal: (typeof dashboard.growth)[number]['signal']
+): string => {
+  if (signal === 'accelerating')
+    return 'Protect this momentum: ship the next high-confidence improvement and amplify the channels already working.'
+
+  if (signal === 'growing')
+    return 'Turn early traction into a repeatable loop: release, distribute, listen, and measure again.'
+
+  if (signal === 'slowing')
+    return 'Inspect release cadence and discovery before investing more product work.'
+
+  return 'Run a small distribution or product experiment so the next sync has a clearer signal.'
+}
+
+const getGrowthMetricLabel = (item: (typeof rankedGrowth)[number]): string => {
+  const percent = formatGrowthPercent(item.growth.downloadVelocityPercent)
+
+  const hasDownloadSignal =
+    item.project.sources.npm.length > 0 ||
+    item.project.npmDownloads30d > 0 ||
+    item.growth.downloadVelocityChange !== 0
+
+  if (hasDownloadSignal)
+    return percent ?
+      `${percent} download velocity` :
+      `${formatSignedNumber(item.growth.downloadVelocityChange)} download velocity`
+
+  return `${formatSignedNumber(item.growth.starsGained)} stars`
+}
+
 const categoryCounts = dashboard.projects.reduce<Record<string, number>>(
   (counts, project) => {
     counts[project.category] = (counts[project.category] ?? 0) + 1
 
     return counts
-  }, {}
+  },
+  {}
 )
 
 const getCategoryIcon = (
@@ -341,6 +527,16 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                     <Icon aria-hidden="true" name="scan-eye" />
                     Focus
                   </button>
+                  {dashboard.operationalHealth.length > 0 && (
+                    <button
+                      aria-selected="false"
+                      data-value="operations"
+                      role="tab"
+                    >
+                      <Icon aria-hidden="true" name="activity" />
+                      Operations
+                    </button>
+                  )}
                   <button
                     aria-selected="false"
                     data-value="packages"
@@ -387,6 +583,163 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
             data-value="pulse"
             role="tabpanel"
           >
+            <section
+              aria-labelledby="growth-brief-heading"
+              class="growth-brief"
+            >
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Decision brief</span>
+                  <h2 id="growth-brief-heading">
+                    Where to place your next bet
+                  </h2>
+                  <p>
+                    Projects ranked by observed momentum in {rangeLabel}, with
+                    the evidence kept visible instead of compressed into an
+                    opaque score.
+                  </p>
+                </div>
+                <Badge
+                  variant={observedGrowth.length > 0 ? 'outline' : 'warning'}
+                >
+                  {observedGrowth.length} of {rankedGrowth.length} comparable
+                </Badge>
+              </div>
+
+              {
+                growthLeader ?
+                  (
+                    <div class="growth-brief-grid">
+                      <Card
+                        as="article"
+                        class="growth-leader"
+                        aria-labelledby="growth-leader-heading"
+                      >
+                        <div class="growth-leader__header">
+                          <span class="growth-leader__icon">
+                            <Icon aria-hidden="true" name="sparkles" />
+                          </span>
+                          <Badge
+                            variant={getGrowthBadgeVariant(
+                              growthLeader.growth.signal
+                            )}
+                          >
+                            {growthLeader.growth.signal}
+                          </Badge>
+                        </div>
+                        <span class="eyebrow">Best current signal</span>
+                        <h3 id="growth-leader-heading">
+                          {growthLeader.project.name}
+                        </h3>
+                        <p>{getGrowthAction(growthLeader.growth.signal)}</p>
+                        <dl class="growth-evidence">
+                          <div>
+                            <dt>Download velocity</dt>
+                            <dd>
+                              {formatSignedNumber(
+                                growthLeader.growth.downloadVelocityChange
+                              )}
+                              {formatGrowthPercent(
+                                growthLeader.growth.downloadVelocityPercent
+                              ) && (
+                                <small>
+                                  {formatGrowthPercent(
+                                    growthLeader.growth.downloadVelocityPercent
+                                  )}
+                                </small>
+                              )}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Stars gained</dt>
+                            <dd>
+                              {formatSignedNumber(
+                                growthLeader.growth.starsGained
+                              )}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Issue change</dt>
+                            <dd>
+                              {formatSignedNumber(
+                                growthLeader.growth.issueChange
+                              )}
+                            </dd>
+                          </div>
+                        </dl>
+                        <div class="growth-leader__footer">
+                          <span>
+                            {growthLeader.growth.observations} observations
+                          </span>
+                          <ButtonLink
+                            href={`/projects/${growthLeader.project.slug}/?range=${dashboard.range}`}
+                            variant="secondary"
+                          >
+                            Open project
+                            <Icon aria-hidden="true" name="arrow-right" />
+                          </ButtonLink>
+                        </div>
+                      </Card>
+
+                      <Card
+                        as="section"
+                        class="growth-ranking"
+                        aria-labelledby="growth-ranking-heading"
+                      >
+                        <div class="panel-heading">
+                          <div>
+                            <span class="eyebrow">Momentum ranking</span>
+                            <h3 id="growth-ranking-heading">Projects to watch</h3>
+                          </div>
+                          <span>{rangeLabel}</span>
+                        </div>
+                        <ol>
+                          {observedGrowth.slice(0, 5).map((item, index) => (
+                            <li>
+                              <span class="growth-ranking__position">
+                                {index + 1}
+                              </span>
+                              <div>
+                                <a
+                                  href={`/projects/${item.project.slug}/?range=${dashboard.range}`}
+                                >
+                                  {item.project.name}
+                                </a>
+                                <small>{getGrowthMetricLabel(item)}</small>
+                              </div>
+                              <Badge
+                                variant={getGrowthBadgeVariant(
+                                  item.growth.signal
+                                )}
+                              >
+                                {item.growth.signal}
+                              </Badge>
+                            </li>
+                          ))}
+                        </ol>
+                      </Card>
+                    </div>
+                  ) :
+                  (
+                    <Card class="growth-brief-empty">
+                      <Empty>
+                        <span class="empty-icon">
+                          <Icon
+                            aria-hidden="true"
+                            name="chart-no-axes-combined"
+                          />
+                        </span>
+                        <h3>One more sync will reveal momentum</h3>
+                        <p>
+                          Growth comparisons need at least two persisted
+                          observations in the selected range.
+                        </p>
+                      </Empty>
+                    </Card>
+                  )
+              }
+            </section>
+
             <section class="metric-grid" aria-label="Portfolio metrics">
               <MetricCard
                 context={`${dashboard.summary.publicProjects} public repositories tracked`}
@@ -395,9 +748,9 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                 value={formatNumber(dashboard.summary.activeProjects)}
               />
               <MetricCard
-                context={`Exact completed-day total · ${rangeLabel}`}
+                context={`Project-adjusted total · ${rangeLabel}`}
                 icon="download"
-                label="Package downloads"
+                label="Project downloads"
                 value={formatNumber(dashboard.npmAnalytics.totalDownloads)}
               />
               <MetricCard
@@ -410,6 +763,11 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                 context={`Change in rolling download velocity · ${rangeLabel}`}
                 icon="activity"
                 label="Download momentum"
+                trend={{
+                  label: `Download velocity trend for ${rangeLabel}`,
+                  tone: 'brand',
+                  values: dashboard.history.map(point => point.npmDownloads30d)
+                }}
                 value={formatSignedNumber(
                   dashboard.period.downloadVelocityChange
                 )}
@@ -418,12 +776,23 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                 context={`Net portfolio change · ${rangeLabel}`}
                 icon="star"
                 label="Stars gained"
+                trend={{
+                  label: `Portfolio star trend for ${rangeLabel}`,
+                  tone: 'accent',
+                  values: dashboard.history.map(point => point.stars)
+                }}
                 value={formatSignedNumber(dashboard.period.starsGained)}
               />
               <MetricCard
                 context={`${formatNumber(dashboard.summary.openIssues)} currently open · ${rangeLabel}`}
                 icon="circle-dot-dashed"
                 label="Issue change"
+                trend={{
+                  label: `Open issue trend for ${rangeLabel}`,
+                  tone:
+                    dashboard.period.issueChange > 0 ? 'warning' : 'neutral',
+                  values: dashboard.history.map(point => point.openIssues)
+                }}
                 value={formatSignedNumber(dashboard.period.issueChange)}
               />
             </section>
@@ -557,13 +926,9 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                     Run the first sync to collect GitHub, npm, and website health
                     metrics.
                   </p>
-                  <button
-                    class="ui-button ui-button--default"
-                    data-sync-button
-                    type="button"
-                  >
+                  <Button data-sync-button type="button">
                     Sync public projects
-                  </button>
+                  </Button>
                 </Empty>
               ) :
               (
@@ -667,6 +1032,140 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                     </section>
                   </div>
 
+                  {dashboard.operationalHealth.length > 0 && (
+                    <div
+                      class="dashboard-tab-panel"
+                      data-value="operations"
+                      role="tabpanel"
+                    >
+                      <section
+                        aria-labelledby="operations-heading"
+                        class="vscode-analytics-section"
+                      >
+                        <div class="section-heading">
+                          <div>
+                            <span class="eyebrow">Operational health</span>
+                            <h2 id="operations-heading">
+                              Availability and latency
+                            </h2>
+                            <p>
+                              Hourly website probes summarized across the
+                              selected range. Unknown checks are excluded.
+                            </p>
+                          </div>
+                          <Badge variant="outline">{rangeLabel}</Badge>
+                        </div>
+
+                        <dl class="npm-summary-grid">
+                          <div>
+                            <dt>Observed availability</dt>
+                            <dd>{formatAvailability(portfolioAvailability)}</dd>
+                            <small>
+                              {formatNumber(portfolioHealthChecks)} checks
+                            </small>
+                          </div>
+                          <div>
+                            <dt>Monitored websites</dt>
+                            <dd>{formatNumber(observedHealth.length)}</dd>
+                            <small>
+                              {dashboard.operationalHealth.length -
+                                observedHealth.length} awaiting data
+                            </small>
+                          </div>
+                          <div>
+                            <dt>Active incidents</dt>
+                            <dd>{formatNumber(activeIncidents)}</dd>
+                            <small>Consecutive failed probes</small>
+                          </div>
+                          <div>
+                            <dt>Below objective</dt>
+                            <dd>{formatNumber(missedAvailabilityTargets)}</dd>
+                            <small>99.9% observed availability target</small>
+                          </div>
+                        </dl>
+
+                        <Card
+                          as="section"
+                          class="panel"
+                          aria-labelledby="operations-table-heading"
+                        >
+                          <div class="panel-heading">
+                            <div>
+                              <span class="eyebrow">Website probes</span>
+                              <h3 id="operations-table-heading">
+                                Project health
+                              </h3>
+                            </div>
+                          </div>
+                          <Table>
+                            <table>
+                              <caption class="sr-only">
+                                Project website availability and response-time
+                                health for {rangeLabel}
+                              </caption>
+                              <thead>
+                                <tr>
+                                  <th scope="col">Project</th>
+                                  <th scope="col">Status</th>
+                                  <th scope="col">Availability</th>
+                                  <th scope="col">p50</th>
+                                  <th scope="col">p95</th>
+                                  <th scope="col">Failed</th>
+                                  <th scope="col">Last incident</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {operationalHealth.map(health => (
+                                  <tr>
+                                    <td>
+                                      <a
+                                        class="npm-package-link"
+                                        href={`/projects/${health.slug}/?range=${dashboard.range}`}
+                                      >
+                                        {projectNameBySlug.get(health.slug) ??
+                                          health.slug}
+                                        <Icon
+                                          aria-hidden="true"
+                                          name="arrow-right"
+                                        />
+                                      </a>
+                                    </td>
+                                    <td>
+                                      <Badge
+                                        variant={getHealthBadgeVariant(
+                                          health.currentStatus
+                                        )}
+                                      >
+                                        {health.currentStatus}
+                                      </Badge>
+                                    </td>
+                                    <td>
+                                      {formatAvailability(
+                                        health.availabilityPercent
+                                      )}
+                                    </td>
+                                    <td>{formatDuration(health.latencyP50Ms)}</td>
+                                    <td>{formatDuration(health.latencyP95Ms)}</td>
+                                    <td>
+                                      {formatNumber(health.failedChecks)}
+                                    </td>
+                                    <td>
+                                      {health.lastOutageStartedAt ?
+                                        formatRelativeDate(
+                                          health.lastOutageStartedAt
+                                        ) :
+                                        'None observed'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </Table>
+                        </Card>
+                      </section>
+                    </div>
+                  )}
+
                   <div
                     class="dashboard-tab-panel dashboard-tab-panel--extensions"
                     data-value="extensions"
@@ -735,7 +1234,8 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                                 <dd>
                                   {formatNumber(
                                     dashboard.openVsxAnalytics.extensions.reduce(
-                                      (total, extension) => total + extension.reviewCount, 0
+                                      (total, extension) => total + extension.reviewCount,
+                                      0
                                     )
                                   )}
                                 </dd>
@@ -1072,8 +1572,8 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                           <span class="eyebrow">npm adoption</span>
                           <h2 id="npm-analytics-heading">Download analytics</h2>
                           <p>
-                            Exact npm downloads, grouped at the cadence that best
-                            fits the selected range.
+                            Registry tarball downloads—not unique installations or
+                            users—grouped for the selected range.
                           </p>
                         </div>
                         <Badge
@@ -1092,18 +1592,28 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                           <>
                             <dl class="npm-summary-grid">
                               <div>
-                                <dt>Adjusted downloads</dt>
+                                <dt>Project-adjusted</dt>
                                 <dd>
                                   {formatNumber(
                                     dashboard.npmAnalytics.totalDownloads
                                   )}
                                 </dd>
-                                <small>Package average per project · {rangeLabel}</small>
+                                <small>
+                                  Package average per project · {rangeLabel}
+                                </small>
                               </div>
                               <div>
-                                <dt>Daily average</dt>
-                                <dd>{formatNumber(npmAveragePerDay)}</dd>
-                                <small>Across completed days</small>
+                                <dt>7-day adjusted total</dt>
+                                <dd>
+                                  {npmLast7Days === null ?
+                                    '—' :
+                                    formatNumber(npmLast7Days)}
+                                </dd>
+                                <small>
+                                  {npmLast7Days === null ?
+                                    'Requires 7 completed days' :
+                                    'Same time window npm highlights'}
+                                </small>
                               </div>
                               <div>
                                 <dt>Peak day</dt>
@@ -1218,7 +1728,8 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                                           </td>
                                           <td>
                                             {formatDownloadShare(
-                                              packageDownloads.downloads, npmRawDownloads
+                                              packageDownloads.downloads,
+                                              npmRawDownloads
                                             )}
                                           </td>
                                           <td>
@@ -1239,15 +1750,20 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                                       </th>
                                       <td>
                                         <strong>
-                                          {formatNumber(
-                                            npmRawDownloads
-                                          )}
+                                          {formatNumber(npmRawDownloads)}
                                         </strong>
                                       </td>
                                     </tr>
                                   </tfoot>
                                 </table>
                               </Table>
+                              <p class="npm-method-note">
+                                The table contains raw counts for each package. The
+                                project-adjusted figure averages sibling packages so
+                                one multi-package project does not dominate the
+                                portfolio. npm’s package page usually highlights a
+                                7-day count.
+                              </p>
                             </Card>
                           </>
                         ) :
@@ -1299,6 +1815,53 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                           {historyCoverage.label}
                         </Badge>
                       </div>
+
+                      {npmGrowthMap.points.length >= 2 ?
+                        (
+                          <Card
+                            as="section"
+                            class="growth-map-panel"
+                            aria-labelledby="growth-map-heading"
+                          >
+                            <div class="panel-heading">
+                              <div>
+                                <span class="eyebrow">Portfolio strategy</span>
+                                <h3 id="growth-map-heading">
+                                  npm reach × momentum
+                                </h3>
+                                <p>{growthMapTakeaway}</p>
+                              </div>
+                              <Badge variant="outline">
+                                {npmGrowthMap.points.length} plotted
+                                {npmGrowthMap.excludedCount > 0 &&
+                                  ` · ${npmGrowthMap.excludedCount} awaiting baseline`}
+                              </Badge>
+                            </div>
+                            <GrowthMap
+                              points={npmGrowthMap.points}
+                              range={dashboard.range}
+                              rangeLabel={rangeLabel}
+                              reachDividerX={npmGrowthMap.reachDividerX}
+                            />
+                          </Card>
+                        ) :
+                        (
+                          <Card class="growth-map-empty">
+                            <Empty>
+                              <span class="empty-icon">
+                                <Icon
+                                  aria-hidden="true"
+                                  name="chart-no-axes-combined"
+                                />
+                              </span>
+                              <h3>Growth map needs comparable projects</h3>
+                              <p>
+                                Two npm projects with a non-zero baseline and at
+                                least two observations are required.
+                              </p>
+                            </Empty>
+                          </Card>
+                        )}
 
                       {dashboard.history.length > 1 ?
                         (
@@ -1453,6 +2016,7 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                             data-project-sort
                             options={[
                               { label: 'Most relevant', value: 'relevance' },
+                              { label: 'Fastest growth', value: 'momentum' },
                               { label: 'Most downloads', value: 'downloads' },
                               { label: 'Most stars', value: 'stars' },
                               { label: 'Recently updated', value: 'updated' },
@@ -1490,6 +2054,7 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                               <th scope="col">Project</th>
                               <th scope="col">Status</th>
                               <th scope="col">Reach</th>
+                              <th scope="col">Growth</th>
                               <th scope="col">Maintenance</th>
                               <th scope="col">Health</th>
                               <th scope="col">Last push</th>
@@ -1499,89 +2064,133 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                             </tr>
                           </thead>
                           <tbody data-project-rows>
-                            {dashboard.projects.map(project => (
-                              <tr
-                                data-project-category={project.category}
-                                data-project-downloads={project.npmDownloads30d}
-                                data-project-name={project.name.toLocaleLowerCase()}
-                                data-project-relevance={project.relevanceScore}
-                                data-project-stars={project.stars}
-                                data-project-status={project.status}
-                                data-project-updated={
-                                  project.pushedAt ?
-                                    Date.parse(project.pushedAt) :
-                                    0
-                                }
-                              >
-                                <td>
-                                  <div class="project-cell">
-                                    <span class="project-icon">
-                                      <Icon
-                                        aria-hidden="true"
-                                        name={getCategoryIcon(project.category)}
-                                      />
+                            {dashboard.projects.map(project => {
+                              const growth = growthBySlug.get(project.slug)
+                              const growthItem = growth ? { growth, project } : null
+
+                              return (
+                                <tr
+                                  data-project-category={project.category}
+                                  data-project-downloads={project.npmDownloads30d}
+                                  data-project-growth-change={growth?.downloadVelocityChange ?? 0}
+                                  data-project-growth-priority={
+                                    growth ? growthSignalPriority[growth.signal] : 0
+                                  }
+                                  data-project-name={project.name.toLocaleLowerCase()}
+                                  data-project-relevance={project.relevanceScore}
+                                  data-project-stars={project.stars}
+                                  data-project-status={project.status}
+                                  data-project-updated={
+                                    project.pushedAt ?
+                                      Date.parse(project.pushedAt) :
+                                      0
+                                  }
+                                >
+                                  <td>
+                                    <div class="project-cell">
+                                      <span class="project-icon">
+                                        <Icon
+                                          aria-hidden="true"
+                                          name={getCategoryIcon(project.category)}
+                                        />
+                                      </span>
+                                      <span>
+                                        <strong>
+                                          <a
+                                            class="project-link"
+                                            href={`/projects/${project.slug}/?range=${dashboard.range}`}
+                                          >
+                                            {project.name}
+                                          </a>
+                                        </strong>
+                                        <small>
+                                          {project.description ?? project.slug}
+                                        </small>
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <StatusBadge status={project.status} />
+                                  </td>
+                                  <td>
+                                    <strong>
+                                      {formatNumber(project.npmDownloads30d)}
+                                    </strong>
+                                    <small>
+                                      npm / 30d · relevance {project.relevanceScore}
+                                    </small>
+                                  </td>
+                                  <td>
+                                    {growthItem ?
+                                      (
+                                        <div class="project-growth-cell">
+                                          <span>
+                                            <Badge
+                                              variant={getGrowthBadgeVariant(
+                                                growthItem.growth.signal
+                                              )}
+                                            >
+                                              {growthItem.growth.signal}
+                                            </Badge>
+                                            <small>
+                                              {growthItem.growth.observations >= 2 ?
+                                                getGrowthMetricLabel(growthItem) :
+                                                'Needs another observation'}
+                                            </small>
+                                          </span>
+                                          {growthItem.growth.npmDownloads30dTrend.length >= 2 && (
+                                            <Sparkline
+                                              area
+                                              class="project-growth-cell__sparkline"
+                                              label={`${growthItem.project.name} rolling 30-day npm download trend across ${growthItem.growth.observations} observations for ${rangeLabel}`}
+                                              tone={getGrowthTrendTone(
+                                                growthItem.growth.signal
+                                              )}
+                                              values={growthItem.growth.npmDownloads30dTrend}
+                                            />
+                                          )}
+                                        </div>
+                                      ) :
+                                      (
+                                        <small>Not available</small>
+                                      )}
+                                  </td>
+                                  <td>
+                                    <strong>{project.openIssues} issues</strong>
+                                    <small>
+                                      {project.stars} stars · {project.forks} forks
+                                    </small>
+                                  </td>
+                                  <td>
+                                    <span
+                                      class={`health-label health-label--${project.healthStatus}`}
+                                    >
+                                      <span class="health-dot" />
+                                      {project.healthStatus}
                                     </span>
-                                    <span>
-                                      <strong>
-                                        <a
-                                          class="project-link"
-                                          href={`/projects/${project.slug}/?range=${dashboard.range}`}
-                                        >
-                                          {project.name}
-                                        </a>
-                                      </strong>
-                                      <small>
-                                        {project.description ?? project.slug}
-                                      </small>
-                                    </span>
-                                  </div>
-                                </td>
-                                <td>
-                                  <StatusBadge status={project.status} />
-                                </td>
-                                <td>
-                                  <strong>
-                                    {formatNumber(project.npmDownloads30d)}
-                                  </strong>
-                                  <small>
-                                    npm / 30d · relevance {project.relevanceScore}
-                                  </small>
-                                </td>
-                                <td>
-                                  <strong>{project.openIssues} issues</strong>
-                                  <small>
-                                    {project.stars} stars · {project.forks} forks
-                                  </small>
-                                </td>
-                                <td>
-                                  <span
-                                    class={`health-label health-label--${project.healthStatus}`}
-                                  >
-                                    <span class="health-dot" />
-                                    {project.healthStatus}
-                                  </span>
-                                  <small>
-                                    {formatDuration(project.responseTimeMs)}
-                                  </small>
-                                </td>
-                                <td>
-                                  <strong>
-                                    {formatRelativeDate(project.pushedAt)}
-                                  </strong>
-                                  <small>{formatDate(project.pushedAt)}</small>
-                                </td>
-                                <td>
-                                  <ButtonLink
-                                    ariaLabel={`View ${project.name} dashboard`}
-                                    href={`/projects/${project.slug}/?range=${dashboard.range}`}
-                                    shape="icon"
-                                    variant="ghost"
-                                  >
-                                    <Icon aria-hidden="true" name="arrow-right" />
-                                  </ButtonLink>
-                                </td>
-                              </tr>
-                            ))}
+                                    <small>
+                                      {formatDuration(project.responseTimeMs)}
+                                    </small>
+                                  </td>
+                                  <td>
+                                    <strong>
+                                      {formatRelativeDate(project.pushedAt)}
+                                    </strong>
+                                    <small>{formatDate(project.pushedAt)}</small>
+                                  </td>
+                                  <td>
+                                    <ButtonLink
+                                      ariaLabel={`View ${project.name} dashboard`}
+                                      href={`/projects/${project.slug}/?range=${dashboard.range}`}
+                                      shape="icon"
+                                      variant="ghost"
+                                    >
+                                      <Icon aria-hidden="true" name="arrow-right" />
+                                    </ButtonLink>
+                                  </td>
+                                </tr>
+                              )
+                            })}
                           </tbody>
                         </table>
                       </Table>
@@ -1625,6 +2234,11 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
 </AppLayout>
 
 <script>
+  import {
+    compareProjectSortRecords,
+    type ProjectSortRecord
+  } from '@/lib/project-sort'
+
   const search = document.querySelector<HTMLInputElement>(
     '[data-project-search]'
 )
@@ -1657,40 +2271,27 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
   [...rowsContainer.querySelectorAll<HTMLTableRowElement>('tr')] :
   []
 
-  const numericSortValue = (
-    row: HTMLTableRowElement,
-    selectedSort: string
-): number => {
-    switch (selectedSort) {
-      case 'downloads':
-        return Number(row.dataset.projectDownloads ?? 0)
-
-      case 'stars':
-        return Number(row.dataset.projectStars ?? 0)
-
-      case 'updated':
-        return Number(row.dataset.projectUpdated ?? 0)
-
-      default:
-        return Number(row.dataset.projectRelevance ?? 0)
-    }
-  }
+  const toProjectSortRecord = (
+    row: HTMLTableRowElement
+  ): ProjectSortRecord => ({
+    downloads: Number(row.dataset.projectDownloads ?? 0),
+    growthChange: Number(row.dataset.projectGrowthChange ?? 0),
+    growthPriority: Number(row.dataset.projectGrowthPriority ?? 0),
+    name: row.dataset.projectName ?? '',
+    relevance: Number(row.dataset.projectRelevance ?? 0),
+    stars: Number(row.dataset.projectStars ?? 0),
+    updated: Number(row.dataset.projectUpdated ?? 0)
+  })
 
   const compareProjectRows = (
     left: HTMLTableRowElement,
     right: HTMLTableRowElement,
     selectedSort: string
-): number => {
-    if (selectedSort === 'name')
-      return (left.dataset.projectName ?? '').localeCompare(
-        right.dataset.projectName ?? ''
+  ): number => compareProjectSortRecords(
+      toProjectSortRecord(left),
+      toProjectSortRecord(right),
+      selectedSort
     )
-
-    return (
-      numericSortValue(right, selectedSort) -
-      numericSortValue(left, selectedSort)
-    )
-  }
 
   const rowMatchesFilters = (
     row: HTMLTableRowElement,
@@ -1745,8 +2346,11 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
 
     for (const row of rows) {
       const isVisible = rowMatchesFilters(
-        row, query, selectedCategory, selectedStatus
-      )
+        row,
+        query,
+        selectedCategory,
+        selectedStatus
+    )
 
       if (isVisible) visibleCount += 1
 

@@ -1,0 +1,36 @@
+name: Publish release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Verify and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up pnpm workspace
+        uses: santi020k/quality/actions/setup-pnpm@eec1701b98bcc0b76d36af288ee78a0369cd84cc # v1.1.1
+        with:
+          node-version-file: .node-version
+
+      - name: Validate release tag
+        run: pnpm release:validate-tag -- "$GITHUB_REF_NAME"
+
+      - name: Verify release
+        run: pnpm verify
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
+          || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
+          --verify-tag --generate-notes --title "Observatory $GITHUB_REF_NAME"

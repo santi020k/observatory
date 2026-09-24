@@ -19,6 +19,7 @@ import {
   getNpmDownloadsSince,
   getProjectPreferences,
   getPublicSnapshotsSince,
+  getReleaseAssetSnapshotsSince,
   getSnapshotsForSyncRun,
   getVscodeExtensionSnapshotsSince
 } from '@santi020k/observatory-db'
@@ -35,6 +36,10 @@ type NpmDownloadSnapshot = Awaited<
 
 type VscodeExtensionSnapshot = Awaited<
   ReturnType<typeof getVscodeExtensionSnapshotsSince>
+>[number]
+
+type ReleaseAssetSnapshot = Awaited<
+  ReturnType<typeof getReleaseAssetSnapshotsSince>
 >[number]
 
 type ProjectPreference = Pick<
@@ -80,7 +85,9 @@ const getNpmRangeStart = (
   const date = new Date(now)
 
   const todayStart = Date.UTC(
-    date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate()
   )
 
   if (range === 'ytd') return Date.UTC(date.getUTCFullYear(), 0, 1)
@@ -197,17 +204,20 @@ const buildHistory = (rows: Snapshot[], range: AnalyticsRange) => {
       return {
         collectedAt: new Date(
           Math.max(
-            bucketStart, ...snapshots.map(snapshot => snapshot.collectedAt)
+            bucketStart,
+            ...snapshots.map(snapshot => snapshot.collectedAt)
           )
         ).toISOString(),
         githubViews14d: sumNullable(
           snapshots.map(snapshot => snapshot.githubViews14d)
         ),
         npmDownloads30d: snapshots.reduce(
-          (total, snapshot) => total + snapshot.npmDownloads30d, 0
+          (total, snapshot) => total + snapshot.npmDownloads30d,
+          0
         ),
         openIssues: snapshots.reduce(
-          (total, snapshot) => total + snapshot.openIssues, 0
+          (total, snapshot) => total + snapshot.openIssues,
+          0
         ),
         stars: snapshots.reduce((total, snapshot) => total + snapshot.stars, 0)
       }
@@ -233,10 +243,12 @@ const buildRawHistory = (rows: Snapshot[]) => {
         snapshots.map(snapshot => snapshot.githubViews14d)
       ),
       npmDownloads30d: snapshots.reduce(
-        (total, snapshot) => total + snapshot.npmDownloads30d, 0
+        (total, snapshot) => total + snapshot.npmDownloads30d,
+        0
       ),
       openIssues: snapshots.reduce(
-        (total, snapshot) => total + snapshot.openIssues, 0
+        (total, snapshot) => total + snapshot.openIssues,
+        0
       ),
       stars: snapshots.reduce((total, snapshot) => total + snapshot.stars, 0)
     }))
@@ -257,12 +269,222 @@ const getPeriodSummary = (rows: Snapshot[]) => {
     availableFrom: first?.collectedAt ?? null,
     availableTo: last?.collectedAt ?? null,
     downloadVelocityChange: getHistoryChange(
-      first, last, value => value.npmDownloads30d
+      first,
+      last,
+      value => value.npmDownloads30d
     ),
     issueChange: getHistoryChange(first, last, value => value.openIssues),
     starsGained: getHistoryChange(first, last, value => value.stars),
     syncs: history.length
   }
+}
+
+interface HealthObservation {
+  collectedAt: number
+  responseTimeMs: number | null
+  status: 'degraded' | 'healthy'
+}
+
+const availabilityTarget = 99.9
+
+const toHealthObservations = (rows: readonly Snapshot[]) => rows
+  .flatMap((row): HealthObservation[] => {
+    if (row.healthStatus !== 'degraded' && row.healthStatus !== 'healthy')
+      return []
+
+    return [{
+      collectedAt: row.collectedAt,
+      responseTimeMs: row.responseTimeMs,
+      status: row.healthStatus
+    }]
+  })
+  .sort((left, right) => left.collectedAt - right.collectedAt)
+
+const getPercentile = (
+  values: readonly number[],
+  percentile: number
+): number | null => {
+  if (values.length === 0) return null
+
+  const sorted = [...values].sort((left, right) => left - right)
+  const index = Math.max(0, Math.ceil(percentile * sorted.length) - 1)
+
+  return sorted[index] ?? null
+}
+
+const getIncidentState = (observations: readonly HealthObservation[]) => {
+  let consecutiveFailures = 0
+  let lastOutageStartedAt: number | null = null
+  let lastRecoveredAt: number | null = null
+  let previousStatus: HealthObservation['status'] | null = null
+
+  for (const observation of observations) {
+    if (observation.status === 'degraded') {
+      consecutiveFailures += 1
+
+      if (previousStatus !== 'degraded')
+        lastOutageStartedAt = observation.collectedAt
+    } else {
+      if (previousStatus === 'degraded')
+        lastRecoveredAt = observation.collectedAt
+
+      consecutiveFailures = 0
+    }
+
+    previousStatus = observation.status
+  }
+
+  return { consecutiveFailures, lastOutageStartedAt, lastRecoveredAt }
+}
+
+export const buildOperationalHealth = (
+  rows: readonly Snapshot[],
+  slug: string
+) => {
+  const observations = toHealthObservations(rows)
+
+  const healthyChecks = observations.filter(
+    observation => observation.status === 'healthy'
+  ).length
+
+  const failedChecks = observations.length - healthyChecks
+
+  const availability = observations.length === 0 ?
+    null :
+    (healthyChecks / observations.length) * 100
+
+  const availabilityPercent = availability === null ?
+    null :
+    Math.round(availability * 100) / 100
+
+  const latencyValues = observations.flatMap(
+    observation => observation.responseTimeMs === null ?
+      [] :
+      [observation.responseTimeMs]
+  )
+
+  const latest = observations[observations.length - 1]
+  const incidents = getIncidentState(observations)
+
+  return {
+    availabilityPercent,
+    availabilityTarget,
+    consecutiveFailures: incidents.consecutiveFailures,
+    currentStatus: latest?.status ?? 'unknown',
+    failedChecks,
+    healthyChecks,
+    lastCheckedAt: latest ? new Date(latest.collectedAt).toISOString() : null,
+    lastOutageStartedAt: incidents.lastOutageStartedAt === null ?
+      null :
+      new Date(incidents.lastOutageStartedAt).toISOString(),
+    lastRecoveredAt: incidents.lastRecoveredAt === null ?
+      null :
+      new Date(incidents.lastRecoveredAt).toISOString(),
+    latencyP50Ms: getPercentile(latencyValues, 0.5),
+    latencyP95Ms: getPercentile(latencyValues, 0.95),
+    meetsTarget: availability === null ?
+      null :
+      availability >= availabilityTarget,
+    observations: observations.length,
+    slug
+  }
+}
+
+const buildPortfolioOperationalHealth = (
+  rows: readonly Snapshot[],
+  projects: readonly ProjectMetric[]
+) => projects
+  .filter(project => project.sources.website !== null)
+  .map(project => buildOperationalHealth(
+    rows.filter(row => row.slug === project.slug),
+    project.slug
+  ))
+
+const getDownloadVelocityPercent = (
+  first: Snapshot | undefined,
+  last: Snapshot | undefined
+): number | null => {
+  if (!first || !last || first.npmDownloads30d === 0) return null
+
+  return (
+    Math.round(
+      ((last.npmDownloads30d - first.npmDownloads30d) / first.npmDownloads30d) *
+      1_000
+    ) / 10
+  )
+}
+
+const sampleGrowthTrend = (
+  values: readonly number[],
+  maximumPoints = 24
+): number[] => {
+  if (values.length <= maximumPoints) return [...values]
+
+  return Array.from({ length: maximumPoints }, (_, index) => {
+    const sourceIndex = Math.round(
+      (index * (values.length - 1)) / (maximumPoints - 1)
+    )
+
+    return values[sourceIndex] ?? 0
+  })
+}
+
+const getProjectGrowth = (rows: Snapshot[], projects: ProjectMetric[]) => {
+  const projectSlugs = new Set(projects.map(project => project.slug))
+  const rowsBySlug = new Map<string, Snapshot[]>()
+
+  for (const row of rows) {
+    if (!projectSlugs.has(row.slug)) continue
+
+    const projectRows = rowsBySlug.get(row.slug) ?? []
+
+    projectRows.push(row)
+
+    rowsBySlug.set(row.slug, projectRows)
+  }
+
+  return projects.map(project => {
+    const projectRows = (rowsBySlug.get(project.slug) ?? []).sort(
+      (left, right) => left.collectedAt - right.collectedAt
+    )
+
+    const first = projectRows[0]
+    const last = projectRows[projectRows.length - 1]
+
+    const downloadVelocityChange = getHistoryChange(
+      first,
+      last,
+      value => value.npmDownloads30d
+    )
+
+    const downloadVelocityPercent = getDownloadVelocityPercent(first, last)
+    const starsGained = getHistoryChange(first, last, value => value.stars)
+
+    let signal:
+      'accelerating' | 'growing' | 'insufficient' | 'slowing' | 'steady' =
+        'steady'
+
+    if (projectRows.length < 2) signal = 'insufficient'
+    else if (downloadVelocityPercent !== null && downloadVelocityPercent >= 10)
+      signal = 'accelerating'
+    else if (downloadVelocityChange < 0) signal = 'slowing'
+    else if (downloadVelocityChange > 0 || starsGained > 0) signal = 'growing'
+
+    return {
+      availableFrom: first ? new Date(first.collectedAt).toISOString() : null,
+      availableTo: last ? new Date(last.collectedAt).toISOString() : null,
+      downloadVelocityChange,
+      downloadVelocityPercent,
+      issueChange: getHistoryChange(first, last, value => value.openIssues),
+      npmDownloads30dTrend: sampleGrowthTrend(
+        projectRows.map(row => row.npmDownloads30d)
+      ),
+      observations: projectRows.length,
+      signal,
+      slug: project.slug,
+      starsGained
+    }
+  })
 }
 
 type NpmBucket = 'day' | 'month' | 'week' | 'year'
@@ -298,21 +520,22 @@ const aggregateNpmDownloads = (
   rows: readonly NpmDownloadSnapshot[],
   bucket: NpmBucket
 ) => {
-  const downloadsByPeriod = new Map<
-    number,
-    Map<string, Map<string, number>>
-  >()
+  const downloadsByPeriod = new Map<number, Map<string, Map<string, number>>>()
 
   for (const row of rows) {
     const periodStart = getNpmBucketStart(row.periodStart, bucket)
 
-    const downloadsByProject = downloadsByPeriod.get(periodStart) ??
+    const downloadsByProject =
+      downloadsByPeriod.get(periodStart) ??
       new Map<string, Map<string, number>>()
 
-    const downloadsByPackage = downloadsByProject.get(row.slug) ??
-      new Map<string, number>()
+    const downloadsByPackage =
+      downloadsByProject.get(row.slug) ?? new Map<string, number>()
 
-    downloadsByPackage.set(row.packageName, (downloadsByPackage.get(row.packageName) ?? 0) + row.downloads)
+    downloadsByPackage.set(
+      row.packageName,
+      (downloadsByPackage.get(row.packageName) ?? 0) + row.downloads
+    )
 
     downloadsByProject.set(row.slug, downloadsByPackage)
 
@@ -324,12 +547,13 @@ const aggregateNpmDownloads = (
     .map(([periodStart, downloadsByProject]) => ({
       downloads: [...downloadsByProject.values()].reduce(
         (portfolioTotal, downloadsByPackage) => {
-          const projectAverage = averageDownloads(
-            [...downloadsByPackage.values()]
-          )
+          const projectAverage = averageDownloads([
+            ...downloadsByPackage.values()
+          ])
 
           return portfolioTotal + projectAverage
-        }, 0
+        },
+        0
       ),
       periodStart: new Date(periodStart).toISOString()
     }))
@@ -365,9 +589,8 @@ export const buildNpmAnalytics = (rows: readonly NpmDownloadSnapshot[]) => {
   const packageDownloadsByProject = new Map<string, number[]>()
 
   for (const packageDownloads of packages) {
-    const projectDownloads = packageDownloadsByProject.get(
-      packageDownloads.slug
-    ) ?? []
+    const projectDownloads =
+      packageDownloadsByProject.get(packageDownloads.slug) ?? []
 
     projectDownloads.push(packageDownloads.downloads)
 
@@ -375,7 +598,8 @@ export const buildNpmAnalytics = (rows: readonly NpmDownloadSnapshot[]) => {
   }
 
   const totalDownloads = [...packageDownloadsByProject.values()].reduce(
-    (portfolioTotal, projectDownloads) => portfolioTotal + averageDownloads(projectDownloads), 0
+    (portfolioTotal, projectDownloads) => portfolioTotal + averageDownloads(projectDownloads),
+    0
   )
 
   return {
@@ -389,6 +613,93 @@ export const buildNpmAnalytics = (rows: readonly NpmDownloadSnapshot[]) => {
     totalDownloads,
     weekly: aggregateNpmDownloads(sortedRows, 'week'),
     yearly: aggregateNpmDownloads(sortedRows, 'year')
+  }
+}
+
+const getLatestReleaseAssets = (
+  rows: readonly ReleaseAssetSnapshot[]
+): ReleaseAssetSnapshot[] => {
+  const latestByAsset = new Map<string, ReleaseAssetSnapshot>()
+
+  for (const row of rows) {
+    const current = latestByAsset.get(row.assetId)
+
+    if (!current || current.collectedAt < row.collectedAt)
+      latestByAsset.set(row.assetId, row)
+  }
+
+  return [...latestByAsset.values()]
+}
+
+const buildReleaseHistory = (rows: readonly ReleaseAssetSnapshot[]) => {
+  const downloadsByCollection = new Map<number, number>()
+
+  for (const row of rows)
+    downloadsByCollection.set(
+      row.collectedAt,
+      (downloadsByCollection.get(row.collectedAt) ?? 0) + row.downloads
+    )
+
+  return [...downloadsByCollection.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([collectedAt, downloads]) => ({
+      collectedAt: new Date(collectedAt).toISOString(),
+      downloads
+    }))
+}
+
+const buildReleaseChannels = (
+  assets: readonly { channel: string, downloads: number }[]
+) => {
+  const downloadsByChannel = new Map<string, number>()
+
+  for (const asset of assets)
+    downloadsByChannel.set(
+      asset.channel,
+      (downloadsByChannel.get(asset.channel) ?? 0) + asset.downloads
+    )
+
+  return [...downloadsByChannel.entries()]
+    .map(([channel, downloads]) => ({ channel, downloads }))
+    .sort(
+      (left, right) => right.downloads - left.downloads ||
+        left.channel.localeCompare(right.channel)
+    )
+}
+
+export const buildReleaseAnalytics = (
+  rows: readonly ReleaseAssetSnapshot[]
+) => {
+  const assets = getLatestReleaseAssets(rows)
+    .sort(
+      (left, right) => right.downloads - left.downloads ||
+        left.assetName.localeCompare(right.assetName)
+    )
+    .map(row => ({
+      assetName: row.assetName,
+      channel: row.channel,
+      downloads: row.downloads,
+      releaseTag: row.releaseTag
+    }))
+
+  const history = buildReleaseHistory(rows)
+  const first = history[0]
+  const last = history[history.length - 1]
+
+  return {
+    assets,
+    availableFrom: first?.collectedAt ?? null,
+    availableTo: last?.collectedAt ?? null,
+    channels: buildReleaseChannels(assets),
+    downloadsGained: Math.max(
+      0,
+      (last?.downloads ?? 0) - (first?.downloads ?? 0)
+    ),
+    history,
+    totalDownloads: assets.reduce(
+      (total, asset) => total + asset.downloads,
+      0
+    )
   }
 }
 
@@ -450,10 +761,12 @@ export const buildVscodeAnalytics = (
     extensions,
     history,
     totalDownloads: extensions.reduce(
-      (total, extension) => total + extension.downloads, 0
+      (total, extension) => total + extension.downloads,
+      0
     ),
     totalInstalls: extensions.reduce(
-      (total, extension) => total + extension.installs, 0
+      (total, extension) => total + extension.installs,
+      0
     )
   }
 }
@@ -472,7 +785,8 @@ export const buildOpenVsxAnalytics = (
     latestByExtension.set(row.extensionId, row)
 
     downloadsByCollection.set(
-      row.collectedAt, (downloadsByCollection.get(row.collectedAt) ?? 0) + row.downloads
+      row.collectedAt,
+      (downloadsByCollection.get(row.collectedAt) ?? 0) + row.downloads
     )
   }
 
@@ -504,7 +818,8 @@ export const buildOpenVsxAnalytics = (
     extensions,
     history,
     totalDownloads: extensions.reduce(
-      (total, extension) => total + extension.downloads, 0
+      (total, extension) => total + extension.downloads,
+      0
     )
   }
 }
@@ -552,13 +867,20 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
   const now = Date.now()
   const since = now - getRangeMilliseconds(range)
 
-  const [latestRows, historyRows, npmDownloadRows, vscodeExtensionRows] =
+  const [
+    latestRows,
+    historyRows,
+    npmDownloadRows,
+    releaseAssetRows,
+    vscodeExtensionRows
+  ] =
     await Promise.all([
       latestSuccessfulSync ?
         getSnapshotsForSyncRun(database, latestSuccessfulSync.id) :
         Promise.resolve([]),
       getPublicSnapshotsSince(database, since),
       getNpmDownloadsSince(database, getNpmRangeStart(range, now)),
+      getReleaseAssetSnapshotsSince(database, since),
       getVscodeExtensionSnapshotsSince(database, since)
     ])
 
@@ -569,6 +891,7 @@ const getDashboardRows = async (env: Bindings, range: AnalyticsRange) => {
     latestRows,
     latestSuccessfulSync,
     npmDownloadRows: npmDownloadRows.filter(row => isEnabled(row.slug)),
+    releaseAssetRows: releaseAssetRows.filter(row => isEnabled(row.slug)),
     sync,
     vscodeExtensionRows: vscodeExtensionRows.filter(row => isEnabled(row.slug))
   }
@@ -585,6 +908,7 @@ export const buildDashboard = async (
     latestRows,
     latestSuccessfulSync,
     npmDownloadRows,
+    releaseAssetRows,
     sync,
     vscodeExtensionRows
   } = await getDashboardRows(env, range)
@@ -598,12 +922,15 @@ export const buildDashboard = async (
 
   return dashboardSchema.parse({
     generatedAt: new Date().toISOString(),
+    growth: getProjectGrowth(historyRows, projects),
     history,
     npmAnalytics: buildNpmAnalytics(npmDownloadRows),
     openVsxAnalytics: buildOpenVsxAnalytics(vscodeExtensionRows),
+    operationalHealth: buildPortfolioOperationalHealth(historyRows, projects),
     period: getPeriodSummary(historyRows),
     projects,
     range,
+    releaseAnalytics: buildReleaseAnalytics(releaseAssetRows),
     summary: {
       activeProjects: projects.filter(project => project.status === 'active')
         .length,
@@ -614,10 +941,12 @@ export const buildDashboard = async (
         projects.map(project => project.githubViews14d)
       ),
       npmDownloads30d: projects.reduce(
-        (total, project) => total + project.npmDownloads30d, 0
+        (total, project) => total + project.npmDownloads30d,
+        0
       ),
       openIssues: projects.reduce(
-        (total, project) => total + project.openIssues, 0
+        (total, project) => total + project.openIssues,
+        0
       ),
       publicProjects: projects.length
     },
@@ -638,6 +967,7 @@ export const buildProjectDashboard = async (
     latestRows,
     latestSuccessfulSync,
     npmDownloadRows,
+    releaseAssetRows,
     sync,
     vscodeExtensionRows
   } = await getDashboardRows(env, range)
@@ -665,16 +995,28 @@ export const buildProjectDashboard = async (
     snapshot => snapshot.slug === slug
   )
 
+  const projectReleaseAssetRows = releaseAssetRows.filter(
+    snapshot => snapshot.slug === slug
+  )
+
+  const project = toProjectMetric(row, preference)
+  const growth = getProjectGrowth(projectHistoryRows, [project])[0]
+
+  if (!growth) return null
+
   return projectDashboardSchema.parse({
     generatedAt: new Date().toISOString(),
+    growth,
     history,
     npmAnalytics: buildNpmAnalytics(projectNpmDownloadRows),
     openVsxAnalytics: buildOpenVsxAnalytics(
       vscodeExtensionRows.filter(snapshot => snapshot.slug === slug)
     ),
+    operationalHealth: buildOperationalHealth(projectHistoryRows, slug),
     period: getPeriodSummary(projectHistoryRows),
-    project: toProjectMetric(row, preference),
+    project,
     range,
+    releaseAnalytics: buildReleaseAnalytics(projectReleaseAssetRows),
     sync: toSyncState(sync, latestSuccessfulSync),
     vscodeAnalytics: buildVscodeAnalytics(
       vscodeExtensionRows.filter(snapshot => snapshot.slug === slug)

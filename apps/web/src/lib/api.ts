@@ -4,7 +4,8 @@ import type {
   Dashboard,
   ProjectDashboard,
   ProjectSettings,
-  SessionResponse
+  SessionResponse,
+  StoreAnalytics
 } from '@santi020k/observatory-api-types'
 
 export interface AdminFeedbackResponse {
@@ -86,6 +87,14 @@ export const getProjectSettings = async (
 ): Promise<ApiResponse<ProjectSettings>> => (await requestFromApi(
   '/settings/projects', request, requestUrl
 )) as ApiResponse<ProjectSettings>
+
+export const getStoreAnalytics = async (
+  range: AnalyticsRange,
+  request: Request,
+  requestUrl: URL
+): Promise<ApiResponse<StoreAnalytics>> => (await requestFromApi(
+  `/analytics/apps?range=${range}`, request, requestUrl
+)) as ApiResponse<StoreAnalytics>
 
 export const getAdminFeedback = async (
   request: Request,

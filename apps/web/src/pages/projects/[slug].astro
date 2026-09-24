@@ -24,14 +24,17 @@ import {
 } from '@/lib/format'
 import { aggregateWebsiteAnalytics } from '@/lib/website-analytics'
 
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
-import Card from '@santi020k/lumen-astro/components/Card'
-import Empty from '@santi020k/lumen-astro/components/Empty'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import LineChart from '@santi020k/lumen-astro/components/LineChart'
-import Table from '@santi020k/lumen-astro/components/Table'
-import Tabs from '@santi020k/lumen-astro/components/Tabs'
+import {
+  Badge,
+  Breadcrumb,
+  ButtonLink,
+  Card,
+  Empty,
+  Icon,
+  LineChart,
+  Table,
+  Tabs
+} from '@santi020k/lumen-astro'
 import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
 
 const slug = Astro.params.slug
@@ -77,6 +80,14 @@ const websiteDataIsSampled = websiteHistory.some(
   point => point.sampleInterval > 1
 )
 
+const operationalHealth = dashboard.operationalHealth
+
+const operationalAvailability = operationalHealth.availabilityPercent === null ?
+  '—' :
+  `${operationalHealth.availabilityPercent.toFixed(
+    operationalHealth.availabilityPercent === 100 ? 0 : 2
+  )}%`
+
 const rangeMeta = analyticsRangeMeta[dashboard.range]
 const rangeLabel = rangeMeta.longLabel
 
@@ -104,6 +115,26 @@ const websiteTrafficSeries = [
 ] as const
 
 const npmChart = getNpmChart(dashboard.npmAnalytics, dashboard.range)
+const npmPackageCount = dashboard.npmAnalytics.packages.length
+
+const npmRawDownloads = dashboard.npmAnalytics.packages.reduce(
+  (total, packageDownloads) => total + packageDownloads.downloads,
+  0
+)
+
+const npmLast7Days =
+  dashboard.npmAnalytics.daily.length >= 7 ?
+    dashboard.npmAnalytics.daily
+      .slice(-7)
+      .reduce((total, point) => total + point.downloads, 0) :
+    null
+
+let npmLast7DaysContext = 'Requires 7 completed days'
+
+if (npmLast7Days !== null)
+  npmLast7DaysContext = npmPackageCount === 1 ?
+    'Same time window npm highlights' :
+    `Average of ${formatNumber(npmPackageCount)} packages`
 
 const formatNpmPeriodLabel = (value: string): string => {
   let options: Intl.DateTimeFormatOptions
@@ -155,6 +186,27 @@ const openVsxHistorySeries = [
   }
 ] as const
 
+const releaseHistorySeries = [
+  {
+    data: dashboard.releaseAnalytics.history.map(point => ({
+      label: `${formatNumber(point.downloads)} downloads`,
+      x: formatHistoryLabel(point.collectedAt, dashboard.range),
+      y: point.downloads
+    })),
+    id: 'release-downloads',
+    label: 'Release downloads',
+    tone: 'brand'
+  }
+] as const
+
+const releaseChannelLabels = {
+  direct: 'Direct download',
+  homebrew: 'Homebrew',
+  'homebrew-or-update': 'Homebrew or update',
+  update: 'In-app update',
+  website: 'Website'
+} as const
+
 const getOpenVsxUrl = (extensionId: string): string => {
   const extensionParts = extensionId.split('.', 2)
   const namespace = extensionParts[0] ?? 'santi020k'
@@ -167,7 +219,7 @@ const formatSignedNumber = (value: number): string => `${value > 0 ? '+' : ''}${
 
 interface ProjectPulseMetric {
   context: string
-  icon: 'download' | 'monitor' | 'mouse-pointer-click' | 'star'
+  icon: 'activity' | 'download' | 'monitor' | 'mouse-pointer-click' | 'star'
   label: string
   value: string
 }
@@ -181,10 +233,17 @@ let primaryReachMetric: ProjectPulseMetric = {
 
 if (project.sources.npm.length > 0)
   primaryReachMetric = {
-    context: `Average per package · ${rangeLabel}`,
+    context: `${npmPackageCount === 1 ? 'Exact package total' : `Average of ${formatNumber(npmPackageCount)} packages`} · ${rangeLabel}`,
     icon: 'download',
-    label: 'Adjusted downloads',
+    label: 'Project downloads',
     value: formatNumber(dashboard.npmAnalytics.totalDownloads)
+  }
+else if (dashboard.releaseAnalytics.assets.length > 0)
+  primaryReachMetric = {
+    context: 'Cumulative GitHub release asset requests',
+    icon: 'download',
+    label: 'Release downloads',
+    value: formatNumber(dashboard.releaseAnalytics.totalDownloads)
   }
 else if (websiteAnalytics)
   primaryReachMetric = {
@@ -201,19 +260,97 @@ else if (dashboard.vscodeAnalytics.extensions.length > 0)
     value: formatNumber(dashboard.vscodeAnalytics.totalDownloads)
   }
 
-const momentumMetric = project.sources.npm.length > 0 ?
-  {
+let momentumMetric: ProjectPulseMetric = {
+  context: `Net change · ${rangeLabel}`,
+  icon: 'star',
+  label: 'Stars gained',
+  value: formatSignedNumber(dashboard.period.starsGained)
+}
+
+if (project.sources.npm.length > 0)
+  momentumMetric = {
     context: `Rolling 30-day velocity · ${rangeLabel}`,
-    icon: 'activity' as const,
+    icon: 'activity',
     label: 'Download momentum',
     value: formatSignedNumber(dashboard.period.downloadVelocityChange)
-  } :
-  {
-    context: `Net change · ${rangeLabel}`,
-    icon: 'star' as const,
-    label: 'Stars gained',
-    value: formatSignedNumber(dashboard.period.starsGained)
   }
+
+if (dashboard.releaseAnalytics.assets.length > 0)
+  momentumMetric = {
+    context: `Observed cumulative growth · ${rangeLabel}`,
+    icon: 'activity',
+    label: 'New release downloads',
+    value: formatSignedNumber(dashboard.releaseAnalytics.downloadsGained)
+  }
+
+let momentumTrendValues = dashboard.history.map(point => point.stars)
+
+if (project.sources.npm.length > 0)
+  momentumTrendValues = dashboard.history.map(point => point.npmDownloads30d)
+
+if (dashboard.releaseAnalytics.assets.length > 0)
+  momentumTrendValues = dashboard.releaseAnalytics.history.map(
+    point => point.downloads
+  )
+
+const growthPercent = dashboard.growth.downloadVelocityPercent === null ?
+  null :
+  `${new Intl.NumberFormat('en', {
+    maximumFractionDigits: 1,
+    signDisplay: 'exceptZero'
+  }).format(dashboard.growth.downloadVelocityPercent)}%`
+
+const getGrowthBadgeVariant = (): 'outline' | 'secondary' | 'success' | 'warning' => {
+  if (
+    dashboard.growth.signal === 'accelerating' ||
+    dashboard.growth.signal === 'growing'
+  )
+    return 'success'
+
+  if (dashboard.growth.signal === 'slowing') return 'warning'
+
+  if (dashboard.growth.signal === 'steady') return 'secondary'
+
+  return 'outline'
+}
+
+const growthBadgeVariant = getGrowthBadgeVariant()
+
+const growthGuidance = (() => {
+  if (dashboard.growth.signal === 'accelerating')
+    return {
+      action:
+        'Ship the next high-confidence improvement and amplify the channels already producing adoption.',
+      heading: 'Protect the momentum'
+    }
+
+  if (dashboard.growth.signal === 'growing')
+    return {
+      action:
+        'Repeat the release and distribution loop that created this traction, then watch whether velocity compounds.',
+      heading: 'Turn traction into a repeatable loop'
+    }
+
+  if (dashboard.growth.signal === 'slowing')
+    return {
+      action:
+        'Check release cadence, discovery channels, and recent product friction before investing more build time.',
+      heading: 'Diagnose the slowdown'
+    }
+
+  if (dashboard.growth.signal === 'steady')
+    return {
+      action:
+        'Run one focused product or distribution experiment with a measurable outcome for the next sync window.',
+      heading: 'Create a measurable catalyst'
+    }
+
+  return {
+    action:
+      'Run another successful sync in this range to establish a trustworthy direction before making a growth decision.',
+    heading: 'Establish the baseline'
+  }
+})()
 ---
 
 <AppLayout
@@ -232,11 +369,11 @@ const momentumMetric = project.sources.npm.length > 0 ?
       />
 
       <main class="dashboard project-dashboard" id="main-content">
-        <nav aria-label="Breadcrumb" class="breadcrumb">
+        <Breadcrumb class="breadcrumb">
           <a href={`/dashboard/?range=${dashboard.range}`}>Overview</a>
           <Icon aria-hidden="true" name="chevron-right" />
           <span aria-current="page">{project.name}</span>
-        </nav>
+        </Breadcrumb>
 
         <section class="hero-row" aria-labelledby="project-title">
           <div>
@@ -317,10 +454,7 @@ const momentumMetric = project.sources.npm.length > 0 ?
           </div>
         </section>
 
-        <Tabs
-          class="dashboard-tabs project-tabs"
-          initialValue="pulse"
-        >
+        <Tabs class="dashboard-tabs project-tabs" initialValue="pulse">
           <div
             aria-label={`${project.name} dashboard views`}
             class="dashboard-tablist"
@@ -335,6 +469,14 @@ const momentumMetric = project.sources.npm.length > 0 ?
                 <button aria-selected="false" data-value="website" role="tab">
                   <Icon aria-hidden="true" name="globe" />
                   Website
+                </button>
+              )
+            }
+            {
+              dashboard.releaseAnalytics.assets.length > 0 && (
+                <button aria-selected="false" data-value="downloads" role="tab">
+                  <Icon aria-hidden="true" name="download" />
+                  Downloads
                 </button>
               )
             }
@@ -370,12 +512,66 @@ const momentumMetric = project.sources.npm.length > 0 ?
             data-value="pulse"
             role="tabpanel"
           >
+            <Card
+              as="section"
+              class="project-growth-brief"
+              aria-labelledby="project-growth-heading"
+            >
+              <div class="project-growth-brief__summary">
+                <span class="project-growth-brief__icon">
+                  <Icon aria-hidden="true" name="chart-no-axes-combined" />
+                </span>
+                <div>
+                  <span class="eyebrow">Recommended next move</span>
+                  <h2 id="project-growth-heading">{growthGuidance.heading}</h2>
+                  <p>{growthGuidance.action}</p>
+                </div>
+              </div>
+              <div class="project-growth-brief__signal">
+                <Badge variant={growthBadgeVariant}>
+                  {dashboard.growth.signal}
+                </Badge>
+                <span>
+                  {dashboard.growth.observations}{' '}
+                  {dashboard.growth.observations === 1 ?
+                    'observation' :
+                    'observations'}
+                </span>
+              </div>
+              <dl class="project-growth-evidence">
+                <div>
+                  <dt>Download velocity</dt>
+                  <dd>
+                    {formatSignedNumber(
+                      dashboard.growth.downloadVelocityChange
+                    )}
+                    {growthPercent && <small>{growthPercent}</small>}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Stars gained</dt>
+                  <dd>{formatSignedNumber(dashboard.growth.starsGained)}</dd>
+                </div>
+                <div>
+                  <dt>Issue change</dt>
+                  <dd>{formatSignedNumber(dashboard.growth.issueChange)}</dd>
+                </div>
+              </dl>
+            </Card>
+
             <section
               class="metric-grid project-metric-grid"
               aria-label={`${project.name} metrics`}
             >
               <MetricCard {...primaryReachMetric} />
-              <MetricCard {...momentumMetric} />
+              <MetricCard
+                {...momentumMetric}
+                trend={{
+                  label: `${project.name} momentum trend for ${rangeLabel}`,
+                  tone: 'brand',
+                  values: momentumTrendValues
+                }}
+              />
               <MetricCard
                 context="Current authenticated 14-day traffic"
                 icon="eye"
@@ -386,6 +582,12 @@ const momentumMetric = project.sources.npm.length > 0 ?
                 context={`Change ${dashboard.period.issueChange >= 0 ? '+' : ''}${formatNumber(dashboard.period.issueChange)} in range`}
                 icon="circle-dot-dashed"
                 label="Open issues"
+                trend={{
+                  label: `${project.name} issue trend for ${rangeLabel}`,
+                  tone:
+                    dashboard.period.issueChange > 0 ? 'warning' : 'neutral',
+                  values: dashboard.history.map(point => point.openIssues)
+                }}
                 value={formatNumber(project.openIssues)}
               />
             </section>
@@ -416,6 +618,42 @@ const momentumMetric = project.sources.npm.length > 0 ?
                     {websiteAnalytics && (
                       <Badge variant="outline">{rangeLabel}</Badge>
                     )}
+                  </div>
+
+                  <div
+                    class="website-metric-grid"
+                    aria-label={`${project.name} operational health metrics`}
+                  >
+                    <MetricCard
+                      context={`${formatNumber(operationalHealth.observations)} checks · ${operationalHealth.availabilityTarget}% objective`}
+                      icon="activity"
+                      label="Observed availability"
+                      value={operationalAvailability}
+                    />
+                    <MetricCard
+                      context={`Median ${formatDuration(operationalHealth.latencyP50Ms)}`}
+                      icon="history"
+                      label="p95 response time"
+                      value={formatDuration(operationalHealth.latencyP95Ms)}
+                    />
+                    <MetricCard
+                      context={operationalHealth.lastOutageStartedAt ?
+                        `Last outage ${formatRelativeDate(operationalHealth.lastOutageStartedAt)}` :
+                        'No outage observed in this range'}
+                      icon="circle-dot-dashed"
+                      label="Failed checks"
+                      value={formatNumber(operationalHealth.failedChecks)}
+                    />
+                    <MetricCard
+                      context={operationalHealth.lastRecoveredAt ?
+                        `Last recovery ${formatRelativeDate(operationalHealth.lastRecoveredAt)}` :
+                        `Current status: ${operationalHealth.currentStatus}`}
+                      icon="activity"
+                      label="Consecutive failures"
+                      value={formatNumber(
+                        operationalHealth.consecutiveFailures
+                      )}
+                    />
                   </div>
 
                   {websiteAnalytics ?
@@ -477,12 +715,129 @@ const momentumMetric = project.sources.npm.length > 0 ?
                           </span>
                           <h3>No Cloudflare traffic yet</h3>
                           <p>
-                            Data will appear after the Web Analytics beacon reports
-                            activity and the next analytics sync completes.
+                            Data will appear after the Web Analytics beacon
+                            reports activity and the next analytics sync
+                            completes.
                           </p>
                         </Empty>
                       </Card>
                     )}
+                </section>
+              </div>
+            )
+          }
+
+          {
+            dashboard.releaseAnalytics.assets.length > 0 && (
+              <div
+                class="dashboard-tab-panel project-channel-panel"
+                data-value="downloads"
+                role="tabpanel"
+              >
+                <section
+                  class="vscode-analytics-section"
+                  aria-labelledby="project-release-downloads-heading"
+                >
+                  <div class="section-heading">
+                    <div>
+                      <span class="eyebrow">GitHub Releases</span>
+                      <h2 id="project-release-downloads-heading">
+                        Application downloads
+                      </h2>
+                      <p>
+                        Asset requests are cumulative provider counters, not
+                        unique users or confirmed installations.
+                      </p>
+                    </div>
+                    <Badge variant="outline">{rangeLabel}</Badge>
+                  </div>
+
+                  <div
+                    class="website-metric-grid"
+                    aria-label={`${project.name} release download metrics`}
+                  >
+                    <MetricCard
+                      context="Across every tracked release asset"
+                      icon="download"
+                      label="Lifetime downloads"
+                      value={formatNumber(
+                        dashboard.releaseAnalytics.totalDownloads
+                      )}
+                    />
+                    <MetricCard
+                      context={`Observed cumulative growth · ${rangeLabel}`}
+                      icon="activity"
+                      label="Downloads gained"
+                      value={formatSignedNumber(
+                        dashboard.releaseAnalytics.downloadsGained
+                      )}
+                    />
+                  </div>
+
+                  <div class="vscode-project-grid">
+                    {dashboard.releaseAnalytics.history.length > 1 && (
+                      <Card
+                        as="section"
+                        class="panel"
+                        aria-labelledby="project-release-history-heading"
+                      >
+                        <div class="panel-heading">
+                          <div>
+                            <span class="eyebrow">Observed growth</span>
+                            <h3 id="project-release-history-heading">
+                              Cumulative downloads
+                            </h3>
+                          </div>
+                        </div>
+                        <LineChart
+                          markers={
+                            dashboard.releaseAnalytics.history.length <= 24
+                          }
+                          aria-label={`${project.name} cumulative GitHub release downloads for ${rangeLabel}`}
+                          caption="Cumulative release asset requests reported by GitHub at each Observatory sync."
+                          series={releaseHistorySeries}
+                        />
+                      </Card>
+                    )}
+
+                    <Card class="panel">
+                      <Table>
+                        <caption class="sr-only">
+                          {project.name} GitHub release asset downloads
+                        </caption>
+                        <thead>
+                          <tr>
+                            <th scope="col">Channel</th>
+                            <th scope="col">Release</th>
+                            <th scope="col">Asset</th>
+                            <th scope="col">Downloads</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dashboard.releaseAnalytics.assets.map(asset => (
+                            <tr>
+                              <td>{releaseChannelLabels[asset.channel]}</td>
+                              <td>{asset.releaseTag}</td>
+                              <td><code>{asset.assetName}</code></td>
+                              <td>{formatNumber(asset.downloads)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <th colspan={3} scope="row">All assets</th>
+                            <td>
+                              <strong>
+                                {formatNumber(
+                                  dashboard.releaseAnalytics.totalDownloads
+                                )}
+                              </strong>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </Table>
+                    </Card>
+                  </div>
                 </section>
               </div>
             )
@@ -496,61 +851,63 @@ const momentumMetric = project.sources.npm.length > 0 ?
                 data-value="extensions"
                 role="tabpanel"
               >
-                {
-                  dashboard.vscodeAnalytics.extensions.length > 0 && (
-                    <section
-                      class="vscode-analytics-section"
-                      aria-labelledby="project-vscode-heading"
-                    >
-                      <div class="section-heading">
-                        <div>
-                          <span class="eyebrow">VS Code Marketplace</span>
-                          <h2 id="project-vscode-heading">Extension reach</h2>
-                          <p>
-                            Marketplace data stays separate from npm package downloads
-                            and GitHub repository activity.
-                          </p>
-                        </div>
-                        <Badge variant="outline">Marketplace snapshot</Badge>
+                {dashboard.vscodeAnalytics.extensions.length > 0 && (
+                  <section
+                    class="vscode-analytics-section"
+                    aria-labelledby="project-vscode-heading"
+                  >
+                    <div class="section-heading">
+                      <div>
+                        <span class="eyebrow">VS Code Marketplace</span>
+                        <h2 id="project-vscode-heading">Extension reach</h2>
+                        <p>
+                          Marketplace data stays separate from npm package
+                          downloads and GitHub repository activity.
+                        </p>
                       </div>
-                      <div class="vscode-project-grid">
-                        {dashboard.vscodeAnalytics.history.length > 1 && (
-                          <Card
-                            as="section"
-                            class="panel"
-                            aria-labelledby="project-vscode-history-heading"
-                          >
-                            <div class="panel-heading">
-                              <div>
-                                <span class="eyebrow">Observed growth</span>
-                                <h3 id="project-vscode-history-heading">
-                                  Cumulative downloads
-                                </h3>
-                              </div>
+                      <Badge variant="outline">Marketplace snapshot</Badge>
+                    </div>
+                    <div class="vscode-project-grid">
+                      {dashboard.vscodeAnalytics.history.length > 1 && (
+                        <Card
+                          as="section"
+                          class="panel"
+                          aria-labelledby="project-vscode-history-heading"
+                        >
+                          <div class="panel-heading">
+                            <div>
+                              <span class="eyebrow">Observed growth</span>
+                              <h3 id="project-vscode-history-heading">
+                                Cumulative downloads
+                              </h3>
                             </div>
-                            <LineChart
-                              markers={dashboard.vscodeAnalytics.history.length <= 24}
-                              aria-label={`${project.name} VS Code Marketplace downloads for ${rangeLabel}`}
-                              caption="Cumulative downloads reported by the VS Code Marketplace at each Observatory sync."
-                              series={vscodeHistorySeries}
-                            />
-                          </Card>
-                        )}
-                        <Card class="panel">
-                          <Table>
-                            <caption class="sr-only">
-                              {project.name} VS Code Marketplace extensions
-                            </caption>
-                            <thead>
-                              <tr>
-                                <th scope="col">Extension</th>
-                                <th scope="col">Version</th>
-                                <th scope="col">Downloads</th>
-                                <th scope="col">Installs</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {dashboard.vscodeAnalytics.extensions.map(extension => (
+                          </div>
+                          <LineChart
+                            markers={
+                              dashboard.vscodeAnalytics.history.length <= 24
+                            }
+                            aria-label={`${project.name} VS Code Marketplace downloads for ${rangeLabel}`}
+                            caption="Cumulative downloads reported by the VS Code Marketplace at each Observatory sync."
+                            series={vscodeHistorySeries}
+                          />
+                        </Card>
+                      )}
+                      <Card class="panel">
+                        <Table>
+                          <caption class="sr-only">
+                            {project.name} VS Code Marketplace extensions
+                          </caption>
+                          <thead>
+                            <tr>
+                              <th scope="col">Extension</th>
+                              <th scope="col">Version</th>
+                              <th scope="col">Downloads</th>
+                              <th scope="col">Installs</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dashboard.vscodeAnalytics.extensions.map(
+                              extension => (
                                 <tr>
                                   <td>
                                     <a
@@ -563,153 +920,152 @@ const momentumMetric = project.sources.npm.length > 0 ?
                                       target="_blank"
                                     >
                                       {extension.extensionId}
-                                      <Icon aria-hidden="true" name="arrow-up-right" />
+                                      <Icon
+                                        aria-hidden="true"
+                                        name="arrow-up-right"
+                                      />
                                     </a>
                                   </td>
                                   <td>{extension.version}</td>
                                   <td>{formatNumber(extension.downloads)}</td>
                                   <td>{formatNumber(extension.installs)}</td>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </Table>
-                        </Card>
-                      </div>
-                    </section>
-                  )
-                }
+                              )
+                            )}
+                          </tbody>
+                        </Table>
+                      </Card>
+                    </div>
+                  </section>
+                )}
 
-                {
-                  dashboard.openVsxAnalytics.extensions.length > 0 && (
-                    <section
-                      class="vscode-analytics-section"
-                      aria-labelledby="project-open-vsx-heading"
-                    >
-                      <div class="section-heading">
-                        <div>
-                          <span class="eyebrow">Open VSX Registry</span>
-                          <h2 id="project-open-vsx-heading">Open editor reach</h2>
-                          <p>
-                            Downloads from Open VSX stay separate from Microsoft
-                            Marketplace installs and npm package usage.
-                          </p>
-                        </div>
-                        <Badge variant="outline">Open VSX snapshot</Badge>
+                {dashboard.openVsxAnalytics.extensions.length > 0 && (
+                  <section
+                    class="vscode-analytics-section"
+                    aria-labelledby="project-open-vsx-heading"
+                  >
+                    <div class="section-heading">
+                      <div>
+                        <span class="eyebrow">Open VSX Registry</span>
+                        <h2 id="project-open-vsx-heading">Open editor reach</h2>
+                        <p>
+                          Downloads from Open VSX stay separate from Microsoft
+                          Marketplace installs and npm package usage.
+                        </p>
                       </div>
-                      <div class="vscode-project-grid">
-                        {dashboard.openVsxAnalytics.history.length > 1 && (
-                          <Card
-                            as="section"
-                            class="panel"
-                            aria-labelledby="project-open-vsx-history-heading"
-                          >
-                            <div class="panel-heading">
-                              <div>
-                                <span class="eyebrow">Observed growth</span>
-                                <h3 id="project-open-vsx-history-heading">
-                                  Cumulative downloads
-                                </h3>
-                              </div>
+                      <Badge variant="outline">Open VSX snapshot</Badge>
+                    </div>
+                    <div class="vscode-project-grid">
+                      {dashboard.openVsxAnalytics.history.length > 1 && (
+                        <Card
+                          as="section"
+                          class="panel"
+                          aria-labelledby="project-open-vsx-history-heading"
+                        >
+                          <div class="panel-heading">
+                            <div>
+                              <span class="eyebrow">Observed growth</span>
+                              <h3 id="project-open-vsx-history-heading">
+                                Cumulative downloads
+                              </h3>
                             </div>
-                            <LineChart
-                              markers={
-                                dashboard.openVsxAnalytics.history.length <= 24
-                              }
-                              aria-label={`${project.name} Open VSX downloads for ${rangeLabel}`}
-                              caption="Cumulative downloads reported by Open VSX at each Observatory sync."
-                              series={openVsxHistorySeries}
-                            />
-                          </Card>
-                        )}
-                        <Card class="panel">
-                          <Table>
-                            <table>
-                              <caption class="sr-only">
-                                {project.name} Open VSX extensions
-                              </caption>
-                              <thead>
-                                <tr>
-                                  <th scope="col">Extension</th>
-                                  <th scope="col">Version</th>
-                                  <th scope="col">Downloads</th>
-                                  <th scope="col">Reviews</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {dashboard.openVsxAnalytics.extensions.map(
-                                  extension => (
-                                    <tr>
-                                      <td>
-                                        <a
-                                          class="npm-package-link"
-                                          href={getOpenVsxUrl(extension.extensionId)}
-                                          rel="noreferrer"
-                                          target="_blank"
-                                        >
-                                          {extension.extensionId}
-                                          <Icon
-                                            aria-hidden="true"
-                                            name="arrow-up-right"
-                                          />
-                                        </a>
-                                      </td>
-                                      <td>{extension.version}</td>
-                                      <td>{formatNumber(extension.downloads)}</td>
-                                      <td>{formatNumber(extension.reviewCount)}</td>
-                                    </tr>
-                                  )
-                                )}
-                              </tbody>
-                            </table>
-                          </Table>
+                          </div>
+                          <LineChart
+                            markers={
+                              dashboard.openVsxAnalytics.history.length <= 24
+                            }
+                            aria-label={`${project.name} Open VSX downloads for ${rangeLabel}`}
+                            caption="Cumulative downloads reported by Open VSX at each Observatory sync."
+                            series={openVsxHistorySeries}
+                          />
                         </Card>
-                      </div>
-                    </section>
-                  )
-                }
+                      )}
+                      <Card class="panel">
+                        <Table>
+                          <table>
+                            <caption class="sr-only">
+                              {project.name} Open VSX extensions
+                            </caption>
+                            <thead>
+                              <tr>
+                                <th scope="col">Extension</th>
+                                <th scope="col">Version</th>
+                                <th scope="col">Downloads</th>
+                                <th scope="col">Reviews</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dashboard.openVsxAnalytics.extensions.map(
+                                extension => (
+                                  <tr>
+                                    <td>
+                                      <a
+                                        class="npm-package-link"
+                                        href={getOpenVsxUrl(
+                                          extension.extensionId
+                                        )}
+                                        rel="noreferrer"
+                                        target="_blank"
+                                      >
+                                        {extension.extensionId}
+                                        <Icon
+                                          aria-hidden="true"
+                                          name="arrow-up-right"
+                                        />
+                                      </a>
+                                    </td>
+                                    <td>{extension.version}</td>
+                                    <td>{formatNumber(extension.downloads)}</td>
+                                    <td>
+                                      {formatNumber(extension.reviewCount)}
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                            </tbody>
+                          </table>
+                        </Table>
+                      </Card>
+                    </div>
+                  </section>
+                )}
 
-                {
-                  dashboard.vscodeAnalytics.extensions.length === 0 &&
+                {dashboard.vscodeAnalytics.extensions.length === 0 &&
                   dashboard.openVsxAnalytics.extensions.length === 0 && (
-                    <Empty class="project-channel-empty">
-                      <span class="empty-icon">
-                        <Icon aria-hidden="true" name="blocks" />
-                      </span>
-                      <h2>Extension analytics start with the next sync</h2>
-                      <p>
-                        Observatory knows which registries this project uses and
-                        will keep each provider's reach separate once a snapshot
-                        succeeds.
-                      </p>
-                      <div class="project-channel-actions">
-                        {
-                          project.sources.vscode[0] && (
-                            <ButtonLink
-                              href={project.sources.vscode[0]}
-                              newTab
-                              variant="secondary"
-                            >
-                              <Icon aria-hidden="true" name="monitor" />
-                              Open VS Code Marketplace
-                            </ButtonLink>
-                          )
-                        }
-                        {
-                          project.sources.openVsx[0] && (
-                            <ButtonLink
-                              href={project.sources.openVsx[0]}
-                              newTab
-                              variant="secondary"
-                            >
-                              <Icon aria-hidden="true" name="blocks" />
-                              Open VSX Registry
-                            </ButtonLink>
-                          )
-                        }
-                      </div>
-                    </Empty>
-                  )
-                }
+                  <Empty class="project-channel-empty">
+                    <span class="empty-icon">
+                      <Icon aria-hidden="true" name="blocks" />
+                    </span>
+                    <h2>Extension analytics start with the next sync</h2>
+                    <p>
+                      Observatory knows which registries this project uses and
+                      will keep each provider's reach separate once a snapshot
+                      succeeds.
+                    </p>
+                    <div class="project-channel-actions">
+                      {project.sources.vscode[0] && (
+                        <ButtonLink
+                          href={project.sources.vscode[0]}
+                          newTab
+                          variant="secondary"
+                        >
+                          <Icon aria-hidden="true" name="monitor" />
+                          Open VS Code Marketplace
+                        </ButtonLink>
+                      )}
+                      {project.sources.openVsx[0] && (
+                        <ButtonLink
+                          href={project.sources.openVsx[0]}
+                          newTab
+                          variant="secondary"
+                        >
+                          <Icon aria-hidden="true" name="blocks" />
+                          Open VSX Registry
+                        </ButtonLink>
+                      )}
+                    </div>
+                  </Empty>
+                )}
               </div>
             )
           }
@@ -721,20 +1077,67 @@ const momentumMetric = project.sources.npm.length > 0 ?
                 data-value="packages"
                 role="tabpanel"
               >
-                <Card
-                  as="section"
-                  class="panel history-panel project-reach-panel"
-                  aria-labelledby="project-history-heading"
+                <section
+                  aria-labelledby="project-packages-heading"
+                  class="npm-analytics-section"
                 >
-                  <div class="panel-heading">
+                  <div class="section-heading">
                     <div>
-                      <span class="eyebrow">Reach over time</span>
-                      <h2 id="project-history-heading">{npmChart.heading}</h2>
+                      <span class="eyebrow">npm registry</span>
+                      <h2 id="project-packages-heading">Package downloads</h2>
+                      <p>
+                        Registry downloads are requests for package tarballs,
+                        not unique users or installations.
+                      </p>
                     </div>
                     <Badge variant="outline">{rangeLabel}</Badge>
                   </div>
-                  {
-                    npmChart.points.length > 0 ?
+
+                  <dl class="npm-summary-grid">
+                    <div>
+                      <dt>Project-adjusted</dt>
+                      <dd>
+                        {formatNumber(dashboard.npmAnalytics.totalDownloads)}
+                      </dd>
+                      <small>
+                        {npmPackageCount === 1 ?
+                          'Exact package total' :
+                          `Average of ${formatNumber(npmPackageCount)} packages`}
+                      </small>
+                    </div>
+                    <div>
+                      <dt>Last 7 completed days</dt>
+                      <dd>
+                        {npmLast7Days === null ?
+                          '—' :
+                          formatNumber(npmLast7Days)}
+                      </dd>
+                      <small>{npmLast7DaysContext}</small>
+                    </div>
+                    <div>
+                      <dt>Raw package total</dt>
+                      <dd>{formatNumber(npmRawDownloads)}</dd>
+                      <small>All mapped packages · {rangeLabel}</small>
+                    </div>
+                    <div>
+                      <dt>Mapped packages</dt>
+                      <dd>{formatNumber(npmPackageCount)}</dd>
+                      <small>Compared individually below</small>
+                    </div>
+                  </dl>
+
+                  <Card
+                    as="section"
+                    class="panel history-panel project-reach-panel"
+                    aria-labelledby="project-history-heading"
+                  >
+                    <div class="panel-heading">
+                      <div>
+                        <span class="eyebrow">Reach over time</span>
+                        <h3 id="project-history-heading">{npmChart.heading}</h3>
+                      </div>
+                    </div>
+                    {npmChart.points.length > 0 ?
                       (
                         <LineChart
                           area
@@ -750,18 +1153,88 @@ const momentumMetric = project.sources.npm.length > 0 ?
                             No npm download history is stored for {rangeLabel}.
                           </p>
                         </Empty>
-                      )
-                  }
-                </Card>
+                      )}
+                  </Card>
+
+                  <Card
+                    as="section"
+                    class="npm-package-panel"
+                    aria-labelledby="project-package-table-heading"
+                  >
+                    <div class="npm-package-heading">
+                      <div>
+                        <span class="eyebrow">Package-by-package comparison</span>
+                        <h3 id="project-package-table-heading">
+                          Downloads by package
+                        </h3>
+                      </div>
+                      <Badge variant="secondary">
+                        {formatNumber(npmPackageCount)} packages
+                      </Badge>
+                    </div>
+                    <Table class="npm-package-table">
+                      <table>
+                        <caption class="sr-only">
+                          {project.name} npm package downloads for {rangeLabel}
+                        </caption>
+                        <thead>
+                          <tr>
+                            <th scope="col">Package</th>
+                            <th scope="col">Period</th>
+                            <th scope="col">Downloads</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dashboard.npmAnalytics.packages.map(
+                            packageDownloads => (
+                              <tr>
+                                <td>
+                                  <a
+                                    class="npm-package-link"
+                                    href={`https://www.npmjs.com/package/${packageDownloads.packageName}`}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                  >
+                                    {packageDownloads.packageName}
+                                    <Icon
+                                      aria-hidden="true"
+                                      name="arrow-up-right"
+                                    />
+                                  </a>
+                                </td>
+                                <td>{rangeLabel}</td>
+                                <td>
+                                  <strong>
+                                    {formatNumber(packageDownloads.downloads)}
+                                  </strong>
+                                </td>
+                              </tr>
+                            )
+                          )}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <th colspan={2} scope="row">
+                              Raw package total
+                            </th>
+                            <td>
+                              <strong>{formatNumber(npmRawDownloads)}</strong>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </Table>
+                    <p class="npm-method-note">
+                      npm’s package page usually highlights a 7-day count. Match
+                      both the package and period before comparing figures.
+                    </p>
+                  </Card>
+                </section>
               </div>
             )
           }
 
-          <div
-            class="dashboard-tab-panel"
-            data-value="details"
-            role="tabpanel"
-          >
+          <div class="dashboard-tab-panel" data-value="details" role="tabpanel">
             <Card
               as="section"
               class="panel project-facts project-facts--full"

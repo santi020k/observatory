@@ -6,6 +6,20 @@ MAIL_FROM=Observatory <observatory@example.com>
 OWNER_EMAIL=you@example.com
 SITE_URL=http://localhost:4321
 
+# Optional. Enables aggregate App Store Analytics Reports collection. The
+# request mapping contains existing ONGOING Analytics Report request IDs;
+# Observatory never creates or deletes report requests.
+APP_STORE_CONNECT_ISSUER_ID=
+APP_STORE_CONNECT_KEY_ID=
+APP_STORE_CONNECT_PRIVATE_KEY=
+APP_STORE_CONNECT_REPORT_REQUESTS_JSON={"postlens":"request-id","betweencontractions":"request-id"}
+
+# Optional. Enables read-only Google Play CSV report collection from the
+# account's private reporting bucket. Store the full service-account JSON as a
+# secret; never expose it to the web app.
+GOOGLE_PLAY_REPORT_BUCKET=
+GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=
+
 # Optional dedicated key for hashing feedback voter and rate-limit identifiers.
 # AUTH_SECRET is used when omitted.
 FEEDBACK_HASH_SECRET=

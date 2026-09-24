@@ -5,6 +5,8 @@ import {
   getCatalogOverride,
   getFeedbackOrigins,
   getFeedbackProject,
+  getGithubReleaseSources,
+  getPublishedApps,
   getVscodeExtensionMappings,
   titleFromSlug
 } from './index'
@@ -14,6 +16,27 @@ describe('project catalog', () => {
     expect(getCatalogOverride('lumen')?.npmPackages).toContain(
       '@santi020k/lumen-astro'
     )
+  })
+
+  test('registers OG and Quality with their published surfaces', () => {
+    expect(getCatalogOverride('og')).toMatchObject({
+      category: 'library',
+      displayName: 'OG',
+      npmPackages: ['@santi020k/og']
+    })
+    expect(getCatalogOverride('quality')).toMatchObject({
+      category: 'tool',
+      displayName: 'Quality'
+    })
+
+    expect(getGithubReleaseSources()).toContainEqual({
+      assets: [{
+        assetNamePattern: '^quality-.*\\.(?:tar\\.gz|zip)$',
+        channel: 'direct'
+      }],
+      repository: 'quality',
+      slug: 'quality'
+    })
   })
 
   test('maps the theme repository only to its published packages', () => {
@@ -40,6 +63,23 @@ describe('project catalog', () => {
     })
   })
 
+  test('maps Coolstead release assets to observable download channels', () => {
+    const source = getGithubReleaseSources().find(
+      candidate => candidate.repository === 'coolstead-releases'
+    )
+
+    expect(source?.slug).toBe('coolstead-releases')
+    expect(source?.assets.map(asset => asset.channel)).toEqual([
+      'website',
+      'update',
+      'homebrew-or-update'
+    ])
+
+    expect(getCatalogOverride('coolstead-releases')?.displayName).toBe(
+      'Coolstead'
+    )
+  })
+
   test('registers project-scoped feedback surfaces and their trusted origins', () => {
     expect(getFeedbackProject('postlens')).toMatchObject({
       displayName: 'PostLens',
@@ -52,5 +92,22 @@ describe('project catalog', () => {
     expect(getFeedbackProject('between-contractions')).toBeDefined()
     expect(getFeedbackOrigins()).toContain('https://roadscore.santi020k.com')
     expect(getFeedbackOrigins()).toContain('https://between.santi020k.com')
+    expect(getFeedbackOrigins()).toContain('https://roadscore.santi020k.com')
+  })
+
+  test('registers published native apps and their store identities', () => {
+    const lumen = getPublishedApps().find(app => app.slug === 'lumen')
+    const postLens = getPublishedApps().find(app => app.slug === 'postlens')
+    const between = getPublishedApps().find(
+      app => app.slug === 'betweencontractions'
+    )
+
+    expect(lumen?.apple).toEqual({
+      appId: '6805250815',
+      bundleId: 'com.santi020k.lumen.playground.apple'
+    })
+    expect(postLens?.apple?.appId).toBe('6804601300')
+    expect(between?.apple?.appId).toBe('6802499436')
+    expect(between?.google).toBeUndefined()
   })
 })

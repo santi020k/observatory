@@ -1,7 +1,9 @@
 {
   "name": "@santi020k/observatory-root",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "description": "Private portfolio operations control room for product, package, deployment, and repository signals.",
+  "license": "UNLICENSED",
   "type": "module",
   "packageManager": "pnpm@11.6.0",
   "engines": {
@@ -10,6 +12,7 @@
   "scripts": {
     "build": "turbo run build",
     "check": "turbo run check",
+    "check:security": "pnpm audit --prod",
     "clean": "turbo run clean",
     "commit": "commitprompt",
     "db:migrate:local": "pnpm --filter @santi020k/observatory-api run db:migrate:local",
@@ -21,12 +24,13 @@
     "lint:fix": "pnpm run lint:repo:fix && turbo run lint:fix",
     "lint:repo": "eslint . --cache --no-warn-ignored --max-warnings=0",
     "lint:repo:fix": "eslint . --cache --fix --no-warn-ignored --max-warnings=0",
+    "release:validate-tag": "node scripts/validate-release-tag.mjs",
     "setup:github": "node scripts/setup-github-token.mjs",
-    "setup:local": "node scripts/setup-local.mjs",
-    "test": "turbo run test",
+    "setup:local": "node scripts/setup-local.mjs && pnpm run hooks:install",
+    "test": "turbo run test && node --test scripts/*.test.mjs",
     "type-check": "turbo run type-check",
-    "verify": "pnpm run lint && pnpm run check && pnpm run type-check && pnpm run test && pnpm run doctor && pnpm run build",
-    "prepare": "husky",
+    "verify": "pnpm run lint && pnpm run check && pnpm run type-check && pnpm run test && pnpm run doctor && pnpm run check:security && pnpm run build",
+    "hooks:install": "node scripts/install-quality-hooks.mjs",
     "pre-push": "pnpm run verify"
   },
   "devDependencies": {
@@ -42,7 +46,6 @@
     "@santi020k/eslint-config-testing": "catalog:",
     "@santi020k/eslint-config-tools": "catalog:",
     "eslint": "catalog:",
-    "husky": "catalog:",
     "prettier": "catalog:",
     "prettier-plugin-astro": "catalog:",
     "turbo": "catalog:",

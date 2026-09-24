@@ -1,6 +1,7 @@
-import { getTableName } from 'drizzle-orm'
+import { getTableColumns, getTableName } from 'drizzle-orm'
 import { describe, expect, test } from 'vitest'
 
+import { storeMetricWriteColumnCount } from './index'
 import {
   authAttempts,
   authCodes,
@@ -12,7 +13,10 @@ import {
   passkeyCredentials,
   projectPreferences,
   projectSnapshots,
+  releaseAssetSnapshots,
   sessions,
+  storeMetricPoints,
+  storeSyncRuns,
   syncRuns,
   vscodeExtensionSnapshots,
   websiteAnalyticsSnapshots
@@ -26,6 +30,10 @@ describe('observatory database schema', () => {
 
     expect(getTableName(projectSnapshots)).toBe('project_snapshots')
 
+    expect(getTableName(releaseAssetSnapshots)).toBe(
+      'release_asset_snapshots'
+    )
+
     expect(getTableName(npmDownloadSnapshots)).toBe('npm_download_snapshots')
 
     expect(getTableName(syncRuns)).toBe('sync_runs')
@@ -37,6 +45,9 @@ describe('observatory database schema', () => {
     expect(getTableName(websiteAnalyticsSnapshots)).toBe(
       'website_analytics_snapshots'
     )
+
+    expect(getTableName(storeMetricPoints)).toBe('store_metric_points')
+    expect(getTableName(storeSyncRuns)).toBe('store_sync_runs')
   })
 
   test('keeps passkey material and one-time challenges separate', () => {
@@ -57,6 +68,23 @@ describe('observatory database schema', () => {
     expect(vscodeExtensionSnapshots.provider.name).toBe('provider')
 
     expect(vscodeExtensionSnapshots.syncRunId.name).toBe('sync_run_id')
+  })
+
+  test('stores cumulative release downloads with channel identity', () => {
+    expect(releaseAssetSnapshots.assetId.name).toBe('asset_id')
+    expect(releaseAssetSnapshots.channel.name).toBe('channel')
+    expect(releaseAssetSnapshots.syncRunId.name).toBe('sync_run_id')
+  })
+
+  test('stores normalized store metrics without conflating dimensions', () => {
+    expect(storeMetricPoints.provider.notNull).toBe(true)
+    expect(storeMetricPoints.metric.notNull).toBe(true)
+    expect(storeMetricPoints.dimension.name).toBe('dimension')
+    expect(storeMetricPoints.dimensionValue.name).toBe('dimension_value')
+    expect(storeSyncRuns.errorCode.name).toBe('error_code')
+    expect(Object.keys(getTableColumns(storeMetricPoints))).toHaveLength(
+      storeMetricWriteColumnCount
+    )
   })
 
   test('stores visibility on every project snapshot', () => {

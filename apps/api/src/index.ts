@@ -20,6 +20,10 @@ import {
   buildProjectDashboard,
   buildProjectSettings
 } from './lib/dashboard'
+import {
+  buildStoreAnalytics,
+  syncStoreAnalytics
+} from './lib/store-analytics'
 import { authRoutes } from './routes/auth'
 import { feedbackRoutes } from './routes/feedback'
 import type { Bindings, WorkerEnv } from './env'
@@ -195,10 +199,26 @@ app.get('/analytics/websites', requireAuth, async context => context.json(
   )
 ))
 
+app.get('/analytics/apps', requireAuth, async context => context.json(
+  await buildStoreAnalytics(
+    context.env,
+    readRange(context.req.query('range'))
+  )
+))
+
 app.post('/sync/cloudflare', requireAuth, async context => {
   const count = await syncCloudflareAnalytics(context.env)
 
   return context.json({ count, status: 'succeeded' })
+})
+
+app.post('/sync/stores', requireAuth, async context => {
+  const result = await syncStoreAnalytics(context.env)
+
+  return context.json({
+    ...result,
+    status: result.failed > 0 ? 'failed' : 'succeeded'
+  })
 })
 
 app.notFound(context => context.json(
@@ -225,13 +245,14 @@ export default {
     executionContext: ExecutionContext
   ) => app.fetch(request, env, executionContext),
   scheduled: (
-    _controller: ScheduledController,
+    controller: ScheduledController,
     env: Bindings,
     executionContext: ExecutionContext
   ) => {
     executionContext.waitUntil(
       (async () => {
-        await syncDashboardData(env)
+        if (controller.cron === '37 17 * * *') await syncStoreAnalytics(env)
+        else await syncDashboardData(env)
 
         await cleanupAuth(env)
       })()

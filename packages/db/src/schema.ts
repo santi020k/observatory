@@ -155,6 +155,80 @@ export const vscodeExtensionSnapshots = sqliteTable(
   ]
 )
 
+export const releaseAssetSnapshots = sqliteTable(
+  'release_asset_snapshots', {
+    assetId: text('asset_id').notNull(),
+    assetName: text('asset_name').notNull(),
+    channel: text('channel').notNull(),
+    collectedAt: integer('collected_at').notNull(),
+    downloads: integer('downloads').notNull().default(0),
+    id: text('id').primaryKey(),
+    releaseTag: text('release_tag').notNull(),
+    repository: text('repository').notNull(),
+    slug: text('slug').notNull(),
+    syncRunId: text('sync_run_id').references(() => syncRuns.id)
+  }, table => [
+    index('release_asset_snapshots_collected_idx').on(table.collectedAt),
+    index('release_asset_snapshots_slug_collected_idx').on(
+      table.slug, table.collectedAt
+    ),
+    uniqueIndex('release_asset_snapshots_asset_run_idx').on(
+      table.repository, table.assetId, table.syncRunId
+    )
+  ]
+)
+
+export const storeMetricPoints = sqliteTable(
+  'store_metric_points', {
+    appSlug: text('app_slug').notNull(),
+    collectedAt: integer('collected_at').notNull(),
+    dimension: text('dimension', {
+      enum: ['appVersion', 'country', 'device', 'osVersion', 'overall']
+    }).notNull(),
+    dimensionValue: text('dimension_value').notNull(),
+    id: text('id').primaryKey(),
+    metric: text('metric').notNull(),
+    periodStart: integer('period_start').notNull(),
+    provider: text('provider', { enum: ['apple', 'google'] }).notNull(),
+    source: text('source').notNull(),
+    value: real('value').notNull()
+  }, table => [
+    index('store_metric_points_app_period_idx').on(
+      table.appSlug, table.periodStart
+    ),
+    index('store_metric_points_provider_period_idx').on(
+      table.provider, table.periodStart
+    ),
+    uniqueIndex('store_metric_points_fact_idx').on(
+      table.appSlug,
+      table.provider,
+      table.periodStart,
+      table.metric,
+      table.dimension,
+      table.dimensionValue
+    )
+  ]
+)
+
+export const storeSyncRuns = sqliteTable(
+  'store_sync_runs', {
+    appSlug: text('app_slug').notNull(),
+    completedAt: integer('completed_at'),
+    errorCode: text('error_code'),
+    id: text('id').primaryKey(),
+    provider: text('provider', { enum: ['apple', 'google'] }).notNull(),
+    records: integer('records').notNull().default(0),
+    startedAt: integer('started_at').notNull(),
+    status: text('status', {
+      enum: ['failed', 'skipped', 'succeeded']
+    }).notNull()
+  }, table => [
+    index('store_sync_runs_app_provider_started_idx').on(
+      table.appSlug, table.provider, table.startedAt
+    )
+  ]
+)
+
 export const projectPreferences = sqliteTable('project_preferences', {
   attentionMode: text('attention_mode').notNull().default('all'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
