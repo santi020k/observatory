@@ -20,6 +20,8 @@ jobs:
     environment:
       name: production
       url: https://observatory.santi020k.com
+    env:
+      INFISICAL_PROJECT_ID: b0239823-1d6e-492c-8449-517ab0b8b115
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -38,7 +40,7 @@ jobs:
         run: |
           # The nested shell expands Infisical-injected values.
           # shellcheck disable=SC2016
-          infisical run --env=prod --path=/apps/api -- \
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
             sh -c 'test -n "$CLOUDFLARE_DEPLOY_API_TOKEN" \
               || { echo "::error::CLOUDFLARE_DEPLOY_API_TOKEN is missing in Infisical"; exit 1; }'
 
@@ -46,8 +48,8 @@ jobs:
         env:
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
         run: >-
-          infisical run --env=prod --path=/apps/api --
-          infisical run --env=prod --path=/apps/web --
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api --
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web --
           pnpm verify
 
       - name: Apply database migrations
@@ -56,7 +58,7 @@ jobs:
         run: |
           # The nested shell expands Infisical-injected values.
           # shellcheck disable=SC2016
-          infisical run --env=prod --path=/apps/api -- \
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
             sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
               pnpm --filter @santi020k/observatory-api run db:migrate:remote'
 
@@ -66,7 +68,7 @@ jobs:
         run: |
           # Nested processes expand Infisical-injected values.
           # shellcheck disable=SC2016
-          infisical run --silent --env=prod --path=/apps/api -- \
+          infisical run --silent --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
             node --input-type=module -e '
               const requiredNames = [
                 "AUTH_SECRET",
@@ -104,12 +106,12 @@ jobs:
               process.stdout.write(JSON.stringify(Object.fromEntries(
                 names.map(name => [name, process.env[name]])
               )))
-            ' | infisical run --silent --env=prod --path=/apps/api -- \
+            ' | infisical run --silent --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
               sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
                 pnpm --filter @santi020k/observatory-api exec wrangler secret bulk'
           # The nested shell expands Infisical-injected values.
           # shellcheck disable=SC2016
-          infisical run --env=prod --path=/apps/api -- sh -c '
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- sh -c '
             set -eu
             version_tag="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
             CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
@@ -128,8 +130,8 @@ jobs:
         run: |
           # The nested shell expands Infisical-injected values.
           # shellcheck disable=SC2016
-          infisical run --env=prod --path=/apps/api -- \
-          infisical run --env=prod --path=/apps/web -- \
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web -- \
           sh -c '
             set -eu
             pnpm --filter @santi020k/observatory-web build
