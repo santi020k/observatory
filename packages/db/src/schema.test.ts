@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest'
 import { storeMetricWriteColumnCount } from './index'
 import {
   authAttempts,
+  authCodeRequests,
   authCodes,
   feedbackItems,
   feedbackRateLimits,
@@ -25,6 +26,7 @@ import {
 describe('observatory database schema', () => {
   test('keeps authentication and analytics in separate tables', () => {
     expect(getTableName(authCodes)).toBe('auth_codes')
+    expect(getTableName(authCodeRequests)).toBe('auth_code_requests')
 
     expect(getTableName(sessions)).toBe('sessions')
 
@@ -54,6 +56,8 @@ describe('observatory database schema', () => {
     expect(getTableName(passkeyCredentials)).toBe('passkey_credentials')
     expect(getTableName(passkeyChallenges)).toBe('passkey_challenges')
     expect(getTableName(authAttempts)).toBe('auth_attempts')
+    expect(authCodeRequests.identityHash.name).toBe('identity_hash')
+    expect(authCodeRequests.expiresAt.notNull).toBe(true)
   })
 
   test('stores exact npm downloads separately from rolling project metrics', () => {

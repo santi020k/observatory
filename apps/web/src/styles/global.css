@@ -2521,8 +2521,27 @@ p {
   gap: 0.65rem;
 }
 
+.auth-options-divider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0.85rem;
+  color: hsl(var(--ink-muted));
+  font-size: 0.72rem;
+}
+
+.auth-options-divider::before,
+.auth-options-divider::after {
+  height: 1px;
+  background: hsl(var(--line));
+  content: '';
+}
+
 .auth-card form[hidden],
-.passkey-login-actions[hidden] {
+.passkey-login-actions[hidden],
+.auth-options-divider[hidden],
+[data-passkey-login][hidden] {
   display: none;
 }
 

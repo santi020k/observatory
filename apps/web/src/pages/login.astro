@@ -42,12 +42,13 @@ const apiUrl = getBrowserApiUrl()
     <section class="auth-panel" aria-labelledby="sign-in-title">
       <Card class="auth-card">
         <span class="auth-card__icon">
-          <Icon aria-hidden="true" name="fingerprint" />
+          <Icon aria-hidden="true" name="mail" />
         </span>
         <span class="eyebrow">Private access</span>
         <h2 id="sign-in-title">Sign in to Observatory</h2>
         <p data-auth-description>
-          Use Face ID, Touch ID, Windows Hello, or your device lock.
+          Enter your authorized email. We’ll send a six-digit code that expires
+          in ten minutes.
         </p>
 
         <Alert
@@ -59,11 +60,34 @@ const apiUrl = getBrowserApiUrl()
           variant="destructive"
         />
 
-        <div class="passkey-login-actions" data-api-url={apiUrl}>
-          <Button data-passkey-login size="lg" type="button">
+        <form data-api-url={apiUrl} data-login-form data-ui-form>
+          <Field>
+            <Label for="email">Email address</Label>
+            <Input
+              autocomplete="email"
+              id="email"
+              inputmode="email"
+              name="email"
+              placeholder="hi@santi020k.com"
+              required
+              size="lg"
+              type="email"
+            />
+          </Field>
+          <Button size="lg" type="submit">
+            <span data-submit-label>Send verification code</span>
+            <Icon aria-hidden="true" name="arrow-right" />
+          </Button>
+        </form>
+
+        <div class="auth-options-divider" data-auth-options-divider>
+          <span>or use another secure method</span>
+        </div>
+
+        <div class="passkey-login-actions" data-auth-options>
+          <Button data-passkey-login type="button" variant="ghost">
             <Icon aria-hidden="true" name="fingerprint" />
             <span data-passkey-label>Continue with a passkey</span>
-            <Icon aria-hidden="true" name="arrow-right" />
           </Button>
           <Button data-show-recovery type="button" variant="ghost">
             <Icon aria-hidden="true" name="key-round" />
@@ -89,12 +113,12 @@ const apiUrl = getBrowserApiUrl()
             <Icon aria-hidden="true" name="arrow-right" />
           </Button>
           <Button data-hide-recovery type="button" variant="ghost">
-            Back to passkey
+            Back to sign in
           </Button>
         </form>
         <p class="auth-note">
-          <Icon aria-hidden="true" name="shield" /> Owner-only access. Passkeys
-          stay on your devices.
+          <Icon aria-hidden="true" name="shield" /> No password stored. This
+          device stays signed in for up to 30 days.
         </p>
       </Card>
     </section>
@@ -106,7 +130,12 @@ const apiUrl = getBrowserApiUrl()
     supportsPasskeys
   } from '@/lib/passkeys'
 
-  const actions = document.querySelector<HTMLElement>('.passkey-login-actions')
+  const loginForm = document.querySelector<HTMLFormElement>('[data-login-form]')
+  const authOptions = document.querySelector<HTMLElement>('[data-auth-options]')
+
+  const authOptionsDivider = document.querySelector<HTMLElement>(
+    '[data-auth-options-divider]'
+  )
 
   const passkeyButton = document.querySelector<HTMLButtonElement>(
     '[data-passkey-login]'
@@ -127,7 +156,22 @@ const apiUrl = getBrowserApiUrl()
   )
 
   const alert = document.querySelector<HTMLElement>('[data-form-alert]')
-  const apiUrl = actions?.dataset.apiUrl ?? '/api'
+  const apiUrl = loginForm?.dataset.apiUrl ?? '/api'
+  const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+
+  const readString = (value: unknown, key: string): string | undefined => {
+    if (!isRecord(value)) return undefined
+
+    const field = value[key]
+
+    return typeof field === 'string' ? field : undefined
+  }
+
+  const readErrorMessage = (value: unknown): string | undefined => {
+    if (!isRecord(value)) return undefined
+
+    return readString(value.error, 'message')
+  }
 
   const displayError = (error: unknown, fallback: string) => {
     if (!alert) return
@@ -138,19 +182,92 @@ const apiUrl = getBrowserApiUrl()
   }
 
   const toggleRecovery = (visible: boolean) => {
-    actions?.toggleAttribute('hidden', visible)
+    loginForm?.toggleAttribute('hidden', visible)
+
+    authOptions?.toggleAttribute('hidden', visible)
+
+    authOptionsDivider?.toggleAttribute('hidden', visible)
 
     if (recoveryForm) recoveryForm.hidden = !visible
 
     if (visible) recoveryForm?.querySelector<HTMLInputElement>('input')?.focus()
-    else passkeyButton?.focus()
+    else loginForm?.querySelector<HTMLInputElement>('input')?.focus()
   }
 
-  if (!supportsPasskeys()) toggleRecovery(true)
+  if (!supportsPasskeys()) passkeyButton?.setAttribute('hidden', '')
 
   showRecovery?.addEventListener('click', () => toggleRecovery(true))
 
   hideRecovery?.addEventListener('click', () => toggleRecovery(false))
+
+  const setSubmitting = (
+    button: HTMLButtonElement | null,
+    label: HTMLElement | null | undefined,
+    submitting: boolean,
+    idleLabel: string,
+    submittingLabel: string
+  ) => {
+    if (button) {
+      button.disabled = submitting
+
+      button.toggleAttribute('aria-busy', submitting)
+    }
+
+    if (label) label.textContent = submitting ? submittingLabel : idleLabel
+  }
+
+  loginForm?.addEventListener('submit', async event => {
+    event.preventDefault()
+
+    const button = loginForm.querySelector<HTMLButtonElement>(
+      'button[type="submit"]'
+    )
+
+    const label = loginForm.querySelector<HTMLElement>('[data-submit-label]')
+    const email = String(new FormData(loginForm).get('email') ?? '').trim()
+
+    setSubmitting(
+      button, label, true, 'Send verification code', 'Sending code…'
+    )
+
+    if (alert) alert.hidden = true
+
+    try {
+      const response = await fetch(`${apiUrl}/auth/request-code`, {
+        body: JSON.stringify({ email }),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST'
+      })
+
+      const result: unknown = await response.json()
+
+      if (!response.ok) {
+        throw new Error(readErrorMessage(result) ?? 'Could not send the code.')
+      }
+
+      const developmentCode = readString(result, 'developmentCode')
+
+      sessionStorage.setItem('observatory:pending-login-email', email)
+
+      if (developmentCode)
+        sessionStorage.setItem(
+          'observatory:pending-login-development-code', developmentCode
+        )
+      else
+        sessionStorage.removeItem(
+          'observatory:pending-login-development-code'
+        )
+
+      window.location.assign('/verify/')
+    } catch (error) {
+      displayError(error, 'Could not send the code.')
+
+      setSubmitting(
+        button, label, false, 'Send verification code', 'Sending code…'
+      )
+    }
+  })
 
   passkeyButton?.addEventListener('click', async () => {
     passkeyButton.disabled = true
@@ -172,16 +289,6 @@ const apiUrl = getBrowserApiUrl()
     }
   })
 
-  const setRecoverySubmitting = (
-    button: HTMLButtonElement | null,
-    label: HTMLElement | null,
-    submitting: boolean
-  ) => {
-    if (button) button.disabled = submitting
-
-    if (label) label.textContent = submitting ? 'Verifying…' : 'Open Observatory'
-  }
-
   recoveryForm?.addEventListener('submit', async event => {
     event.preventDefault()
 
@@ -195,7 +302,7 @@ const apiUrl = getBrowserApiUrl()
 
     const passcode = String(new FormData(recoveryForm).get('passcode') ?? '')
 
-    setRecoverySubmitting(button, label, true)
+    setSubmitting(button, label, true, 'Open Observatory', 'Verifying…')
 
     if (alert) alert.hidden = true
 
@@ -207,10 +314,12 @@ const apiUrl = getBrowserApiUrl()
         method: 'POST'
       })
 
-      const result = await response.json()
+      const result: unknown = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error?.message ?? 'The recovery code is invalid.')
+        throw new Error(
+          readErrorMessage(result) ?? 'The recovery code is invalid.'
+        )
       }
 
       recoveryForm.reset()
@@ -219,7 +328,7 @@ const apiUrl = getBrowserApiUrl()
     } catch (error) {
       displayError(error, 'The recovery code could not be verified.')
 
-      setRecoverySubmitting(button, label, false)
+      setSubmitting(button, label, false, 'Open Observatory', 'Verifying…')
     }
   })
   </script>

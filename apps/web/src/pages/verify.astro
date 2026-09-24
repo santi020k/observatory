@@ -14,15 +14,7 @@ import InputOTP from '@santi020k/lumen-astro/components/InputOTP'
 import Label from '@santi020k/lumen-astro/components/Label'
 import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
 
-const email = Astro.url.searchParams.get('email') ?? ''
-
-const developmentCode = import.meta.env.DEV ?
-  Astro.url.searchParams.get('devCode') :
-  null
-
 const apiUrl = getBrowserApiUrl()
-
-if (!email) return Astro.redirect('/login/')
 ---
 
 <AppLayout
@@ -39,17 +31,14 @@ if (!email) return Astro.redirect('/login/')
       <span class="eyebrow">Check your inbox</span>
       <h1>Enter your code</h1>
       <p>
-        We sent a six-digit code to <strong>{email}</strong>. It expires in ten
-        minutes.
+        We sent a six-digit code to
+        <strong data-masked-email>your authorized email</strong>. It expires in
+        ten minutes.
       </p>
 
-      {
-        developmentCode && (
-          <Alert variant="default">
-            Local development code: <strong>{developmentCode}</strong>
-          </Alert>
-        )
-      }
+      <Alert data-development-code-alert hidden variant="default">
+        Local development code: <strong data-development-code></strong>
+      </Alert>
       <Alert
         aria-atomic="true"
         aria-live="assertive"
@@ -61,7 +50,6 @@ if (!email) return Astro.redirect('/login/')
 
       <form
         data-api-url={apiUrl}
-        data-email={email}
         data-ui-form
         data-verify-form
       >
@@ -85,7 +73,58 @@ if (!email) return Astro.redirect('/login/')
   const form = document.querySelector<HTMLFormElement>('[data-verify-form]')
   const alert = document.querySelector<HTMLElement>('[data-form-alert]')
   const apiUrl = form?.dataset.apiUrl ?? '/api'
-  const email = form?.dataset.email ?? ''
+  const emailStorageKey = 'observatory:pending-login-email'
+
+  const developmentCodeStorageKey =
+    'observatory:pending-login-development-code'
+
+  const email = sessionStorage.getItem(emailStorageKey) ?? ''
+
+  const maskEmail = (value: string): string => {
+    const separatorIndex = value.lastIndexOf('@')
+
+    if (separatorIndex <= 0) return value
+
+    return `${value.slice(0, 1)}••${value.slice(separatorIndex)}`
+  }
+
+  if (!email) window.location.replace('/login/')
+
+  const maskedEmail = document.querySelector<HTMLElement>(
+    '[data-masked-email]'
+  )
+
+  if (maskedEmail && email) maskedEmail.textContent = maskEmail(email)
+
+  if (import.meta.env.DEV) {
+    const developmentCode = sessionStorage.getItem(
+      developmentCodeStorageKey
+    )
+
+    const developmentCodeAlert = document.querySelector<HTMLElement>(
+      '[data-development-code-alert]'
+    )
+
+    const developmentCodeValue = document.querySelector<HTMLElement>(
+      '[data-development-code]'
+    )
+
+    if (developmentCode && developmentCodeAlert && developmentCodeValue) {
+      developmentCodeValue.textContent = developmentCode
+
+      developmentCodeAlert.hidden = false
+    }
+  }
+
+  const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+
+  const readErrorMessage = (value: unknown): string | undefined => {
+    if (!isRecord(value) || !isRecord(value.error)) return undefined
+
+    return typeof value.error.message === 'string' ?
+      value.error.message :
+      undefined
+  }
 
   const setSubmitting = (
     button: HTMLButtonElement | null,
@@ -122,12 +161,16 @@ if (!email) return Astro.redirect('/login/')
       method: 'POST'
     })
 
-    const result = await response.json()
+    const result: unknown = await response.json()
 
     if (!response.ok)
       throw new Error(
-        result.error?.message ?? 'The code could not be verified.'
+        readErrorMessage(result) ?? 'The code could not be verified.'
       )
+
+    sessionStorage.removeItem(emailStorageKey)
+
+    sessionStorage.removeItem(developmentCodeStorageKey)
 
     window.location.assign('/dashboard/')
   }
