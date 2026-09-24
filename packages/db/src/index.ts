@@ -121,6 +121,8 @@ export interface StoreMetricWrite {
   value: number
 }
 
+export const storeMetricWriteColumnCount = 10
+
 export interface StoreSyncRunWrite {
   appSlug: string
   completedAt: number | null
@@ -839,7 +841,9 @@ export const upsertStoreMetrics = async (
   db: ObservatoryDb,
   points: readonly StoreMetricWrite[]
 ): Promise<void> => {
-  const batchSize = 40
+  // A store metric binds every table column. D1 accepts at most 100 bound
+  // parameters per statement, so this is the largest safe batch.
+  const batchSize = Math.floor(100 / storeMetricWriteColumnCount)
 
   for (let index = 0; index < points.length; index += batchSize) {
     const batch = points.slice(index, index + batchSize)

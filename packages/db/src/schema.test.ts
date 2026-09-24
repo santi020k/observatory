@@ -1,6 +1,7 @@
-import { getTableName } from 'drizzle-orm'
+import { getTableColumns, getTableName } from 'drizzle-orm'
 import { describe, expect, test } from 'vitest'
 
+import { storeMetricWriteColumnCount } from './index'
 import {
   authAttempts,
   authCodes,
@@ -81,6 +82,9 @@ describe('observatory database schema', () => {
     expect(storeMetricPoints.dimension.name).toBe('dimension')
     expect(storeMetricPoints.dimensionValue.name).toBe('dimension_value')
     expect(storeSyncRuns.errorCode.name).toBe('error_code')
+    expect(Object.keys(getTableColumns(storeMetricPoints))).toHaveLength(
+      storeMetricWriteColumnCount
+    )
   })
 
   test('stores visibility on every project snapshot', () => {
