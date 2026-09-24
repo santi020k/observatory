@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   deploy:
@@ -20,8 +21,6 @@ jobs:
     environment:
       name: production
       url: https://observatory.santi020k.com
-    env:
-      INFISICAL_PROJECT_ID: b0239823-1d6e-492c-8449-517ab0b8b115
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -31,45 +30,41 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - name: Install Infisical CLI
-        run: npm install --global @infisical/cli@0.43.124
+      - name: Load API production secrets
+        uses: Infisical/secrets-action@6cd3f7c0e4cc0d2395ee4ef414eb6eeb5d3e73db # v1.0.17
+        with:
+          method: oidc
+          identity-id: 915c434a-dc2a-48cb-9dd6-6019b9181375
+          project-slug: observatory-1dc-w
+          env-slug: prod
+          secret-path: /apps/api
+
+      - name: Load web production secrets
+        uses: Infisical/secrets-action@6cd3f7c0e4cc0d2395ee4ef414eb6eeb5d3e73db # v1.0.17
+        with:
+          method: oidc
+          identity-id: 915c434a-dc2a-48cb-9dd6-6019b9181375
+          project-slug: observatory-1dc-w
+          env-slug: prod
+          secret-path: /apps/web
 
       - name: Validate deployment credentials
-        env:
-          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
         run: |
-          # The nested shell expands Infisical-injected values.
-          # shellcheck disable=SC2016
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
-            sh -c 'test -n "$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              || { echo "::error::CLOUDFLARE_DEPLOY_API_TOKEN is missing in Infisical"; exit 1; }'
+          test -n "$CLOUDFLARE_DEPLOY_API_TOKEN" \
+            || { echo "::error::CLOUDFLARE_DEPLOY_API_TOKEN is missing in Infisical"; exit 1; }
 
       - name: Load production secrets and verify
-        env:
-          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
-        run: >-
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api --
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web --
-          pnpm verify
+        run: pnpm verify
 
       - name: Apply database migrations
-        env:
-          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
-        run: |
-          # The nested shell expands Infisical-injected values.
-          # shellcheck disable=SC2016
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
-            sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-api run db:migrate:remote'
+        run: >-
+          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN"
+          pnpm --filter @santi020k/observatory-api run db:migrate:remote
 
       - name: Deploy API Worker
-        env:
-          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
         run: |
-          # Nested processes expand Infisical-injected values.
-          # shellcheck disable=SC2016
-          infisical run --silent --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
-            node --input-type=module -e '
+          set -eu
+          node --input-type=module -e '
               const requiredNames = [
                 "AUTH_SECRET",
                 "CLOUDFLARE_ACCOUNT_ID",
@@ -106,42 +101,29 @@ jobs:
               process.stdout.write(JSON.stringify(Object.fromEntries(
                 names.map(name => [name, process.env[name]])
               )))
-            ' | infisical run --silent --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
-              sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-                pnpm --filter @santi020k/observatory-api exec wrangler secret bulk'
-          # The nested shell expands Infisical-injected values.
-          # shellcheck disable=SC2016
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- sh -c '
-            set -eu
-            version_tag="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-api exec wrangler versions upload \
-                --tag "$version_tag" --message "GitHub $GITHUB_SHA"
-            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-api exec wrangler versions deploy \
-                --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"
-            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-api exec wrangler triggers deploy
-          '
+            ' | CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+              pnpm --filter @santi020k/observatory-api exec wrangler secret bulk
+
+          version_tag="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+            pnpm --filter @santi020k/observatory-api exec wrangler versions upload \
+              --tag "$version_tag" --message "GitHub $GITHUB_SHA"
+          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+            pnpm --filter @santi020k/observatory-api exec wrangler versions deploy \
+              --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"
+          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+            pnpm --filter @santi020k/observatory-api exec wrangler triggers deploy
 
       - name: Deploy web Worker
-        env:
-          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
         run: |
-          # The nested shell expands Infisical-injected values.
-          # shellcheck disable=SC2016
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web -- \
-          sh -c '
-            set -eu
-            pnpm --filter @santi020k/observatory-web build
-            version_tag="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-web exec wrangler versions upload \
-                --tag "$version_tag" --message "GitHub $GITHUB_SHA"
-            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-web exec wrangler versions deploy \
-                --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"
-            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-web exec wrangler triggers deploy
-          '
+          set -eu
+          pnpm --filter @santi020k/observatory-web build
+          version_tag="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+            pnpm --filter @santi020k/observatory-web exec wrangler versions upload \
+              --tag "$version_tag" --message "GitHub $GITHUB_SHA"
+          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+            pnpm --filter @santi020k/observatory-web exec wrangler versions deploy \
+              --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"
+          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
+            pnpm --filter @santi020k/observatory-web exec wrangler triggers deploy

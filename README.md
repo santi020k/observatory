@@ -85,10 +85,10 @@ migrations, deploys the API Worker, and then deploys the web Worker. The public 
 `https://observatory.santi020k.com`; the API Worker is available at
 `https://api.observatory.santi020k.com`.
 
-The workflow stores only a read-only, production-scoped `INFISICAL_TOKEN` bootstrap credential in
-the GitHub `production` environment. Application and Cloudflare credentials remain in Infisical.
-Deployments are serialized so a newer push cannot interrupt a database migration or partially
-replace a release.
+The workflow authenticates to Infisical with GitHub OIDC through the read-only
+`github-actions-apps` machine identity. No long-lived Infisical credential is stored in GitHub;
+application and Cloudflare credentials remain in Infisical. Deployments are serialized so a newer
+push cannot interrupt a database migration or partially replace a release.
 
 Keep `CLOUDFLARE_API_TOKEN` scoped to runtime analytics reads. CI uses the separate
 `CLOUDFLARE_DEPLOY_API_TOKEN`, which needs Workers Scripts, Workers KV, and D1 edit permissions for
