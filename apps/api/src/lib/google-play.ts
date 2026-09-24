@@ -176,7 +176,7 @@ export const selectGoogleReportObjects = (
     1
   )
 
-  const historicalOffset = 2 + Math.floor(now / dayMilliseconds) % 10
+  const historicalOffset = 2 + Math.floor(now / dayMilliseconds) % 11
 
   const historicalMonth = Date.UTC(
     nowDate.getUTCFullYear(),

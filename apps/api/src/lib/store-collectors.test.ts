@@ -58,9 +58,9 @@ describe('store collector report selection', () => {
   })
 
   test('bounds Google downloads while rotating historical months', () => {
-    const now = Date.UTC(2026, 8, 24)
+    const now = Date.UTC(2026, 8, 27)
     const dimensions = ['app_version', 'carrier', 'country', 'device', 'os_version']
-    const objects = Array.from({ length: 12 }, (_, offset) => {
+    const objects = Array.from({ length: 13 }, (_, offset) => {
       const month = new Date(Date.UTC(2026, 8 - offset, 1))
       const period = `${month.getUTCFullYear()}${String(
         month.getUTCMonth() + 1
@@ -73,7 +73,7 @@ describe('store collector report selection', () => {
 
     const selected = selectGoogleReportObjects(
       objects,
-      Date.UTC(2025, 8, 24),
+      Date.UTC(2025, 8, 26),
       now
     )
     const selectedMonths = new Set(selected.map(object => /_(\d{6})_/u
@@ -81,6 +81,7 @@ describe('store collector report selection', () => {
 
     expect(selected).toHaveLength(12)
     expect(selectedMonths.size).toBe(3)
+    expect(selectedMonths).toContain('202509')
     expect(selected.some(object => object.name.includes('_carrier.csv')))
       .toBe(false)
   })
