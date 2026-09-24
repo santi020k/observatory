@@ -131,8 +131,6 @@ jobs:
             CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
               pnpm --filter @santi020k/observatory-api exec wrangler versions deploy \
                 --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"
-            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-api exec wrangler triggers deploy
           '
 
       - name: Deploy web Worker
@@ -151,6 +149,4 @@ jobs:
             CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
               pnpm --filter @santi020k/observatory-web exec wrangler versions deploy \
                 --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"
-            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
-              pnpm --filter @santi020k/observatory-web exec wrangler triggers deploy
           '

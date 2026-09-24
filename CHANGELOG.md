@@ -8,6 +8,8 @@
   authentication through the shared read-only machine identity.
 - Use the Infisical CLI for OIDC exchange so deployment remains compatible with the repository's
   restricted GitHub Actions allowlist.
+- Keep pre-provisioned Worker routes out of routine deployments so the CI token remains scoped to
+  Worker, KV, and D1 changes.
 
 ### Security
 
