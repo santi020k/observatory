@@ -17,6 +17,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@santi020k/auth-cloudflare": "catalog:",
     "@santi020k/observatory-api-types": "workspace:*",
     "@santi020k/observatory-catalog": "workspace:*",
     "@santi020k/observatory-db": "workspace:*",
