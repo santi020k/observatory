@@ -10,6 +10,10 @@ const bundleDirectory = resolve(import.meta.dirname, '../vendor/auth-v0.4.0')
 const isRecord = value => typeof value === 'object' && value !== null && !Array.isArray(value)
 const readText = async path => await readFile(path, 'utf8')
 
+const gitEnvironment = Object.fromEntries(Object.entries(process.env).filter(
+  ([key]) => !['GIT_DIR', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_WORK_TREE'].includes(key)
+))
+
 const parseJsonRecord = (text, label) => {
   const value = JSON.parse(text)
 
@@ -141,27 +145,29 @@ export const validateAuthPilotSource = async (
   const rebuiltDirectory = resolve(temporaryDirectory, 'bundle')
 
   try {
-    execFileSync('git', ['init', '--quiet', sourceDirectory])
+    execFileSync('git', ['init', '--quiet', sourceDirectory], { env: gitEnvironment })
 
     execFileSync('git', [
       '-C', sourceDirectory, 'remote', 'add', 'origin', bundleResult.sourceRepository
-    ])
+    ], { env: gitEnvironment })
 
     execFileSync('git', [
       '-C', sourceDirectory, 'fetch', '--depth', '1', 'origin', bundleResult.sourceCommit
-    ], { stdio: 'inherit' })
+    ], { env: gitEnvironment, stdio: 'inherit' })
 
     execFileSync('git', [
       '-C', sourceDirectory, 'checkout', '--detach', '--quiet', 'FETCH_HEAD'
-    ])
+    ], { env: gitEnvironment })
 
     execFileSync('pnpm', ['install', '--frozen-lockfile'], {
       cwd: sourceDirectory,
+      env: gitEnvironment,
       stdio: 'inherit'
     })
 
     execFileSync('pnpm', ['pilot:pack', '--', rebuiltDirectory], {
       cwd: sourceDirectory,
+      env: gitEnvironment,
       stdio: 'inherit'
     })
 
