@@ -182,7 +182,7 @@ export const validateAuthPilotSource = async (
     if (sourceStatus)
       throw new Error(`Pinned Auth checkout is not clean after install: ${sourceStatus}`)
 
-    execFileSync('pnpm', ['pilot:pack', '--', rebuiltDirectory], {
+    execFileSync('node', ['scripts/release/pilot-pack.mjs', '--', rebuiltDirectory], {
       cwd: sourceDirectory,
       env: gitEnvironment,
       stdio: 'inherit'
