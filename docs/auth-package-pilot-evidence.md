@@ -11,12 +11,15 @@ production revision; an unchecked item remains a release blocker.
 - Merged revision: `b637b7617510dc54b57839747507bd5083b75718`
 - Package candidate: Auth v0.4.0 from `79df2175b91281728ca56f39daaa05d098eb0eee`
 - Consumer pull request: [santi020k/observatory#21](https://github.com/santi020k/observatory/pull/21)
+- Migration deployment: [run 36145018725](https://github.com/santi020k/observatory/actions/runs/36145018725)
 - Disabled deployment: [run 36178959083](https://github.com/santi020k/observatory/actions/runs/36178959083)
 - Activation deployment: [run 36179654010](https://github.com/santi020k/observatory/actions/runs/36179654010)
 
-Both deployments completed the repository verification gate, applied the additive migration through the existing
-migration journal, and deployed the API and web Workers from the merged revision. The activation used coordinated
-API and web flags. Legacy login, legacy passkeys, owner recovery, cookies, and tables remain available.
+Run 36145018725 applied additive migration `0016_auth_cloudflare.sql` through the existing migration journal. The
+disabled and activation deployments completed the repository verification and migration gates with no pending
+migrations, then deployed the API and web Workers from the merged revision. The activation used coordinated API and
+web flags. Legacy routes, cookies, tables, and implementation remain deployed; only `/login/` reachability has been
+verified in production, so the functional legacy ceremonies remain pending below.
 
 ## Verified automated evidence
 
@@ -44,6 +47,8 @@ mailbox receipt or a completed sign-in.
 - [ ] After sign-out, that package passkey signs in successfully on the same relying-party origin.
 - [ ] A canceled or failed user-verification ceremony creates no package session.
 - [ ] Legacy email login, legacy passkey login, and owner recovery still work independently.
+- [ ] A configuration and deployment review confirms that Observatory's cookie prefix, secret, D1 tables, relying-party
+      ID and passkeys, email sender, and recovery policy remain isolated from every other consumer.
 - [ ] Final aggregate counts and the deployed revision are recorded after the ceremonies without reading sensitive rows.
 - [ ] Rollback is rehearsed by setting both pilot flags to `false`, redeploying, and confirming the pilot routes close
       while legacy authentication remains available; additive package tables remain intact.
