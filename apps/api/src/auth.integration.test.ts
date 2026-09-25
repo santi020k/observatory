@@ -76,6 +76,7 @@ const { app } = await import('./index')
 const { requireAuth } = await import('./lib/auth')
 
 const environment = {
+  AUTH_PILOT_ENABLED: 'true',
   AUTH_SECRET: 'test-auth-secret-that-is-long-enough',
   OWNER_PASSCODE: 'private-test-code',
   CORS_ORIGIN: 'https://observatory.example',
@@ -147,6 +148,33 @@ describe('owner authentication flow', () => {
 
     expect(isRecord(authOptions) && typeof authOptions.sendVerificationOTP).toBe('function')
     expect(isRecord(authOptions) && typeof authOptions.waitUntil).toBe('function')
+  })
+
+  test('keeps package endpoints and package sessions disabled at the API gate', async () => {
+    mocks.packageSession.active = true
+    const disabledEnvironment = {
+      ...environment,
+      AUTH_PILOT_ENABLED: 'false'
+    }
+    const packageResponse = await app.request(
+      '/api/auth/get-session', {}, disabledEnvironment, executionContext
+    )
+
+    expect(packageResponse.status).toBe(404)
+    expect(mocks.createOwnerAuth).not.toHaveBeenCalled()
+
+    const protectedApp = new Hono<WorkerEnv>()
+
+    protectedApp.get('/private', requireAuth, context => context.json({
+      email: context.get('sessionEmail')
+    }))
+
+    const protectedResponse = await protectedApp.request(
+      '/private', {}, disabledEnvironment, executionContext
+    )
+
+    expect(protectedResponse.status).toBe(401)
+    expect(mocks.createOwnerAuth).not.toHaveBeenCalled()
   })
 
   test('authorizes API routes with a shared-package session', async () => {

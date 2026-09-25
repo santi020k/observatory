@@ -10,7 +10,10 @@ import { logger } from 'hono/logger'
 import { secureHeaders } from 'hono/secure-headers'
 
 import { cleanupAuth, requireAuth } from './lib/auth'
-import { handleObservatoryOwnerAuth } from './lib/auth-cloudflare'
+import {
+  handleObservatoryOwnerAuth,
+  isObservatoryOwnerAuthEnabled
+} from './lib/auth-cloudflare'
 import {
   buildWebsiteAnalytics,
   syncCloudflareAnalytics
@@ -35,7 +38,9 @@ app.use(logger())
 
 app.use(secureHeaders())
 
-app.all('/api/auth/*', handleObservatoryOwnerAuth)
+app.all('/api/auth/*', context => isObservatoryOwnerAuthEnabled(context.env) ?
+  handleObservatoryOwnerAuth(context) :
+  context.notFound())
 
 const readCorsOrigin = (environment: unknown): string | null => {
   if (

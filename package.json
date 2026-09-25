@@ -12,6 +12,8 @@
   "scripts": {
     "build": "turbo run build",
     "check": "turbo run check",
+    "check:auth-pilot-bundle": "node scripts/validate-auth-pilot-bundle.mjs",
+    "check:auth-pilot-config": "node scripts/validate-auth-pilot-config.mjs",
     "check:security": "pnpm audit --prod",
     "clean": "turbo run clean",
     "commit": "commitprompt",
@@ -29,7 +31,7 @@
     "setup:local": "node scripts/setup-local.mjs && pnpm run hooks:install",
     "test": "turbo run test && node --test scripts/*.test.mjs",
     "type-check": "turbo run type-check",
-    "verify": "pnpm run lint && pnpm run check && pnpm run type-check && pnpm run test && pnpm run doctor && pnpm run check:security && pnpm run build",
+    "verify": "pnpm run check:auth-pilot-bundle && pnpm run check:auth-pilot-config && pnpm run lint && pnpm run check && pnpm run type-check && pnpm run test && pnpm run doctor && pnpm run check:security && pnpm run build",
     "hooks:install": "node scripts/install-quality-hooks.mjs",
     "pre-push": "pnpm run verify"
   },
