@@ -159,7 +159,7 @@ export const validateAuthPilotSource = async (
       '-C', sourceDirectory, 'checkout', '--detach', '--quiet', 'FETCH_HEAD'
     ], { env: gitEnvironment })
 
-    execFileSync('pnpm', ['install', '--frozen-lockfile'], {
+    execFileSync('pnpm', ['install', '--frozen-lockfile', '--ignore-scripts'], {
       cwd: sourceDirectory,
       env: gitEnvironment,
       stdio: 'inherit'
