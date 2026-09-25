@@ -165,6 +165,23 @@ export const validateAuthPilotSource = async (
       stdio: 'inherit'
     })
 
+    const installPatch = execFileSync('git', [
+      '-C', sourceDirectory, 'diff', '--binary', '--no-ext-diff'
+    ], { env: gitEnvironment })
+
+    if (installPatch.length > 0) {
+      execFileSync('git', [
+        '-C', sourceDirectory, 'apply', '--reverse', '--whitespace=nowarn'
+      ], { env: gitEnvironment, input: installPatch })
+    }
+
+    const sourceStatus = execFileSync('git', [
+      '-C', sourceDirectory, 'status', '--porcelain', '--untracked-files=normal'
+    ], { encoding: 'utf8', env: gitEnvironment }).trim()
+
+    if (sourceStatus)
+      throw new Error(`Pinned Auth checkout is not clean after install: ${sourceStatus}`)
+
     execFileSync('pnpm', ['pilot:pack', '--', rebuiltDirectory], {
       cwd: sourceDirectory,
       env: gitEnvironment,
