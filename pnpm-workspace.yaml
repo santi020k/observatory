@@ -22,7 +22,6 @@ catalog:
   '@santi020k/eslint-config-tools': ^3.1.0
   '@santi020k/eslint-plugin-astro-doctor': '^1.0.4'
   '@santi020k/lumen-astro': '^2.1.0'
-  '@santi020k/auth-cloudflare': 0.3.0
   '@santi020k/theme': '^1.2.0'
   '@types/node': '^26.1.1'
   astro: '^7.3.4'
@@ -84,6 +83,5 @@ minimumReleaseAgeExclude:
   - '@better-auth/passkey@1.7.6'
   - '@better-auth/prisma-adapter@1.7.6'
   - '@better-auth/telemetry@1.7.6'
-  - '@santi020k/auth-cloudflare@0.3.0'
   - better-auth@1.7.6
   - vitest@4.1.11

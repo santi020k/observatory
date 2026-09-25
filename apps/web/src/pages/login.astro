@@ -6,6 +6,7 @@ import { getBrowserApiUrl } from '@/lib/api'
 
 import Alert from '@santi020k/lumen-astro/components/Alert'
 import Button from '@santi020k/lumen-astro/components/Button'
+import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
 import Card from '@santi020k/lumen-astro/components/Card'
 import Field from '@santi020k/lumen-astro/components/Field'
 import Icon from '@santi020k/lumen-astro/components/Icon'
@@ -14,6 +15,7 @@ import Label from '@santi020k/lumen-astro/components/Label'
 import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
 
 const apiUrl = getBrowserApiUrl()
+const authPilotEnabled = import.meta.env.PUBLIC_AUTH_PILOT_ENABLED === 'true'
 ---
 
 <AppLayout
@@ -120,6 +122,14 @@ const apiUrl = getBrowserApiUrl()
           <Icon aria-hidden="true" name="shield" /> No password stored. This
           device stays signed in for up to 30 days.
         </p>
+        {
+          authPilotEnabled && (
+            <ButtonLink href="/auth-pilot/" variant="inline">
+              Try the isolated package pilot
+              <Icon aria-hidden="true" name="arrow-right" />
+            </ButtonLink>
+          )
+        }
       </Card>
     </section>
   </main>

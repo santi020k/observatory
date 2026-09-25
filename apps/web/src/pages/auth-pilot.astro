@@ -1,0 +1,370 @@
+---
+import Brand from '@/components/Brand.astro'
+import AppLayout from '@/layouts/AppLayout.astro'
+
+import Alert from '@santi020k/lumen-astro/components/Alert'
+import Button from '@santi020k/lumen-astro/components/Button'
+import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
+import Card from '@santi020k/lumen-astro/components/Card'
+import Field from '@santi020k/lumen-astro/components/Field'
+import Icon from '@santi020k/lumen-astro/components/Icon'
+import Input from '@santi020k/lumen-astro/components/Input'
+import Label from '@santi020k/lumen-astro/components/Label'
+import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
+
+if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
+  return Astro.redirect('/login/')
+---
+
+<AppLayout
+  description="Isolated Observatory package-authentication pilot."
+  title="Authentication pilot · Observatory"
+>
+  <ThemeToggle class="auth-theme-toggle" title="Toggle color theme" />
+  <main class="auth-pilot-shell" id="main-content">
+    <header class="auth-pilot-heading">
+      <Brand />
+      <span class="eyebrow">Migration pilot</span>
+      <h1>Verify the package without replacing recovery.</h1>
+      <p>
+        This opt-in surface exercises Observatory’s isolated package tables,
+        host-only cookie, email delivery, sessions, and passkeys. The existing
+        login and owner recovery flow remain authoritative during verification.
+      </p>
+    </header>
+
+    <Alert aria-live="polite" data-pilot-status variant="default">
+      Checking the package session…
+    </Alert>
+
+    <div class="auth-pilot-grid">
+      <Card class="auth-card">
+        <span class="auth-card__icon"><Icon aria-hidden="true" name="mail" /></span>
+        <span class="eyebrow">Email verification</span>
+        <h2>Start a package session</h2>
+        <p>The response stays generic. Only the configured owner receives a code.</p>
+
+        <form data-email-form data-ui-form>
+          <Field>
+            <Label for="pilot-email">Email address</Label>
+            <Input
+              autocomplete="email"
+              id="pilot-email"
+              inputmode="email"
+              name="email"
+              required
+              type="email"
+            />
+          </Field>
+          <Button type="submit">Send package code</Button>
+        </form>
+
+        <form data-code-form data-ui-form hidden>
+          <Field>
+            <Label for="pilot-code">Six-digit code</Label>
+            <Input
+              autocomplete="one-time-code"
+              id="pilot-code"
+              inputmode="numeric"
+              maxlength="6"
+              minlength="6"
+              name="code"
+              pattern="[0-9]{6}"
+              required
+            />
+          </Field>
+          <Button type="submit">Verify package code</Button>
+        </form>
+
+        <div class="auth-pilot-actions">
+          <Button data-passkey-sign-in type="button" variant="secondary">
+            <Icon aria-hidden="true" name="fingerprint" />
+            Sign in with package passkey
+          </Button>
+          <ButtonLink href="/login/" variant="inline">
+            Use the primary login instead
+          </ButtonLink>
+        </div>
+      </Card>
+
+      <Card class="auth-card" data-session-card hidden>
+        <span class="auth-card__icon"><Icon aria-hidden="true" name="shield-check" /></span>
+        <span class="eyebrow">Package session active</span>
+        <h2>Verify session controls</h2>
+        <p>
+          Signed in as <strong data-session-email></strong>. These controls do
+          not touch legacy sessions, passkeys, or recovery data.
+        </p>
+        <Field>
+          <Label for="pilot-passkey-name">Passkey name</Label>
+          <Input
+            id="pilot-passkey-name"
+            maxlength="64"
+            name="passkeyName"
+            placeholder="This device"
+          />
+        </Field>
+        <div class="auth-pilot-actions">
+          <Button data-add-passkey type="button">
+            <Icon aria-hidden="true" name="fingerprint" />
+            Create package passkey
+          </Button>
+          <Button data-revoke-others type="button" variant="secondary">
+            Revoke other package sessions
+          </Button>
+          <ButtonLink href="/dashboard/" variant="secondary">
+            Verify dashboard access
+          </ButtonLink>
+          <Button data-sign-out type="button" variant="ghost">
+            Sign out package session
+          </Button>
+        </div>
+      </Card>
+    </div>
+  </main>
+
+  <script>
+  import { createSantiAuthHelpers } from '@santi020k/auth-client'
+
+  const auth = createSantiAuthHelpers({
+    baseURL: window.location.origin,
+    basePath: '/api/auth-v2'
+  })
+
+  const status = document.querySelector<HTMLElement>('[data-pilot-status]')
+  const emailForm = document.querySelector<HTMLFormElement>('[data-email-form]')
+  const codeForm = document.querySelector<HTMLFormElement>('[data-code-form]')
+  const sessionCard = document.querySelector<HTMLElement>('[data-session-card]')
+  const sessionEmail = document.querySelector<HTMLElement>('[data-session-email]')
+  const passkeySignIn = document.querySelector<HTMLButtonElement>('[data-passkey-sign-in]')
+  const addPasskey = document.querySelector<HTMLButtonElement>('[data-add-passkey]')
+  const revokeOthers = document.querySelector<HTMLButtonElement>('[data-revoke-others]')
+  const signOut = document.querySelector<HTMLButtonElement>('[data-sign-out]')
+  const passkeyName = document.querySelector<HTMLInputElement>('#pilot-passkey-name')
+  let pendingEmail = ''
+
+  const setStatus = (message: string, destructive = false) => {
+    if (!status) return
+
+    status.textContent = message
+
+    status.dataset.variant = destructive ? 'destructive' : 'default'
+  }
+
+  const requireSuccess = (
+    result: { error: { message: string } | null },
+    fallback: string
+  ): void => {
+    if (result.error) throw new Error(result.error.message ?? fallback)
+  }
+
+  const setButtonBusy = (
+    button: HTMLButtonElement | null,
+    busy: boolean
+  ) => {
+    if (!button) return
+
+    button.disabled = busy
+
+    button.toggleAttribute('aria-busy', busy)
+  }
+
+  const refreshSession = async () => {
+    const result = await auth.getSession()
+
+    requireSuccess(result, 'Could not check the package session.')
+
+    const email = result.data?.email
+    const authenticated = typeof email === 'string'
+
+    if (sessionCard) sessionCard.hidden = !authenticated
+
+    if (sessionEmail) sessionEmail.textContent = email ?? ''
+
+    setStatus(
+      authenticated ?
+        'Package session active. Legacy recovery remains available.' :
+        'No package session is active. The primary login remains unchanged.'
+    )
+  }
+
+  emailForm?.addEventListener('submit', async event => {
+    event.preventDefault()
+
+    const button = emailForm.querySelector<HTMLButtonElement>('button')
+    const email = String(new FormData(emailForm).get('email') ?? '').trim()
+
+    setButtonBusy(button, true)
+
+    try {
+      const result = await auth.requestEmailOtp(email)
+
+      requireSuccess(result, 'Could not request a package code.')
+
+      pendingEmail = email
+
+      if (codeForm) codeForm.hidden = false
+
+      codeForm?.querySelector<HTMLInputElement>('input')?.focus()
+
+      setStatus('If this address is authorized, a verification code is on its way.')
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : 'Could not request a package code.',
+        true
+      )
+    } finally {
+      setButtonBusy(button, false)
+    }
+  })
+
+  codeForm?.addEventListener('submit', async event => {
+    event.preventDefault()
+
+    const button = codeForm.querySelector<HTMLButtonElement>('button')
+    const otp = String(new FormData(codeForm).get('code') ?? '')
+
+    setButtonBusy(button, true)
+
+    try {
+      const result = await auth.signInWithEmailOtp(pendingEmail, otp)
+
+      requireSuccess(result, 'The package code is invalid or expired.')
+
+      codeForm.reset()
+
+      codeForm.hidden = true
+
+      await refreshSession()
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : 'Could not verify the package code.',
+        true
+      )
+    } finally {
+      setButtonBusy(button, false)
+    }
+  })
+
+  passkeySignIn?.addEventListener('click', async () => {
+    setButtonBusy(passkeySignIn, true)
+
+    try {
+      const result = await auth.signInWithPasskey()
+
+      requireSuccess(result, 'The package passkey could not be verified.')
+
+      await refreshSession()
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : 'Could not verify the package passkey.',
+        true
+      )
+    } finally {
+      setButtonBusy(passkeySignIn, false)
+    }
+  })
+
+  addPasskey?.addEventListener('click', async () => {
+    setButtonBusy(addPasskey, true)
+
+    try {
+      const name = passkeyName?.value.trim() || 'Observatory device'
+      const result = await auth.addPasskey({ name })
+
+      requireSuccess(result, 'The package passkey could not be created.')
+
+      if (passkeyName) passkeyName.value = ''
+
+      setStatus('Package passkey created on this Observatory origin.')
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : 'Could not create the package passkey.',
+        true
+      )
+    } finally {
+      setButtonBusy(addPasskey, false)
+    }
+  })
+
+  revokeOthers?.addEventListener('click', async () => {
+    setButtonBusy(revokeOthers, true)
+
+    try {
+      const result = await auth.revokeOtherSessions()
+
+      requireSuccess(result, 'Other package sessions could not be revoked.')
+
+      setStatus('Other package sessions were revoked. This session remains active.')
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : 'Could not revoke other package sessions.',
+        true
+      )
+    } finally {
+      setButtonBusy(revokeOthers, false)
+    }
+  })
+
+  signOut?.addEventListener('click', async () => {
+    setButtonBusy(signOut, true)
+
+    try {
+      const result = await auth.signOut()
+
+      requireSuccess(result, 'The package session could not be signed out.')
+
+      await refreshSession()
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : 'Could not sign out the package session.',
+        true
+      )
+    } finally {
+      setButtonBusy(signOut, false)
+    }
+  })
+
+  void refreshSession().catch(error => {
+    setStatus(
+      error instanceof Error ? error.message : 'Could not check the package session.',
+      true
+    )
+  })
+  </script>
+</AppLayout>
+
+<style>
+  .auth-pilot-shell {
+    display: grid;
+    gap: var(--space-6);
+    margin: 0 auto;
+    max-width: 72rem;
+    min-height: 100vh;
+    padding: clamp(var(--space-6), 8vw, var(--space-12));
+  }
+
+  .auth-pilot-heading {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 52rem;
+  }
+
+  .auth-pilot-heading h1,
+  .auth-pilot-heading p {
+    margin: 0;
+  }
+
+  .auth-pilot-grid {
+    align-items: start;
+    display: grid;
+    gap: var(--space-5);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  }
+
+  .auth-pilot-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+</style>

@@ -4,6 +4,7 @@ export interface Bindings {
   APP_STORE_CONNECT_PRIVATE_KEY?: string
   APP_STORE_CONNECT_REPORT_REQUESTS_JSON?: string
   AUTH_SECRET: string
+  AUTH_PILOT_ENABLED?: string
   OWNER_PASSCODE: string
   CLOUDFLARE_ACCOUNT_ID?: string
   CLOUDFLARE_API_TOKEN?: string

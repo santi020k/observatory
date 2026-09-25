@@ -59,6 +59,25 @@ GitHub App / commercial sources
 7. A verified code is consumed and exchanged for a 30-day opaque session.
 8. Only a hash of the session token is stored. The raw token lives in an HttpOnly cookie.
 
+### Package migration pilot
+
+The optional package pilot preserves the API as the owner of authentication and D1 while solving the dashboard/API
+hostname boundary without widening cookie scope:
+
+```text
+browser at observatory.santi020k.com
+  -> /api/auth-v2/* on the Astro Worker
+  -> allowlisted /api/auth/* endpoint on the API Worker
+  -> Observatory-owned Better Auth tables in Observatory D1
+```
+
+The upstream `Set-Cookie` response is returned through the dashboard origin, which creates a host-only dashboard cookie.
+Astro's existing server-side API client forwards incoming cookies to the API when it renders a protected page. The proxy
+does not expose arbitrary API paths, accept non-auth methods, create a parent-domain cookie, or share identity state with
+another application. `PUBLIC_AUTH_PILOT_ENABLED` gates the UI and proxy, while the matching `AUTH_PILOT_ENABLED` API
+flag gates the package handler and package-session resolution. Legacy authentication remains the primary login and
+recovery path throughout the pilot.
+
 ## Collection cadence
 
 The Worker runs at minute 17 of every hour. Manual sync is owner-authenticated. Each run writes one

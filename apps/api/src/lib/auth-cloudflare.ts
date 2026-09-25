@@ -10,6 +10,17 @@ import { sendLoginCode } from './email'
 
 const COOKIE_PREFIX = 'observatory-owner'
 
+export const isObservatoryOwnerAuthEnabled = (
+  environment: WorkerEnv['Bindings']
+): boolean => {
+  const enabled = environment.AUTH_PILOT_ENABLED ?? 'false'
+
+  if (enabled !== 'true' && enabled !== 'false')
+    throw new Error('AUTH_PILOT_ENABLED must be either true or false')
+
+  return enabled === 'true'
+}
+
 const resolveAuthServerURL = (context: Context<WorkerEnv>): string => {
   const requestUrl = new URL(context.req.url)
 
@@ -73,6 +84,9 @@ export const handleObservatoryOwnerAuth = (
 export const logoutObservatoryOwnerAuth = (
   context: Context<WorkerEnv>
 ): Promise<Response> => {
+  if (!isObservatoryOwnerAuthEnabled(context.env))
+    return Promise.resolve(Response.json({ success: true }))
+
   const requestUrl = new URL('/api/auth/sign-out', context.req.url)
   const headers = new Headers(context.req.raw.headers)
 
@@ -87,6 +101,8 @@ export const logoutObservatoryOwnerAuth = (
 export const resolveOwnerAuthSession = async (
   context: Context<WorkerEnv>
 ): Promise<string | null> => {
+  if (!isObservatoryOwnerAuthEnabled(context.env)) return null
+
   const session = await createObservatoryOwnerAuth(context).resolveSession(
     context.req.raw.headers
   )

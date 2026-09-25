@@ -114,6 +114,14 @@ Set `CORS_ORIGIN` to the dashboard origin. Configure the web app with
 `PUBLIC_API_URL=https://api.observatory.santi020k.com`; use the same URL for `API_INTERNAL_URL` so
 server-side requests reach the API directly.
 
+The package-authentication pilot is disabled unless the API environment sets `AUTH_PILOT_ENABLED=true` and the web
+environment sets `PUBLIC_AUTH_PILOT_ENABLED=true`. The verification gate rejects drift between the flags. When enabled,
+the dashboard exposes only the reviewed pilot endpoints through
+same-origin `/api/auth-v2/*` requests. The web Worker forwards them to the existing API-owned `/api/auth/*` handler, so
+the browser keeps a host-only dashboard cookie and server-rendered pages can forward it to the API. Do not replace this
+with a parent-domain cookie. See [the package-authentication pilot runbook](docs/auth-package-pilot.md) before enabling
+the flag outside local development.
+
 After a release pull request is merged and its production deployment passes, dispatch the
 `Publish release` workflow from `main` with the workspace's semantic version. GitHub Actions
 verifies the release, creates the matching `v<semver>` tag at the dispatched `main` commit, and
@@ -221,12 +229,11 @@ compatibility window. In particular, recovery policy and existing passkeys stay 
 copied into the package tables. Each consumer of the public package must continue to use its own database, secret,
 cookie prefix, origins, passkeys, and recovery behavior.
 
-The browser UI has not switched to the new handler yet. Observatory renders protected pages on
-`observatory.santi020k.com`, while the authentication Worker is hosted on `api.observatory.santi020k.com`; a host-only
-API session cookie is not available to the web Worker's server-side page guard. Complete the cutover only after adding
-a reviewed same-origin auth route (or an equivalent package-supported cookie strategy), then verify email delivery,
-session expiry and revocation, cross-origin rejection, recovery, and passkey registration/sign-in on the production
-origin before retiring any legacy route or table.
+The primary browser UI has not switched to the new handler. An opt-in `/auth-pilot/` surface uses a narrow same-origin
+proxy so its package cookie remains host-only to `observatory.santi020k.com`; Astro forwards that cookie to the API when
+rendering protected pages. The legacy login, recovery, cookies, routes, and tables remain unchanged. Keep the pilot
+disabled in production until its immutable package candidate, configuration preflight, deployment review, and runbook
+are ready. Do not retire legacy authentication until all real-origin evidence is recorded.
 
 ## License
 
