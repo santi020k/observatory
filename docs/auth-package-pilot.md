@@ -61,6 +61,10 @@ package flow.
 Record evidence without including the email code, cookie value, session token, credential public key, secret, or owner
 recovery value:
 
+Use [the package-authentication pilot evidence record](auth-package-pilot-evidence.md) to separate verified production
+facts from pending operator ceremonies. Do not mark an item complete from local tests, a provider request, or an
+aggregate database count alone.
+
 1. The approved and an unapproved email receive the same generic browser response; only the approved address receives
    the transactional message.
 2. A correct code creates a package session; an incorrect and an expired code fail; attempt and request limits activate
