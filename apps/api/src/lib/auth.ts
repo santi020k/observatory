@@ -18,6 +18,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 
 import type { WorkerEnv } from '../env'
 
+import { resolveOwnerAuthSession } from './auth-cloudflare'
 import { generateCode, generateToken, hashValue, safeEqual } from './crypto'
 import { sendLoginCode } from './email'
 
@@ -234,11 +235,16 @@ export const resolveSessionEmail = async (
   return session?.email ?? null
 }
 
+export const resolveAuthenticatedEmail = async (
+  context: Context<WorkerEnv>
+): Promise<string | null> => await resolveOwnerAuthSession(context) ??
+  await resolveSessionEmail(context)
+
 export const requireAuth: MiddlewareHandler<WorkerEnv> = async (
   context,
   next
 ) => {
-  const email = await resolveSessionEmail(context)
+  const email = await resolveAuthenticatedEmail(context)
 
   if (!email) {
     return context.json(
@@ -265,7 +271,8 @@ export const logout = async (context: Context<WorkerEnv>): Promise<void> => {
 
   deleteCookie(context, cookieName, {
     ...(cookieDomain ? { domain: cookieDomain } : {}),
-    path: '/'
+    path: '/',
+    secure: context.env.ENVIRONMENT === 'production'
   })
 }
 

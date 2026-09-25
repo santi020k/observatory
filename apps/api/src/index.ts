@@ -10,6 +10,7 @@ import { logger } from 'hono/logger'
 import { secureHeaders } from 'hono/secure-headers'
 
 import { cleanupAuth, requireAuth } from './lib/auth'
+import { handleObservatoryOwnerAuth } from './lib/auth-cloudflare'
 import {
   buildWebsiteAnalytics,
   syncCloudflareAnalytics
@@ -33,6 +34,8 @@ export const app = new Hono<WorkerEnv>()
 app.use(logger())
 
 app.use(secureHeaders())
+
+app.all('/api/auth/*', handleObservatoryOwnerAuth)
 
 const readCorsOrigin = (environment: unknown): string | null => {
   if (

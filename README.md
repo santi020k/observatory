@@ -208,6 +208,26 @@ and production builds.
 - Provider secrets stay in Worker bindings and never reach the browser.
 - Private-source routes and storage will remain separate from public collection.
 
+## Authentication migration
+
+Observatory has begun a staged migration to
+[`@santi020k/auth-cloudflare`](https://www.npmjs.com/package/@santi020k/auth-cloudflare). The API mounts the new,
+application-local Better Auth handler at `/api/auth/*` and accepts its sessions for owner-only API routes. Migration
+`0016_auth_cloudflare.sql` adds the package tables to Observatory's existing D1 database; it does not modify or remove
+the legacy authentication tables.
+
+The existing `/auth/*` email, passkey, session, logout, and `OWNER_PASSCODE` recovery routes remain active during the
+compatibility window. In particular, recovery policy and existing passkeys stay owned by Observatory and are not
+copied into the package tables. Each consumer of the public package must continue to use its own database, secret,
+cookie prefix, origins, passkeys, and recovery behavior.
+
+The browser UI has not switched to the new handler yet. Observatory renders protected pages on
+`observatory.santi020k.com`, while the authentication Worker is hosted on `api.observatory.santi020k.com`; a host-only
+API session cookie is not available to the web Worker's server-side page guard. Complete the cutover only after adding
+a reviewed same-origin auth route (or an equivalent package-supported cookie strategy), then verify email delivery,
+session expiry and revocation, cross-origin rejection, recovery, and passkey registration/sign-in on the production
+origin before retiring any legacy route or table.
+
 ## License
 
 This is private, proprietary source code. No license is granted to use, copy, modify, or distribute

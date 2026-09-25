@@ -1,20 +1,53 @@
+import { Hono } from 'hono'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { hashValue } from './lib/crypto'
+import type { WorkerEnv } from './env'
 
-const mocks = vi.hoisted(() => ({
-  consumeAuthCode: vi.fn(),
-  countRecentFailedAuthAttempts: vi.fn(),
-  countRecentAuthCodes: vi.fn(),
-  createDb: vi.fn(() => ({ database: 'test' })),
-  findLatestUsableCode: vi.fn(),
-  insertAuthCode: vi.fn(),
-  insertSession: vi.fn(),
-  recordAuthAttempt: vi.fn(),
-  recordCodeAttempt: vi.fn(),
-  sendLoginCode: vi.fn(),
-  tryInsertAuthCodeRequest: vi.fn()
-}))
+const mocks = vi.hoisted(() => {
+  const packageSession = { active: false }
+
+  return {
+    consumeAuthCode: vi.fn(),
+    countRecentFailedAuthAttempts: vi.fn(),
+    countRecentAuthCodes: vi.fn(),
+    createOwnerAuth: vi.fn((_options: unknown) => ({
+      handler: vi.fn((request: Request) => {
+        if (new URL(request.url).pathname.endsWith('/sign-out')) {
+          if (request.headers.get('Origin') !== 'https://observatory.example')
+            return Response.json({ code: 'request_origin_not_allowed' }, { status: 403 })
+
+          packageSession.active = false
+
+          return Response.json({ success: true }, {
+            headers: {
+              'Set-Cookie': '__Secure-observatory-owner.session_token=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax'
+            }
+          })
+        }
+
+        return Response.json({ authenticated: false })
+      }),
+      policy: { authServerOrigin: 'https://localhost' },
+      resolveSession: vi.fn((_headers: Headers) => Promise.resolve(
+        packageSession.active ?
+          { email: 'owner@example.com', userId: 'owner-user-id' } :
+          null
+      ))
+    })),
+    createDb: vi.fn(() => ({ database: 'test' })),
+    deleteSession: vi.fn(),
+    findLatestUsableCode: vi.fn(),
+    insertAuthCode: vi.fn(),
+    insertSession: vi.fn(),
+    packageSession,
+    recordAuthAttempt: vi.fn(),
+    recordCodeAttempt: vi.fn(),
+    reportError: vi.fn(),
+    sendLoginCode: vi.fn(),
+    tryInsertAuthCodeRequest: vi.fn()
+  }
+})
 
 vi.mock('@santi020k/observatory-db', async importOriginal => ({
   ...(await importOriginal()),
@@ -22,6 +55,7 @@ vi.mock('@santi020k/observatory-db', async importOriginal => ({
   countRecentFailedAuthAttempts: mocks.countRecentFailedAuthAttempts,
   countRecentAuthCodes: mocks.countRecentAuthCodes,
   createDb: mocks.createDb,
+  deleteSession: mocks.deleteSession,
   findLatestUsableCode: mocks.findLatestUsableCode,
   insertAuthCode: mocks.insertAuthCode,
   insertSession: mocks.insertSession,
@@ -30,11 +64,16 @@ vi.mock('@santi020k/observatory-db', async importOriginal => ({
   tryInsertAuthCodeRequest: mocks.tryInsertAuthCodeRequest
 }))
 
+vi.mock('@santi020k/auth-cloudflare', () => ({
+  createOwnerAuth: mocks.createOwnerAuth
+}))
+
 vi.mock('./lib/email', () => ({
   sendLoginCode: mocks.sendLoginCode
 }))
 
 const { app } = await import('./index')
+const { requireAuth } = await import('./lib/auth')
 
 const environment = {
   AUTH_SECRET: 'test-auth-secret-that-is-long-enough',
@@ -72,6 +111,9 @@ const readRequiredString = (
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubGlobal('reportError', mocks.reportError)
+
+  mocks.packageSession.active = false
 
   mocks.consumeAuthCode.mockResolvedValue(true)
   mocks.countRecentAuthCodes.mockResolvedValue(0)
@@ -82,6 +124,101 @@ beforeEach(() => {
 })
 
 describe('owner authentication flow', () => {
+  test('configures the shared auth handler for Observatory split origins', async () => {
+    const response = await app.request(
+      '/api/auth/get-session', {
+        headers: { Origin: 'https://observatory.example' }
+      }, environment, executionContext
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.createOwnerAuth).toHaveBeenCalledWith(expect.objectContaining({
+      appName: 'Observatory',
+      applicationOrigin: 'https://observatory.example',
+      authServerURL: 'https://localhost',
+      basePath: '/api/auth',
+      cookiePrefix: 'observatory-owner',
+      database: environment.DB,
+      ownerEmail: environment.OWNER_EMAIL,
+      secret: environment.AUTH_SECRET
+    }))
+
+    const authOptions: unknown = mocks.createOwnerAuth.mock.calls[0]?.[0]
+
+    expect(isRecord(authOptions) && typeof authOptions.sendVerificationOTP).toBe('function')
+    expect(isRecord(authOptions) && typeof authOptions.waitUntil).toBe('function')
+  })
+
+  test('authorizes API routes with a shared-package session', async () => {
+    const auth = {
+      handler: vi.fn(() => Response.json({ authenticated: false })),
+      policy: { authServerOrigin: 'https://localhost' },
+      resolveSession: vi.fn((_headers: Headers) => Promise.resolve({
+        email: environment.OWNER_EMAIL,
+        userId: 'owner-user-id'
+      }))
+    }
+
+    mocks.createOwnerAuth.mockReturnValueOnce(auth)
+
+    const protectedApp = new Hono<WorkerEnv>()
+
+    protectedApp.get('/private', requireAuth, context => context.json({
+      email: context.get('sessionEmail')
+    }))
+
+    const response = await protectedApp.request(
+      '/private', {}, environment, executionContext
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      email: environment.OWNER_EMAIL
+    })
+  })
+
+  test('revokes both sessions through the compatibility logout', async () => {
+    mocks.packageSession.active = true
+
+    const protectedApp = new Hono<WorkerEnv>()
+
+    protectedApp.get('/private', requireAuth, context => context.json({
+      email: context.get('sessionEmail')
+    }))
+
+    const authorizedResponse = await protectedApp.request(
+      '/private', {}, environment, executionContext
+    )
+
+    expect(authorizedResponse.status).toBe(200)
+
+    const legacyToken = 'legacy-session-token'
+    const logoutResponse = await app.request('/auth/logout', {
+      headers: {
+        Cookie: `__Secure-observatory_session=${legacyToken}; __Secure-observatory-owner.session_token=package-session-token`
+      },
+      method: 'POST'
+    }, environment, executionContext)
+
+    expect(mocks.reportError).not.toHaveBeenCalled()
+    expect(logoutResponse.status).toBe(200)
+
+    const setCookie = logoutResponse.headers.get('set-cookie')
+
+    expect(setCookie).toContain('__Secure-observatory-owner.session_token=')
+    expect(setCookie).toContain('__Secure-observatory_session=')
+    expect(mocks.deleteSession).toHaveBeenCalledWith(
+      expect.anything(),
+      await hashValue(environment.AUTH_SECRET, legacyToken)
+    )
+
+    const unauthorizedResponse = await protectedApp.request(
+      '/private', {}, environment, executionContext
+    )
+
+    expect(unauthorizedResponse.status).toBe(401)
+  })
+
   test('stores a hashed code and returns the generic request response', async () => {
     const response = await app.request(
       '/auth/request-code', {

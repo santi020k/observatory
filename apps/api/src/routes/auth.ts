@@ -9,10 +9,11 @@ import type { WorkerEnv } from '../env'
 import {
   logout,
   requestLoginCode,
-  resolveSessionEmail,
+  resolveAuthenticatedEmail,
   verifyLoginCode,
   verifyRecoveryPasscode
 } from '../lib/auth'
+import { logoutObservatoryOwnerAuth } from '../lib/auth-cloudflare'
 
 import { passkeyRoutes } from './passkeys'
 
@@ -109,7 +110,7 @@ authRoutes.post('/verify-code', async context => {
 })
 
 authRoutes.get('/session', async context => {
-  const email = await resolveSessionEmail(context)
+  const email = await resolveAuthenticatedEmail(context)
 
   return context.json(
     email ? { authenticated: true, email } : { authenticated: false }
@@ -117,7 +118,14 @@ authRoutes.get('/session', async context => {
 })
 
 authRoutes.post('/logout', async context => {
+  const packageResponse = await logoutObservatoryOwnerAuth(context)
+
+  if (!packageResponse.ok) return packageResponse
+
   await logout(context)
+
+  for (const cookie of packageResponse.headers.getSetCookie())
+    context.header('Set-Cookie', cookie, { append: true })
 
   return context.json({ authenticated: false })
 })
