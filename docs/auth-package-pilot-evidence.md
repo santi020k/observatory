@@ -47,8 +47,9 @@ mailbox receipt or a completed sign-in.
 - [ ] After sign-out, that package passkey signs in successfully on the same relying-party origin.
 - [ ] A canceled or failed user-verification ceremony creates no package session.
 - [ ] Legacy email login, legacy passkey login, and owner recovery still work independently.
-- [ ] A configuration and deployment review confirms that Observatory's cookie prefix, secret, D1 tables, relying-party
-      ID and passkeys, email sender, and recovery policy remain isolated from every other consumer.
+- [ ] A configuration and deployment review confirms that Observatory's D1 database and binding, auth tables, sessions,
+      cookie prefix, secret, relying-party ID and passkeys, email sender, and recovery policy are not shared with any
+      other consumer.
 - [ ] Final aggregate counts and the deployed revision are recorded after the ceremonies without reading sensitive rows.
 - [ ] Rollback is rehearsed by setting both pilot flags to `false`, redeploying, and confirming the pilot routes close
       while legacy authentication remains available; additive package tables remain intact.
