@@ -1,0 +1,201 @@
+---
+import MetricCard from '@/components/MetricCard.astro'
+
+import { analyticsRangeMeta, formatHistoryLabel } from '@/lib/analytics-range'
+import { formatNumber, formatRelativeDate } from '@/lib/format'
+import {
+  dimensionLabels,
+  emptyStatusMessage,
+  metricIcon,
+  metricLabels,
+  primaryBreakdownMetric,
+  providerLabels,
+  providerMetricOrder,
+  statusMeta
+} from '@/lib/store-presentation'
+
+import {
+  Badge,
+  Card,
+  Empty,
+  Icon,
+  LineChart,
+  Table
+} from '@santi020k/lumen-astro'
+import type {
+  AnalyticsRange,
+  StoreProviderAnalytics
+} from '@santi020k/observatory-api-types'
+
+interface Props {
+  appName: string
+  appSlug: string
+  provider: StoreProviderAnalytics
+  range: AnalyticsRange
+}
+
+const { appName, appSlug, provider, range } = Astro.props
+const status = statusMeta[provider.status]
+const rangeLabel = analyticsRangeMeta[range].longLabel
+
+const visibleMetrics = providerMetricOrder[provider.provider].filter(
+  metric => provider.metrics[metric] !== undefined
+)
+
+const chartMetrics =
+  provider.provider === 'apple' ?
+    (['totalDownloads', 'installations'] as const) :
+    (['dailyDeviceInstalls', 'dailyDeviceUninstalls'] as const)
+
+const chartSeries = chartMetrics
+  .filter(metric => provider.history.some(point => point.metrics[metric] !== undefined))
+  .map((metric, index) => ({
+    data: provider.history.map(point => ({
+      label: `${formatNumber(point.metrics[metric] ?? 0)} ${metricLabels[metric].toLocaleLowerCase('en')}`,
+      x: formatHistoryLabel(point.periodStart, range),
+      y: point.metrics[metric] ?? 0
+    })),
+    id: `${provider.provider}-${metric}`,
+    label: metricLabels[metric],
+    tone: index === 0 ? ('brand' as const) : ('accent' as const)
+  }))
+---
+
+<Card as="article" class="store-provider store-provider--detail">
+  <div class="store-provider__heading">
+    <div>
+      <span class="store-provider__icon">
+        <Icon
+          aria-hidden="true"
+          name={provider.provider === 'apple' ? 'monitor' : 'blocks'}
+        />
+      </span>
+      <div>
+        <h2>{providerLabels[provider.provider]}</h2>
+        <p>
+          {
+            provider.lastCollectedAt ?
+              `Collected ${formatRelativeDate(provider.lastCollectedAt)}` :
+              'No aggregate report collected yet.'
+          }
+        </p>
+      </div>
+    </div>
+    <div class="store-provider__actions">
+      <Badge variant={status.variant}>{status.label}</Badge>
+      <a href={provider.listingUrl} rel="noopener noreferrer" target="_blank">
+        View listing <Icon aria-hidden="true" name="external-link" />
+      </a>
+    </div>
+  </div>
+
+  {
+    visibleMetrics.length > 0 ?
+(
+      <>
+        <section
+          class="metric-grid store-metric-grid"
+          aria-label={`${appName} ${providerLabels[provider.provider]} metrics`}
+        >
+          {visibleMetrics.map(metric => (
+            <MetricCard
+              context={`${providerLabels[provider.provider]} total · ${rangeLabel}`}
+              icon={metricIcon(metric)}
+              label={metricLabels[metric]}
+              value={formatNumber(provider.metrics[metric] ?? null)}
+            />
+          ))}
+        </section>
+
+        {chartSeries.length > 0 && provider.history.length > 1 && (
+          <Card
+            as="section"
+            class="panel store-history-panel"
+            aria-labelledby={`${appSlug}-${provider.provider}-history`}
+          >
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">Daily reporting</span>
+                <h3 id={`${appSlug}-${provider.provider}-history`}>
+                  Acquisition and install activity
+                </h3>
+              </div>
+            </div>
+            <LineChart
+              area
+              markers={provider.history.length <= 31}
+              aria-label={`${appName} ${providerLabels[provider.provider]} history for ${rangeLabel}`}
+              caption="Provider definitions and reporting delays apply. Missing privacy-thresholded Apple rows are not zero-filled."
+              series={chartSeries}
+            />
+          </Card>
+        )}
+
+        <div class="store-breakdown-grid">
+          {provider.breakdowns.map(breakdown => (
+            <Card as="section" class="store-breakdown-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">Aggregate breakdown</span>
+                  <h3>{dimensionLabels[breakdown.dimension]}</h3>
+                </div>
+              </div>
+              <Table>
+                <table>
+                  <caption class="sr-only">
+                    {appName} metrics by{' '}
+                    {dimensionLabels[breakdown.dimension].toLocaleLowerCase(
+                      'en'
+                    )}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">
+                        {dimensionLabels[breakdown.dimension]}
+                      </th>
+                      <th scope="col">Metric</th>
+                      <th scope="col">Count</th>
+                      <th scope="col">Crashes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {breakdown.values.map(value => {
+                      const metric = primaryBreakdownMetric(
+                        provider.provider,
+                        value.metrics
+                      )
+
+                      return (
+                        <tr>
+                          <th scope="row">{value.label}</th>
+                          <td>{metricLabels[metric]}</td>
+                          <td>{formatNumber(value.metrics[metric] ?? null)}</td>
+                          <td>{formatNumber(value.metrics.crashes ?? null)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </Table>
+            </Card>
+          ))}
+        </div>
+      </>
+    ) :
+(
+      <Empty class="store-provider__empty store-provider__empty--compact">
+        <span class="empty-icon">
+          <Icon
+            aria-hidden="true"
+            name={provider.provider === 'google' ? 'blocks' : 'activity'}
+          />
+        </span>
+        <h3>{status.label}</h3>
+        <p>{emptyStatusMessage(provider.status, provider.provider)}</p>
+        {provider.lastSyncAt && (
+          <small>Last checked {formatRelativeDate(provider.lastSyncAt)}</small>
+        )}
+      </Empty>
+    )
+  }
+</Card>

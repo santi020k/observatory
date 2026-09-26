@@ -8,6 +8,8 @@
   pinned bundle provenance checks, configuration validation, and rollback guidance.
 - Accepted shared Auth sessions additively while retaining the existing email-code, passkey,
   recovery-code, and legacy-session paths.
+- Added dedicated store intelligence pages for every published app and verified Google Play
+  listings for Lumen Playground and Between Contractions.
 
 ### Changed
 
@@ -15,6 +17,8 @@
   accessibility, and responsive behavior across phone, tablet, and desktop layouts.
 - Recognized the current App Store Connect download and installation report names while preserving
   compatibility with the previous aliases.
+- Reworked the published-app overview and empty-report states around compact Lumen components,
+  clearer provider status, listing links, and responsive layouts.
 
 ### Security
 

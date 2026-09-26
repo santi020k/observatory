@@ -539,6 +539,7 @@ export const storeProviderAnalyticsSchema = z.object({
   history: z.array(storeHistoryPointSchema),
   lastCollectedAt: z.string().trim().nullable(),
   lastSyncAt: z.string().trim().nullable(),
+  listingUrl: z.url(),
   metrics: storeMetricTotalsSchema,
   provider: storeProviderSchema,
   status: z.enum(['available', 'awaiting_data', 'failed', 'not_configured'])
@@ -588,6 +589,9 @@ export type WebsiteAnalytics = z.infer<typeof websiteAnalyticsSchema>
 export type WebsiteAnalyticsPoint = z.infer<typeof websiteAnalyticsPointSchema>
 export type WebsiteAnalyticsSite = z.infer<typeof websiteAnalyticsSiteSchema>
 export type StoreAnalytics = z.infer<typeof storeAnalyticsSchema>
+export type StoreProviderAnalytics = z.infer<
+  typeof storeProviderAnalyticsSchema
+>
 export type StoreMetricName = z.infer<typeof storeMetricNameSchema>
 export type StoreMetricTotals = z.infer<typeof storeMetricTotalsSchema>
 export type StoreProvider = z.infer<typeof storeProviderSchema>

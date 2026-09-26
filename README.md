@@ -177,9 +177,9 @@ download Analytics Reports. Observatory deliberately does not create or delete
 Analytics Report requests; create each ongoing request as a separate,
 account-holder-authorized setup action before adding its identifier.
 
-Google Play collection is available for future catalog entries that declare a
-published Play listing; none of the three current apps has a verified public
-Google Play listing. It requires `GOOGLE_PLAY_REPORT_BUCKET` and
+Google Play collection is enabled for the verified Lumen Playground and
+Between Contractions listings. PostLens remains App Store-only. Play reporting
+requires `GOOGLE_PLAY_REPORT_BUCKET` and
 `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. Add the service-account email to Play
 Console with global `View app information` access only. Observatory reads
 install and crash CSV exports from the private reporting bucket; it does not

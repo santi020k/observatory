@@ -180,6 +180,7 @@ describe('store analytics contracts', () => {
           }],
           lastCollectedAt: '2026-09-23T00:00:00.000Z',
           lastSyncAt: '2026-09-23T00:00:00.000Z',
+          listingUrl: 'https://apps.apple.com/app/id6804601300',
           metrics: { firstTimeDownloads: 3, installations: 4 },
           provider: 'apple',
           status: 'available'

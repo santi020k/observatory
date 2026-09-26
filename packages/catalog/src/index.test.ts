@@ -30,10 +30,12 @@ describe('project catalog', () => {
     })
 
     expect(getGithubReleaseSources()).toContainEqual({
-      assets: [{
-        assetNamePattern: '^quality-.*\\.(?:tar\\.gz|zip)$',
-        channel: 'direct'
-      }],
+      assets: [
+        {
+          assetNamePattern: '^quality-.*\\.(?:tar\\.gz|zip)$',
+          channel: 'direct'
+        }
+      ],
       repository: 'quality',
       slug: 'quality'
     })
@@ -108,6 +110,12 @@ describe('project catalog', () => {
     })
     expect(postLens?.apple?.appId).toBe('6804601300')
     expect(between?.apple?.appId).toBe('6802499436')
-    expect(between?.google).toBeUndefined()
+    expect(between?.google).toEqual({
+      packageName: 'com.santi020k.betweencontractions'
+    })
+
+    expect(lumen?.google).toEqual({
+      packageName: 'com.santi020k.lumen.playground.compose'
+    })
   })
 })
