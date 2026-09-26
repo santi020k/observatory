@@ -429,12 +429,9 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
       }
     })
 
-    void refreshSession().catch(error => {
+    void refreshSession().catch(() => {
       setStatus(
-        error instanceof Error &&
-        error.message !== 'Authentication request failed' ?
-      error.message :
-      'We could not reach authentication. Try again in a moment.',
+        'We could not reach authentication. Try again in a moment.',
         true
   )
     })
