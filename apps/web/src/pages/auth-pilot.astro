@@ -247,8 +247,6 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
 
       if (sessionEmail) sessionEmail.textContent = email ?? ''
 
-      resetLoginFlow()
-
       if (authenticated) setStatus('Signed in securely.')
       else if (status) status.hidden = true
     }
@@ -306,6 +304,8 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
 
         await refreshSession()
 
+        resetLoginFlow()
+
         sessionTitle?.focus()
       } catch (error) {
         setStatus(
@@ -328,6 +328,8 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
         requireSuccess(result, 'The passkey could not be verified.')
 
         await refreshSession()
+
+        resetLoginFlow()
 
         sessionTitle?.focus()
       } catch (error) {
@@ -396,6 +398,8 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
         requireSuccess(result, 'You could not be signed out.')
 
         await refreshSession()
+
+        resetLoginFlow()
 
         emailInput?.focus()
       } catch (error) {
