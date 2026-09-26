@@ -1,0 +1,32 @@
+name: Bug report
+description: Report a reproducible problem in Observatory.
+title: 'fix: '
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest safe sequence that reproduces the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the revision, browser, and relevant local or Cloudflare environment.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed credentials, private project data, email addresses, and tokens.
+          required: true
