@@ -58,6 +58,21 @@ export const providerMetricOrder: Record<
   ]
 }
 
+const stockMetrics = new Set<StoreMetricName>([
+  'activeDevices',
+  'currentDeviceInstalls',
+  'currentUserInstalls',
+  'totalUserInstalls'
+])
+
+export const metricContext = (
+  metric: StoreMetricName,
+  provider: StoreProvider,
+  rangeLabel: string
+): string => stockMetrics.has(metric) ?
+  `Latest reported · ${rangeLabel}` :
+  `${providerLabels[provider]} total · ${rangeLabel}`
+
 export const primaryMetric = (
   provider: StoreProvider,
   metrics: StoreMetricTotals

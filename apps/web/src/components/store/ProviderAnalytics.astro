@@ -6,6 +6,7 @@ import { formatNumber, formatRelativeDate } from '@/lib/format'
 import {
   dimensionLabels,
   emptyStatusMessage,
+  metricContext,
   metricIcon,
   metricLabels,
   primaryBreakdownMetric,
@@ -99,7 +100,7 @@ const chartSeries = chartMetrics
         >
           {visibleMetrics.map(metric => (
             <MetricCard
-              context={`${providerLabels[provider.provider]} total · ${rangeLabel}`}
+              context={metricContext(metric, provider.provider, rangeLabel)}
               icon={metricIcon(metric)}
               label={metricLabels[metric]}
               value={formatNumber(provider.metrics[metric] ?? null)}
