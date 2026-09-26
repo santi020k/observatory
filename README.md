@@ -122,6 +122,10 @@ the browser keeps a host-only dashboard cookie and server-rendered pages can for
 with a parent-domain cookie. See [the package-authentication pilot runbook](docs/auth-package-pilot.md) before enabling
 the flag outside local development.
 
+Release-relevant pull requests include a Changeset. On the release branch, run
+`pnpm release:version` to consume the pending files and update every private workspace package as
+one fixed version, then reconcile the generated intent into the root `CHANGELOG.md`.
+
 After a release pull request is merged and its production deployment passes, dispatch the
 `Publish release` workflow from `main` with the workspace's semantic version. GitHub Actions
 verifies the release, creates the matching `v<semver>` tag at the dispatched `main` commit, and

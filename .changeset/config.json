@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.3/schema.json",
+  "changelog": false,
+  "commit": false,
+  "fixed": [
+    [
+      "@santi020k/observatory-api",
+      "@santi020k/observatory-web",
+      "@santi020k/observatory-api-types",
+      "@santi020k/observatory-catalog",
+      "@santi020k/observatory-db"
+    ]
+  ],
+  "linked": [],
+  "access": "restricted",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": [],
+  "privatePackages": {
+    "version": true,
+    "tag": false
+  }
+}

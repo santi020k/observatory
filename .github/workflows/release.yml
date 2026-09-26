@@ -38,6 +38,9 @@ jobs:
       - name: Validate release tag
         run: pnpm release:validate-tag -- "$RELEASE_TAG"
 
+      - name: Verify Changesets state
+        run: pnpm release:status
+
       - name: Verify release
         run: pnpm verify
 

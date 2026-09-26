@@ -16,6 +16,7 @@
     "check:auth-pilot-config": "node scripts/validate-auth-pilot-config.mjs",
     "check:security": "pnpm audit --prod",
     "clean": "turbo run clean",
+    "changeset": "changeset",
     "commit": "commitprompt",
     "db:migrate:local": "pnpm --filter @santi020k/observatory-api run db:migrate:local",
     "dev": "turbo run dev",
@@ -27,6 +28,8 @@
     "lint:repo": "eslint . --cache --no-warn-ignored --max-warnings=0",
     "lint:repo:fix": "eslint . --cache --fix --no-warn-ignored --max-warnings=0",
     "release:validate-tag": "node scripts/validate-release-tag.mjs",
+    "release:status": "changeset status",
+    "release:version": "changeset version && node scripts/sync-root-version.mjs",
     "setup:github": "node scripts/setup-github-token.mjs",
     "setup:local": "node scripts/setup-local.mjs && pnpm run hooks:install",
     "test": "turbo run test && node --test scripts/*.test.mjs",
@@ -36,6 +39,7 @@
     "pre-push": "pnpm run verify"
   },
   "devDependencies": {
+    "@changesets/cli": "3.0.3",
     "@commitlint/cli": "catalog:",
     "@commitlint/config-conventional": "catalog:",
     "@santi020k/commitprompt": "catalog:",
