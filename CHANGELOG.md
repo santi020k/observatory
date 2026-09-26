@@ -10,6 +10,9 @@
   recovery-code, and legacy-session paths.
 - Added dedicated store intelligence pages for every published app and verified Google Play
   listings for Lumen Playground and Between Contractions.
+- Added asynchronous owner email notifications for newly stored product feedback.
+- Added Changesets-based release intent and synchronized fixed-version workspace releases.
+- Added structured bug and feature request forms plus a repository security policy.
 
 ### Changed
 
@@ -19,6 +22,7 @@
   compatibility with the previous aliases.
 - Reworked the published-app overview and empty-report states around compact Lumen components,
   clearer provider status, listing links, and responsive layouts.
+- Updated the GitHub Actions checkout and artifact upload actions to their current major releases.
 
 ### Security
 

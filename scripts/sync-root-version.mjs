@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 
 const rootManifestPath = new URL('../package.json', import.meta.url)
+
 const workspaceManifestPaths = [
   new URL('../apps/api/package.json', import.meta.url),
   new URL('../apps/web/package.json', import.meta.url),
@@ -10,6 +11,7 @@ const workspaceManifestPaths = [
 ]
 
 const readManifest = async path => JSON.parse(await readFile(path, 'utf8'))
+
 const workspaceManifests = await Promise.all(
   workspaceManifestPaths.map(readManifest)
 )
