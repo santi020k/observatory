@@ -41,8 +41,6 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
 
     <section class="auth-panel" aria-label="Observatory authentication">
       <div class="auth-panel-stack">
-        <Alert aria-live="polite" data-pilot-status hidden variant="default" />
-
         <Card class="auth-card" data-login-card>
           <span class="auth-card__icon"><Icon aria-hidden="true" name="mail" /></span
           >
@@ -52,6 +50,16 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
             Enter your authorized email. We’ll send a six-digit code that
             expires in ten minutes.
           </p>
+
+          <Alert
+            aria-atomic="true"
+            aria-live="polite"
+            class="auth-status"
+            data-pilot-status
+            hidden
+            role="status"
+            variant="default"
+          />
 
           <form data-email-form data-ui-form>
             <Field>
@@ -115,6 +123,15 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
             Signed in as <strong data-session-email></strong>. You can continue
             to the dashboard or manage this device.
           </p>
+          <Alert
+            aria-atomic="true"
+            aria-live="polite"
+            class="auth-status"
+            data-pilot-status
+            hidden
+            role="status"
+            variant="default"
+          />
           <Field>
             <Label for="pilot-passkey-name">Passkey name</Label>
             <Input
@@ -152,7 +169,9 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
       basePath: '/api/auth-v2'
 })
 
-    const status = document.querySelector<HTMLElement>('[data-pilot-status]')
+    const statuses = document.querySelectorAll<HTMLElement>(
+      '[data-pilot-status]'
+)
 
     const emailForm =
       document.querySelector<HTMLFormElement>('[data-email-form]')
@@ -193,19 +212,19 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
     let pendingEmail = ''
 
     const setStatus = (message: string, destructive = false) => {
-      if (!status) return
+      for (const status of statuses) {
+        status.textContent = message
 
-      status.textContent = message
+        status.hidden = false
 
-      status.hidden = false
+        status.dataset.variant = destructive ? 'destructive' : 'default'
 
-      status.dataset.variant = destructive ? 'destructive' : 'default'
+        status.classList.toggle('ui-alert--destructive', destructive)
 
-      status.classList.toggle('ui-alert--destructive', destructive)
+        status.setAttribute('role', destructive ? 'alert' : 'status')
 
-      status.setAttribute('role', destructive ? 'alert' : 'status')
-
-      status.setAttribute('aria-live', destructive ? 'assertive' : 'polite')
+        status.setAttribute('aria-live', destructive ? 'assertive' : 'polite')
+      }
     }
 
     const requireSuccess = (
@@ -248,7 +267,7 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
       if (sessionEmail) sessionEmail.textContent = email ?? ''
 
       if (authenticated) setStatus('Signed in securely.')
-      else if (status) status.hidden = true
+      else for (const status of statuses) status.hidden = true
     }
 
     emailForm?.addEventListener('submit', async event => {
@@ -309,9 +328,7 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
         sessionTitle?.focus()
       } catch (error) {
         setStatus(
-          error instanceof Error ?
-        error.message :
-        'Could not verify the code.',
+          error instanceof Error ? error.message : 'Could not verify the code.',
           true
     )
       } finally {
@@ -404,9 +421,7 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
         emailInput?.focus()
       } catch (error) {
         setStatus(
-          error instanceof Error ?
-        error.message :
-        'Could not sign out.',
+          error instanceof Error ? error.message : 'Could not sign out.',
           true
     )
       } finally {
@@ -416,9 +431,10 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
 
     void refreshSession().catch(error => {
       setStatus(
-        error instanceof Error ?
+        error instanceof Error &&
+        error.message !== 'Authentication request failed' ?
       error.message :
-      'Could not check your session.',
+      'We could not reach authentication. Try again in a moment.',
         true
   )
     })
@@ -436,6 +452,10 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
     width: 100%;
   }
 
+  .auth-status {
+    margin-top: var(--space-5);
+  }
+
   .auth-pilot-actions {
     display: flex;
     flex-wrap: wrap;
@@ -446,5 +466,21 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
   .auth-pilot-actions > :global(.ui-button),
   .auth-pilot-actions > :global(.ui-button-link) {
     flex: 1 1 12rem;
+  }
+
+  @media (max-width: 38rem) {
+    .auth-panel-stack {
+      width: 100%;
+    }
+
+    .auth-pilot-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .auth-pilot-actions > :global(.ui-button),
+    .auth-pilot-actions > :global(.ui-button-link) {
+      width: 100%;
+    }
   }
 </style>
