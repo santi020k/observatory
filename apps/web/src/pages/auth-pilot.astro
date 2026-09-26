@@ -223,6 +223,16 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
       button.toggleAttribute('aria-busy', busy)
     }
 
+    const resetLoginFlow = (): void => {
+      emailForm?.reset()
+
+      codeForm?.reset()
+
+      codeForm?.setAttribute('hidden', '')
+
+      pendingEmail = ''
+    }
+
     const refreshSession = async (): Promise<void> => {
       const result = await auth.getSession()
 
@@ -236,6 +246,8 @@ if (import.meta.env.PUBLIC_AUTH_PILOT_ENABLED !== 'true')
       if (sessionCard) sessionCard.hidden = !authenticated
 
       if (sessionEmail) sessionEmail.textContent = email ?? ''
+
+      resetLoginFlow()
 
       if (authenticated) setStatus('Signed in securely.')
       else if (status) status.hidden = true
