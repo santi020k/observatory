@@ -12,6 +12,9 @@ catalogs:
     '@astrojs/cloudflare':
       specifier: ^14.3.3
       version: 14.3.3
+    '@changesets/cli':
+      specifier: 3.0.3
+      version: 3.0.3
     '@cloudflare/workers-types':
       specifier: ^5.20260716.1
       version: 5.20260924.1
@@ -118,7 +121,7 @@ importers:
   .:
     devDependencies:
       '@changesets/cli':
-        specifier: 3.0.3
+        specifier: 'catalog:'
         version: 3.0.3
       '@commitlint/cli':
         specifier: 'catalog:'

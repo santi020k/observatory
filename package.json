@@ -40,7 +40,7 @@
     "pre-push": "pnpm run verify"
   },
   "devDependencies": {
-    "@changesets/cli": "3.0.3",
+    "@changesets/cli": "catalog:",
     "@commitlint/cli": "catalog:",
     "@commitlint/config-conventional": "catalog:",
     "@santi020k/commitprompt": "catalog:",
