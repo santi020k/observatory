@@ -17,7 +17,7 @@ describe('store report parsing', () => {
       collectedAt: Date.UTC(2026, 8, 23),
       delimiter: '\t',
       provider: 'apple',
-      source: 'App Store Downloads Standard',
+      source: 'App Downloads Standard',
       text: [
         'Date\tDevice\tApp Version\tDownload Type\tCounts',
         '2026-09-22\tiPhone\t2.0.0\tFirst-time download\t3',
@@ -47,7 +47,7 @@ describe('store report parsing', () => {
       collectedAt: Date.UTC(2026, 8, 23),
       delimiter: '\t',
       provider: 'apple',
-      source: 'App Store Installations and Deletions Standard',
+      source: 'App Store Installation and Deletion Standard',
       text: [
         'Date\tDevice\tEvent\tDownload Type\tCounts\tUnique Devices',
         '2026-09-22\tiPhone\tInstall\tFirst-time download\t3\t3',

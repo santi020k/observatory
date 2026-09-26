@@ -1810,6 +1810,130 @@ p {
   gap: clamp(2rem, 4vw, 3.5rem);
 }
 
+.store-overview {
+  background: radial-gradient(
+    circle at 88% 3%,
+    hsl(var(--brand) / 0.1),
+    transparent 25rem
+  );
+}
+
+.store-summary {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid hsl(var(--line));
+  border-radius: 1rem;
+  background: hsl(var(--surface));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.store-summary > div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 1.25rem 1.5rem;
+  border-right: 1px solid hsl(var(--line));
+}
+
+.store-summary > div:last-child {
+  border-right: 0;
+}
+
+.store-summary strong {
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 4vw, 2.35rem);
+  line-height: 1;
+}
+
+.store-summary span,
+.store-app-card__metric span {
+  color: hsl(var(--ink-muted));
+  font-size: 0.78rem;
+}
+
+.store-app-grid {
+  display: grid;
+  align-items: stretch;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.store-app-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1.2rem;
+  padding: clamp(1.2rem, 2.5vw, 1.6rem);
+}
+
+.store-app-card__topline,
+.store-app-card__providers > div,
+.store-provider__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.store-app-card__icon {
+  display: grid;
+  width: 2.7rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 0.85rem;
+  background: linear-gradient(
+    145deg,
+    hsl(var(--brand-soft)),
+    hsl(var(--surface-raised))
+  );
+  color: hsl(var(--brand));
+}
+
+.store-app-card__copy h2 {
+  margin: 0.25rem 0 0;
+  font-size: 1.25rem;
+}
+.store-app-card__copy p,
+.store-app-card__pending {
+  margin: 0.4rem 0 0;
+  color: hsl(var(--ink-muted));
+  font-size: 0.85rem;
+}
+.store-app-card__metric {
+  display: grid;
+  gap: 0.2rem;
+}
+.store-app-card__metric strong {
+  font-family: var(--font-display);
+  font-size: 2rem;
+}
+.store-app-card__pending {
+  min-height: 2.85rem;
+  padding: 0.8rem;
+  border: 1px dashed hsl(var(--line));
+  border-radius: 0.75rem;
+}
+.store-app-card__providers {
+  display: grid;
+  margin-top: auto;
+  border-block: 1px solid hsl(var(--line));
+}
+.store-app-card__providers > div {
+  min-height: 2.9rem;
+  padding-block: 0.55rem;
+  border-bottom: 1px solid hsl(var(--line));
+  font-size: 0.82rem;
+}
+.store-app-card__providers > div:last-child {
+  border-bottom: 0;
+}
+.store-app-card .ui-button-link {
+  width: 100%;
+}
+.store-provider-stack {
+  display: grid;
+  gap: 1rem;
+}
+
 .store-definition-note,
 .store-lumen-note {
   display: grid;
@@ -1884,6 +2008,22 @@ p {
   flex: 0 0 auto;
 }
 
+.store-provider__actions {
+  flex: 0 0 auto;
+}
+.store-provider__actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: hsl(var(--ink-muted));
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+.store-provider__actions a:hover {
+  color: hsl(var(--ink));
+}
+
 .store-metric-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -1911,6 +2051,12 @@ p {
   min-width: 40rem;
 }
 
+.store-breakdown-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .store-provider__empty {
   min-height: 15rem;
   border: 1px dashed hsl(var(--line));
@@ -1919,6 +2065,24 @@ p {
 
 .store-provider__empty .empty-icon {
   margin-inline: auto;
+}
+
+.store-provider__empty--compact {
+  min-height: auto;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  column-gap: 1rem;
+  padding: 1.25rem;
+  text-align: left;
+}
+.store-provider__empty--compact .empty-icon {
+  margin: 0;
+  grid-row: 1 / -1;
+}
+.store-provider__empty--compact h3,
+.store-provider__empty--compact p,
+.store-provider__empty--compact small {
+  grid-column: 2;
 }
 
 .project-metric-grid {
@@ -2721,6 +2885,10 @@ html[data-observatory-reduce-motion='true'] *::after {
 }
 
 @media (max-width: 52rem) {
+  .store-app-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .auth-shell {
     grid-template-columns: 1fr;
   }
@@ -3208,6 +3376,23 @@ html[data-observatory-reduce-motion='true'] *::after {
   .store-provider__heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .store-summary,
+  .store-app-grid,
+  .store-breakdown-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .store-summary > div {
+    border-right: 0;
+    border-bottom: 1px solid hsl(var(--line));
+  }
+  .store-summary > div:last-child {
+    border-bottom: 0;
+  }
+  .store-provider__actions {
+    width: 100%;
   }
 
   .growth-map__plot svg {

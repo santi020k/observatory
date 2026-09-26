@@ -23,6 +23,7 @@ import * as z from 'zod'
 import type { WorkerEnv } from '../env'
 import { requireAuth } from '../lib/auth'
 import { hashValue } from '../lib/crypto'
+import { sendFeedbackNotification } from '../lib/email'
 
 const feedbackRoutes = new Hono<WorkerEnv>()
 
@@ -83,6 +84,28 @@ const getClientIdentity = (context: Context<WorkerEnv>): string => context.req.h
 ) ?? context.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ?? 'local'
 
 const getHashSecret = (environment: WorkerEnv['Bindings']): string => environment.FEEDBACK_HASH_SECRET ?? environment.AUTH_SECRET
+
+const scheduleFeedbackNotification = (
+  context: Context<WorkerEnv>,
+  project: NonNullable<ReturnType<typeof getFeedbackProject>>,
+  feedback: z.infer<typeof createFeedbackSchema>,
+  id: string
+): void => {
+  context.executionCtx.waitUntil(
+    sendFeedbackNotification(context.env, {
+      contactEmail: feedback.email || null,
+      description: feedback.description,
+      diagnosticReport: feedback.diagnosticReport ?? null,
+      id,
+      locale: feedback.locale,
+      projectDisplayName: project.displayName,
+      projectSlug: project.slug,
+      source: feedback.source,
+      title: feedback.title,
+      type: feedback.type
+    })
+  )
+}
 
 const verifyTurnstile = async (
   secret: string | undefined,
@@ -222,6 +245,8 @@ feedbackRoutes.post('/projects/:projectSlug/items', async context => {
     type: input.data.type,
     updatedAt: now
   })
+
+  scheduleFeedbackNotification(context, project, input.data, id)
 
   context.executionCtx.waitUntil(
     pruneFeedbackRateLimits(

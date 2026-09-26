@@ -1,33 +1,25 @@
 ---
 import AppHeader from '@/components/AppHeader.astro'
 import AppSidebar from '@/components/AppSidebar.astro'
-import MetricCard from '@/components/MetricCard.astro'
 import RangePicker from '@/components/RangePicker.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
-import { analyticsRangeMeta, formatHistoryLabel } from '@/lib/analytics-range'
+import { analyticsRangeMeta } from '@/lib/analytics-range'
 import {
   getBrowserApiUrl,
   getProjectSettings,
   getStoreAnalytics
 } from '@/lib/api'
 import { formatDate, formatNumber, formatRelativeDate } from '@/lib/format'
+import {
+  metricLabels,
+  primaryMetric,
+  providerLabels,
+  statusMeta
+} from '@/lib/store-presentation'
 
-import {
-  Badge,
-  ButtonLink,
-  Card,
-  Empty,
-  Icon,
-  LineChart,
-  Table
-} from '@santi020k/lumen-astro'
-import {
-  analyticsRangeSchema,
-  type StoreMetricName,
-  type StoreMetricTotals,
-  type StoreProvider
-} from '@santi020k/observatory-api-types'
+import { Badge, ButtonLink, Card, Icon } from '@santi020k/lumen-astro'
+import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
 
 const range = analyticsRangeSchema
   .catch('30d')
@@ -54,184 +46,63 @@ const sidebarProjects = settingsResponse.parsed.projects.filter(
   project => project.enabled
 )
 
-const apiUrl = getBrowserApiUrl()
-const rangeLabel = analyticsRangeMeta[analytics.range].longLabel
-
-const providerLabels: Record<StoreProvider, string> = {
-  apple: 'App Store',
-  google: 'Google Play'
-}
-
-const statusMeta = {
-  available: { label: 'Available', variant: 'success' },
-  awaiting_data: { label: 'Awaiting provider data', variant: 'warning' },
-  failed: { label: 'Sync needs attention', variant: 'destructive' },
-  not_configured: { label: 'Not configured', variant: 'outline' }
-} as const
-
-const metricLabels: Record<StoreMetricName, string> = {
-  activeDevices: 'Active devices',
-  anrs: 'ANRs',
-  crashes: 'Crashes',
-  currentDeviceInstalls: 'Active install base',
-  currentUserInstalls: 'Current user installs',
-  dailyDeviceInstalls: 'Device installs',
-  dailyDeviceUninstalls: 'Device uninstalls',
-  dailyDeviceUpgrades: 'Device upgrades',
-  dailyUserInstalls: 'User installs',
-  dailyUserUninstalls: 'User uninstalls',
-  deletions: 'Deletions',
-  firstTimeDownloads: 'First-time downloads',
-  installations: 'Installations',
-  redownloads: 'Redownloads',
-  sessions: 'Sessions',
-  totalDownloads: 'Total downloads',
-  totalUserInstalls: 'Total user installs'
-}
-
-const providerMetricOrder: Record<StoreProvider, readonly StoreMetricName[]> = {
-  apple: [
-    'totalDownloads',
-    'installations',
-    'activeDevices',
-    'deletions',
-    'sessions',
-    'crashes'
-  ],
-  google: [
-    'currentDeviceInstalls',
-    'dailyDeviceInstalls',
-    'dailyDeviceUninstalls',
-    'dailyDeviceUpgrades',
-    'crashes',
-    'anrs'
-  ]
-}
-
-const metricIcon = (
-  metric: StoreMetricName
-): 'activity' | 'circle-dot-dashed' | 'download' | 'history' | 'monitor' | 'users' => {
-  if (
-    metric === 'totalDownloads' ||
-    metric === 'firstTimeDownloads' ||
-    metric === 'redownloads' ||
-    metric === 'dailyDeviceInstalls'
-  ) return 'download'
-
-  if (metric === 'currentDeviceInstalls' || metric === 'installations')
-    return 'monitor'
-
-  if (metric === 'activeDevices' || metric === 'sessions') return 'users'
-
-  if (metric === 'crashes' || metric === 'anrs')
-    return 'circle-dot-dashed'
-
-  if (metric.includes('Uninstall') || metric === 'deletions') return 'history'
-
-  return 'activity'
-}
-
-const metricContext = (
-  provider: StoreProvider,
-  metric: StoreMetricName
-): string => {
-  if (metric === 'activeDevices')
-    return 'Apple usage-sharing population in the selected range'
-
-  if (metric === 'installations')
-    return 'Completed installs reported by opted-in Apple devices'
-
-  if (metric === 'currentDeviceInstalls')
-    return 'Devices active during Google Play’s trailing 30-day window'
-
-  if (metric === 'totalDownloads')
-    return 'First-time downloads plus redownloads'
-
-  return `${providerLabels[provider]} total · ${rangeLabel}`
-}
-
-const getMetric = (
-  metrics: StoreMetricTotals,
-  metric: StoreMetricName
-): number | undefined => metrics[metric]
-
-const dimensionLabels = {
-  appVersion: 'App version',
-  country: 'Country or territory',
-  device: 'Device',
-  osVersion: 'Operating system'
-} as const
-
-const primaryBreakdownMetric = (
-  provider: StoreProvider,
-  metrics: StoreMetricTotals
-): StoreMetricName => {
-  const candidates: readonly StoreMetricName[] = provider === 'apple' ?
-    ['installations', 'totalDownloads', 'activeDevices'] :
-    ['currentDeviceInstalls', 'dailyDeviceInstalls', 'dailyUserInstalls']
-
-  return candidates.find(metric => metrics[metric] !== undefined) ??
-    (provider === 'apple' ? 'installations' : 'currentDeviceInstalls')
-}
-
-const storeSyncTimes = analytics.apps
+const syncTimes = analytics.apps
   .flatMap(app => app.providers)
   .map(provider => provider.lastSyncAt)
   .filter((value): value is string => value !== null)
   .sort()
 
-const latestStoreSync = storeSyncTimes[storeSyncTimes.length - 1]
+const latestStoreSync = syncTimes[syncTimes.length - 1]
 
-const hasFailedStoreSync = analytics.apps.some(app => app.providers.some(
+const hasFailedSync = analytics.apps.some(app => app.providers.some(
   provider => provider.status === 'failed'
 ))
 
-const getStoreSyncStatus = (): 'failed' | 'idle' | 'succeeded' => {
-  if (hasFailedStoreSync) return 'failed'
+const syncStatus = hasFailedSync ? 'failed' : 'succeeded'
 
-  return latestStoreSync ? 'succeeded' : 'idle'
+const appIcon = (slug: string): 'activity' | 'camera' | 'package' => {
+  if (slug === 'lumen') return 'package'
+
+  if (slug === 'postlens') return 'camera'
+
+  return 'activity'
 }
 
-const storeSyncStatus = getStoreSyncStatus()
+const reportingProviders = analytics.apps
+  .flatMap(app => app.providers)
+  .filter(provider => provider.status === 'available').length
 
-const emptyStatusMessage = (
-  status: keyof typeof statusMeta
-): string => {
-  if (status === 'not_configured')
-    return 'Add the provider’s read-only reporting credentials and report identifier to begin daily collection.'
-
-  if (status === 'failed')
-    return 'The latest provider request failed. Existing snapshots remain intact while access or report availability is checked.'
-
-  return 'The provider is configured. Reports may take several days to appear, and Apple can omit low-volume rows for privacy.'
-}
+const publishedListings = analytics.apps.reduce(
+  (count, app) => count + app.providers.length,
+  0
+)
 ---
 
 <AppLayout
-  description="Privacy-safe install, usage, and quality signals for published applications."
+  description="Privacy-safe store intelligence for published applications."
   title="Published apps · Observatory"
 >
   <div class="app-shell">
     <AppSidebar projects={sidebarProjects} range={analytics.range} />
     <div class="app-workspace">
       <AppHeader
-        apiUrl={apiUrl}
+        apiUrl={getBrowserApiUrl()}
         lastSync={latestStoreSync ?
           formatRelativeDate(latestStoreSync) :
           'awaiting store setup'}
         syncPath="/sync/stores"
-        syncStatus={storeSyncStatus}
+        syncStatus={latestStoreSync ? syncStatus : 'idle'}
         syncSubject="App Store and Google Play analytics data"
       />
 
-      <main class="dashboard store-dashboard" id="main-content">
+      <main class="dashboard store-dashboard store-overview" id="main-content">
         <section class="hero-row" aria-labelledby="store-title">
           <div>
-            <span class="eyebrow">Published product intelligence</span>
-            <h1 id="store-title">Store health</h1>
-            <p>
-              Aggregate acquisition, installed-base, device, and reliability
-              signals without identifying individual customers or devices.
+            <span class="eyebrow">Published apps</span><h1 id="store-title">
+              Store intelligence
+            </h1><p>
+              See where each app is published, whether reporting is connected,
+              and which provider has issued usable aggregate data.
             </p>
           </div>
           <div class="hero-controls">
@@ -239,202 +110,114 @@ const emptyStatusMessage = (
           </div>
         </section>
 
-        <Card as="section" class="store-definition-note">
-          <span class="store-definition-note__icon">
-            <Icon aria-hidden="true" name="shield-check" />
-          </span>
+        <section class="store-summary" aria-label="Store coverage summary">
           <div>
-            <h2>Counts retain their provider meaning</h2>
-            <p>
-              Apple downloads, Apple opt-in installations, and Google’s active
-              install base are intentionally separate. Device tables are
-              aggregate model or family totals—not individual device records.
-            </p>
+            <strong>{analytics.apps.length}</strong><span>Published apps</span>
           </div>
-        </Card>
+          <div>
+            <strong>{publishedListings}</strong><span>Live listings</span>
+          </div>
+          <div>
+            <strong>{reportingProviders}</strong><span>Reporting now</span>
+          </div>
+        </section>
 
-        {analytics.apps.map(app => (
-          <section class="store-app" aria-labelledby={`store-app-${app.slug}`}>
-            <div class="section-heading">
-              <div>
-                <span class="eyebrow">Native application</span>
-                <h2 id={`store-app-${app.slug}`}>{app.displayName}</h2>
-                <p>{rangeLabel} of provider-reported store activity.</p>
-              </div>
-              <Badge variant="outline">{app.providers.length} {app.providers.length === 1 ? 'store' : 'stores'}</Badge>
-            </div>
-
-            {app.providers.map(provider => {
-              const status = statusMeta[provider.status]
-
-              const visibleMetrics = providerMetricOrder[provider.provider]
-                .filter(metric => getMetric(provider.metrics, metric) !== undefined)
-
-              const chartMetrics = provider.provider === 'apple' ?
-                ['totalDownloads', 'installations'] as const :
-                ['dailyDeviceInstalls', 'dailyDeviceUninstalls'] as const
-
-              const chartSeries = chartMetrics
-                .filter(metric => provider.history.some(point => point.metrics[metric] !== undefined))
-                .map((metric, index) => ({
-                  data: provider.history.map(point => ({
-                    label: `${formatNumber(point.metrics[metric] ?? 0)} ${metricLabels[metric].toLocaleLowerCase('en')}`,
-                    x: formatHistoryLabel(point.periodStart, analytics.range),
-                    y: point.metrics[metric] ?? 0
-                  })),
-                  id: `${provider.provider}-${metric}`,
-                  label: metricLabels[metric],
-                  tone: index === 0 ? 'brand' as const : 'accent' as const
+        <section class="store-app-grid" aria-label="Published applications">
+          {
+            analytics.apps.map(app => {
+              const appPrimary = app.providers
+                .map(provider => ({
+                  metric: primaryMetric(provider.provider, provider.metrics),
+                  provider
                 }))
+                .find(item => item.metric !== undefined)
 
               return (
-                <Card as="article" class="store-provider">
-                  <div class="store-provider__heading">
-                    <div>
-                      <span class="store-provider__icon">
+                <Card as="article" class="store-app-card">
+                  <div class="store-app-card__topline">
+                    <>
+                      <span class="store-app-card__icon">
                         <Icon
                           aria-hidden="true"
-                          name={provider.provider === 'apple' ? 'monitor' : 'blocks'}
+                          name={appIcon(app.slug)}
                         />
                       </span>
-                      <div>
-                        <h3>{providerLabels[provider.provider]}</h3>
-                        <p>
-                          {provider.lastCollectedAt ?
-                            `Collected ${formatRelativeDate(provider.lastCollectedAt)}` :
-                            'No report has been collected yet.'}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant={status.variant}>{status.label}</Badge>
+                      <Badge variant="outline">
+                        {app.providers.length}{' '}
+                        {app.providers.length === 1 ? 'store' : 'stores'}
+                      </Badge>
+                    </>
                   </div>
-
-                  {visibleMetrics.length > 0 ?
-                    (
-                      <>
-                        <section
-                          class="metric-grid store-metric-grid"
-                          aria-label={`${app.displayName} ${providerLabels[provider.provider]} metrics`}
-                        >
-                          {visibleMetrics.map(metric => (
-                            <MetricCard
-                              context={metricContext(provider.provider, metric)}
-                              icon={metricIcon(metric)}
-                              label={metricLabels[metric]}
-                              value={formatNumber(provider.metrics[metric] ?? null)}
-                            />
-                          ))}
-                        </section>
-
-                        {chartSeries.length > 0 && provider.history.length > 1 && (
-                          <Card
-                            as="section"
-                            class="panel store-history-panel"
-                            aria-labelledby={`${app.slug}-${provider.provider}-history`}
-                          >
-                            <div class="panel-heading">
-                              <div>
-                                <span class="eyebrow">Daily reporting</span>
-                                <h3 id={`${app.slug}-${provider.provider}-history`}>
-                                  Acquisition and install activity
-                                </h3>
-                              </div>
-                            </div>
-                            <LineChart
-                              area
-                              markers={provider.history.length <= 31}
-                              aria-label={`${app.displayName} ${providerLabels[provider.provider]} history for ${rangeLabel}`}
-                              caption="Provider definitions and reporting delays apply. Missing privacy-thresholded Apple rows are not zero-filled by Observatory."
-                              series={chartSeries}
-                            />
-                          </Card>
+                  <div class="store-app-card__copy">
+                    <>
+                      <span class="eyebrow">Native application</span>
+                      <h2>{app.displayName}</h2>
+                      <p>
+                        {analyticsRangeMeta[analytics.range].longLabel} of
+                        provider-reported activity.
+                      </p>
+                    </>
+                  </div>
+                  {appPrimary?.metric ?
+(
+                    <div class="store-app-card__metric">
+                      <strong>
+                        {formatNumber(
+                          appPrimary.provider.metrics[appPrimary.metric] ??
+                          null
                         )}
-
-                        {provider.breakdowns.map(breakdown => (
-                          <Card as="section" class="store-breakdown-panel">
-                            <div class="panel-heading">
-                              <div>
-                                <span class="eyebrow">Aggregate breakdown</span>
-                                <h3>{dimensionLabels[breakdown.dimension]}</h3>
-                              </div>
-                            </div>
-                            <Table>
-                              <table>
-                                <caption class="sr-only">
-                                  {app.displayName} {providerLabels[provider.provider]} metrics by {dimensionLabels[breakdown.dimension].toLocaleLowerCase('en')}
-                                </caption>
-                                <thead>
-                                  <tr>
-                                    <th scope="col">{dimensionLabels[breakdown.dimension]}</th>
-                                    <th scope="col">Metric</th>
-                                    <th scope="col">Count</th>
-                                    <th scope="col">Crashes</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {breakdown.values.map(value => {
-                                    const metric = primaryBreakdownMetric(
-                                      provider.provider,
-                                      value.metrics
-                                    )
-
-                                    return (
-                                      <tr>
-                                        <th scope="row">{value.label}</th>
-                                        <td>{metricLabels[metric]}</td>
-                                        <td>{formatNumber(value.metrics[metric] ?? null)}</td>
-                                        <td>{formatNumber(value.metrics.crashes ?? null)}</td>
-                                      </tr>
-                                    )
-                                  })}
-                                </tbody>
-                              </table>
-                            </Table>
-                          </Card>
-                        ))}
-                      </>
-                    ) :
-                    (
-                      <Empty class="store-provider__empty">
-                        <span class="empty-icon">
-                          <Icon aria-hidden="true" name="activity" />
-                        </span>
-                        <h3>{status.label}</h3>
-                        <p>
-                          {emptyStatusMessage(provider.status)}
-                        </p>
-                      </Empty>
-                    )}
+                      </strong>
+                      <span>
+                        {metricLabels[appPrimary.metric]} ·{' '}
+                        {providerLabels[appPrimary.provider.provider]}
+                      </span>
+                    </div>
+                  ) :
+(
+                    <p class="store-app-card__pending">
+                      No aggregate metrics have been issued yet.
+                    </p>
+                  )}
+                  <div class="store-app-card__providers">
+                    {app.providers.map(provider => (
+                      <div>
+                        <span>{providerLabels[provider.provider]}</span>
+                        <Badge variant={statusMeta[provider.status].variant}>
+                          {statusMeta[provider.status].label}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                  <ButtonLink
+                    href={`/store/${app.slug}/?range=${analytics.range}`}
+                    variant="secondary"
+                  >
+                    View app details{' '}
+                    <Icon aria-hidden="true" name="arrow-right" />
+                  </ButtonLink>
                 </Card>
               )
-            })}
-          </section>
-        ))}
+            })
+          }
+        </section>
 
-        <Card as="section" class="store-lumen-note">
-          <span class="store-lumen-note__icon">
-            <Icon aria-hidden="true" name="package" />
-          </span>
-          <div>
-            <span class="eyebrow">Lumen ecosystem</span>
-            <h2>Playground installs and package reach stay distinct</h2>
-            <p>
-              Lumen Playground is tracked above through App Store reports.
-              npm still reports tarball downloads—not unique installations or
-              developer devices—so library adoption remains in Lumen’s package
-              analytics.
+        <Card
+as="section"
+class="store-definition-note"
+        ><span class="store-definition-note__icon"><Icon aria-hidden="true" name="shield-check" /></span
+          ><div>
+            <h2>Provider numbers stay comparable, not interchangeable</h2><p>
+              Apple downloads and installations use different reporting
+              populations from Google Play’s active install base. Observatory
+              preserves those definitions and never fills withheld rows with
+              zero.
             </p>
-          </div>
-          <ButtonLink href={`/projects/lumen/?range=${analytics.range}`} variant="secondary">
-            View package analytics
-            <Icon aria-hidden="true" name="arrow-right" />
-          </ButtonLink>
-        </Card>
+          </div></Card
+        >
       </main>
 
       <footer class="app-footer">
-        <span>Store analytics remain owner-only</span>
-        <span>Generated {formatDate(analytics.generatedAt)}</span>
+        <span>Store analytics remain owner-only</span><span >Generated {formatDate(analytics.generatedAt)}</span>
       </footer>
     </div>
   </div>

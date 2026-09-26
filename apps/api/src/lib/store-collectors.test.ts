@@ -13,9 +13,12 @@ import { parseStoreReport } from './store-reports'
 
 describe('store collector report selection', () => {
   test('uses Apple standard reports and ignores detailed duplicates', () => {
-    expect(isSupportedAppleReportName('App Store Downloads Standard')).toBe(true)
+    expect(isSupportedAppleReportName('App Downloads Standard')).toBe(true)
+    expect(isSupportedAppleReportName(
+      'App Store Installation and Deletion Standard'
+    )).toBe(true)
     expect(isSupportedAppleReportName('App Crashes')).toBe(true)
-    expect(isSupportedAppleReportName('App Store Downloads Detailed')).toBe(false)
+    expect(isSupportedAppleReportName('App Downloads Detailed')).toBe(false)
     expect(isSupportedAppleReportName('App Store Purchases Standard')).toBe(false)
   })
 
@@ -40,7 +43,7 @@ describe('store collector report selection', () => {
       collectedAt: Date.UTC(2026, 8, 24),
       delimiter: '\t',
       provider: 'apple',
-      source: 'App Store Downloads Standard',
+      source: 'App Downloads Standard',
       text: [
         'Date\tDevice\tDownload Type\tCounts',
         `2026-09-22\tiPhone\tFirst-time download\t${counts}`

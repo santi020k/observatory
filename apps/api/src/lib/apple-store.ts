@@ -5,7 +5,13 @@ import * as z from 'zod'
 import type { Bindings } from '../env'
 
 import { createAppleToken } from './provider-auth'
-import { mergeStoreMetricPoints, parseStoreReport } from './store-reports'
+import {
+  isSupportedAppleReportName,
+  mergeStoreMetricPoints,
+  parseStoreReport
+} from './store-reports'
+
+export { isSupportedAppleReportName } from './store-reports'
 
 interface AppleResource<Attributes> {
   attributes: Attributes
@@ -30,19 +36,6 @@ interface AppleInstanceAttributes {
 interface AppleSegmentAttributes {
   url: string
 }
-
-const reportNames = [
-  'App Crashes',
-  'App Sessions',
-  'App Store Downloads',
-  'App Store Installations and Deletions'
-] as const
-
-const supportedReportNames = new Set<string>(reportNames.flatMap(
-  reportName => [reportName, `${reportName} Standard`]
-))
-
-export const isSupportedAppleReportName = (name: string): boolean => supportedReportNames.has(name)
 
 const apiOrigin = 'https://api.appstoreconnect.apple.com'
 const requestTimeoutMilliseconds = 20_000

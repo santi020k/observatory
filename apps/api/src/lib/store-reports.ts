@@ -38,6 +38,27 @@ const dimensionColumns = {
   readonly string[]
 >
 
+type AppleReportKind = 'crashes' | 'downloads' | 'installations' | 'sessions'
+
+const appleReportKinds = new Map<string, AppleReportKind>([
+  ['App Crashes', 'crashes'],
+  ['App Crashes Standard', 'crashes'],
+  ['App Downloads', 'downloads'],
+  ['App Downloads Standard', 'downloads'],
+  ['App Sessions', 'sessions'],
+  ['App Sessions Standard', 'sessions'],
+  ['App Store Downloads', 'downloads'],
+  ['App Store Downloads Standard', 'downloads'],
+  ['App Store Installation and Deletion', 'installations'],
+  ['App Store Installation and Deletion Standard', 'installations'],
+  ['App Store Installations and Deletions', 'installations'],
+  ['App Store Installations and Deletions Standard', 'installations']
+])
+
+const getAppleReportKind = (name: string): AppleReportKind | undefined => appleReportKinds.get(name)
+
+export const isSupportedAppleReportName = (name: string): boolean => getAppleReportKind(name) !== undefined
+
 const normalizeHeader = (value: string): string => value
   .trim()
   .toLocaleLowerCase('en')
@@ -204,8 +225,6 @@ const addAppleInstallationMetric = (
   else if (event === 'delete') metrics.deletions = counts
 }
 
-const isAppleReport = (source: string, reportName: string): boolean => source === reportName || source === `${reportName} Standard`
-
 const getMetrics = (
   row: ReadonlyMap<string, string>,
   provider: StoreMetricProvider,
@@ -223,10 +242,12 @@ const getMetrics = (
   }
 
   if (provider === 'apple') {
-    if (isAppleReport(source, 'App Store Downloads'))
+    const reportKind = getAppleReportKind(source)
+
+    if (reportKind === 'downloads')
       addAppleDownloadMetric(row, metrics)
 
-    if (isAppleReport(source, 'App Store Installations and Deletions'))
+    if (reportKind === 'installations')
       addAppleInstallationMetric(row, metrics)
   }
 

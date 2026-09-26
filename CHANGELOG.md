@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.0 - 2026-09-26
+
+### Added
+
+- Added the disabled-by-default Auth v0.4 pilot with a same-origin web proxy, app-owned D1 schema,
+  pinned bundle provenance checks, configuration validation, and rollback guidance.
+- Accepted shared Auth sessions additively while retaining the existing email-code, passkey,
+  recovery-code, and legacy-session paths.
+- Added dedicated store intelligence pages for every published app and verified Google Play
+  listings for Lumen Playground and Between Contractions.
+- Added asynchronous owner email notifications for newly stored product feedback.
+- Added Changesets-based release intent and synchronized fixed-version workspace releases.
+- Added structured bug and feature request forms plus a repository security policy.
+
+### Changed
+
+- Restored the branded Observatory login composition and improved authentication status placement,
+  accessibility, and responsive behavior across phone, tablet, and desktop layouts.
+- Recognized the current App Store Connect download and installation report names while preserving
+  compatibility with the previous aliases.
+- Reworked the published-app overview and empty-report states around compact Lumen components,
+  clearer provider status, listing links, and responsive layouts.
+- Updated the GitHub Actions checkout and artifact upload actions to their current major releases.
+
+### Security
+
+- Gated the Auth pilot independently at the API, proxy, UI, and session-resolution boundaries so it
+  remains inactive until the production rollout requirements are satisfied.
+- Revoked shared and legacy sessions together without weakening the existing owner-only recovery
+  path.
+
 ## 0.3.1 - 2026-09-24
 
 ### Changed

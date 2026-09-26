@@ -1,0 +1,150 @@
+---
+import AppHeader from '@/components/AppHeader.astro'
+import AppSidebar from '@/components/AppSidebar.astro'
+import RangePicker from '@/components/RangePicker.astro'
+import ProviderAnalytics from '@/components/store/ProviderAnalytics.astro'
+import AppLayout from '@/layouts/AppLayout.astro'
+
+import { analyticsRangeMeta } from '@/lib/analytics-range'
+import {
+  getBrowserApiUrl,
+  getProjectSettings,
+  getStoreAnalytics
+} from '@/lib/api'
+import { formatDate, formatRelativeDate } from '@/lib/format'
+
+import { ButtonLink, Card, Icon } from '@santi020k/lumen-astro'
+import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
+
+const range = analyticsRangeSchema
+  .catch('30d')
+  .parse(Astro.url.searchParams.get('range'))
+
+const [analyticsResponse, settingsResponse] = await Promise.all([
+  getStoreAnalytics(range, Astro.request, Astro.url),
+  getProjectSettings(Astro.request, Astro.url)
+])
+
+if (analyticsResponse.status === 401) return Astro.redirect('/login/')
+
+if (
+  !analyticsResponse.ok ||
+  !analyticsResponse.parsed ||
+  !settingsResponse.ok ||
+  !settingsResponse.parsed
+)
+  throw new Error('Store analytics are unavailable.')
+
+const analytics = analyticsResponse.parsed
+
+const app = analytics.apps.find(
+  candidate => candidate.slug === Astro.params.slug
+)
+
+if (!app) return new Response('App not found', { status: 404 })
+
+const sidebarProjects = settingsResponse.parsed.projects.filter(
+  project => project.enabled
+)
+
+const syncTimes = app.providers
+  .map(provider => provider.lastSyncAt)
+  .filter((value): value is string => value !== null)
+  .sort()
+
+const latestSync = syncTimes[syncTimes.length - 1]
+
+const hasFailedSync = app.providers.some(
+  provider => provider.status === 'failed'
+)
+
+const syncStatus = hasFailedSync ? 'failed' : 'succeeded'
+---
+
+<AppLayout
+  description={`Store analytics for ${app.displayName}.`}
+  title={`${app.displayName} · Published apps · Observatory`}
+>
+  <div class="app-shell">
+    <AppSidebar projects={sidebarProjects} range={analytics.range} />
+    <div class="app-workspace">
+      <AppHeader
+        apiUrl={getBrowserApiUrl()}
+        lastSync={latestSync ?
+          formatRelativeDate(latestSync) :
+          'awaiting store setup'}
+        syncPath="/sync/stores"
+        syncStatus={latestSync ? syncStatus : 'idle'}
+        syncSubject={`${app.displayName} store analytics data`}
+      />
+      <main class="dashboard store-dashboard store-detail" id="main-content">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href={`/store/?range=${analytics.range}`}>Published apps</a><Icon
+            aria-hidden="true"
+            name="chevron-right"
+                                                                         /><span aria-current="page">{app.displayName}</span>
+        </nav>
+        <section class="hero-row" aria-labelledby="store-app-title">
+          <div>
+            <span class="eyebrow">Store intelligence</span><h1
+              id="store-app-title"
+                                                           >
+              {app.displayName}
+            </h1><p>
+              {analyticsRangeMeta[analytics.range].longLabel} across {
+                app.providers.length === 1 ?
+                  'its published store' :
+                  'its published stores'
+              }, with provider definitions preserved.
+            </p>
+          </div><div class="hero-controls">
+            <RangePicker range={analytics.range} />
+          </div>
+        </section>
+        <div class="store-provider-stack">
+          {
+            app.providers.map(provider => (
+              <ProviderAnalytics
+                appName={app.displayName}
+                appSlug={app.slug}
+                provider={provider}
+                range={analytics.range}
+              />
+            ))
+          }
+        </div>
+        {
+          app.slug === 'lumen' && (
+            <Card as="section" class="store-lumen-note">
+              <>
+                <span class="store-lumen-note__icon">
+                  <Icon aria-hidden="true" name="package" />
+                </span>
+                <div>
+                  <>
+                    <span class="eyebrow">Lumen ecosystem</span>
+                    <h2>Playground installs and package reach stay distinct</h2>
+                    <p>
+                      Store activity belongs here; npm tarball downloads remain
+                      in Lumen’s package analytics.
+                    </p>
+                  </>
+                </div>
+                <ButtonLink
+                  href={`/projects/lumen/?range=${analytics.range}`}
+                  variant="secondary"
+                >
+                  View package analytics{' '}
+                  <Icon aria-hidden="true" name="arrow-right" />
+                </ButtonLink>
+              </>
+            </Card>
+          )
+        }
+      </main>
+      <footer class="app-footer">
+        <span>Store analytics remain owner-only</span><span >Generated {formatDate(analytics.generatedAt)}</span>
+      </footer>
+    </div>
+  </div>
+</AppLayout>

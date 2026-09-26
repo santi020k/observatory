@@ -9,11 +9,8 @@ export interface CatalogOverride {
   vscodeExtensions?: readonly string[]
 }
 
-export type ReleaseDownloadChannel = 'homebrew' |
-  'homebrew-or-update' |
-  'direct' |
-  'update' |
-  'website'
+export type ReleaseDownloadChannel =
+  'homebrew' | 'homebrew-or-update' | 'direct' | 'update' | 'website'
 
 export interface GithubReleaseAssetMapping {
   assetNamePattern: string
@@ -50,54 +47,63 @@ export interface PublishedApp {
 }
 
 const feedbackProjects = new Map<string, FeedbackProject>([
-  ['postlens', {
-    allowedOrigins: [
-      'https://postlens.santi020k.com',
-      'http://localhost:4176',
-      'http://127.0.0.1:4176',
-      'http://localhost:4321',
-      'http://127.0.0.1:4321'
-    ],
-    displayName: 'PostLens',
-    locales: ['en', 'es'],
-    slug: 'postlens'
-  }],
-  ['roadscore', {
-    allowedOrigins: [
-      'https://roadscore.santi020k.com',
-      'http://localhost:4321',
-      'http://127.0.0.1:4321',
-      'http://localhost:4322',
-      'http://127.0.0.1:4322'
-    ],
-    displayName: 'RoadScore',
-    locales: ['en', 'es'],
-    slug: 'roadscore'
-  }],
-  ['between-contractions', {
-    allowedOrigins: [
-      'https://between.santi020k.com',
-      'http://localhost:4321',
-      'http://127.0.0.1:4321',
-      'http://localhost:4322',
-      'http://127.0.0.1:4322'
-    ],
-    displayName: 'Between Contractions',
-    locales: ['en', 'es'],
-    slug: 'between-contractions'
-  }]
+  [
+    'postlens',
+    {
+      allowedOrigins: [
+        'https://postlens.santi020k.com',
+        'http://localhost:4176',
+        'http://127.0.0.1:4176',
+        'http://localhost:4321',
+        'http://127.0.0.1:4321'
+      ],
+      displayName: 'PostLens',
+      locales: ['en', 'es'],
+      slug: 'postlens'
+    }
+  ],
+  [
+    'roadscore',
+    {
+      allowedOrigins: [
+        'https://roadscore.santi020k.com',
+        'http://localhost:4321',
+        'http://127.0.0.1:4321',
+        'http://localhost:4322',
+        'http://127.0.0.1:4322'
+      ],
+      displayName: 'RoadScore',
+      locales: ['en', 'es'],
+      slug: 'roadscore'
+    }
+  ],
+  [
+    'between-contractions',
+    {
+      allowedOrigins: [
+        'https://between.santi020k.com',
+        'http://localhost:4321',
+        'http://127.0.0.1:4321',
+        'http://localhost:4322',
+        'http://127.0.0.1:4322'
+      ],
+      displayName: 'Between Contractions',
+      locales: ['en', 'es'],
+      slug: 'between-contractions'
+    }
+  ]
 ])
 
-export const getFeedbackProject = (
-  slug: string
-): FeedbackProject | undefined => feedbackProjects.get(slug)
+export const getFeedbackProject = (slug: string): FeedbackProject | undefined => feedbackProjects.get(slug)
 
 export const getFeedbackProjects = (): FeedbackProject[] => [
   ...feedbackProjects.values()
 ]
 
 export const getFeedbackOrigins = (): string[] => [
-  ...new Set(getFeedbackProjects().flatMap(project => project.allowedOrigins))
+  ...new Set(
+    getFeedbackProjects().flatMap(project => project.allowedOrigins)
+  )
 ]
 
 const publishedApps: readonly PublishedApp[] = [
@@ -107,6 +113,9 @@ const publishedApps: readonly PublishedApp[] = [
       bundleId: 'com.santi020k.lumen.playground.apple'
     },
     displayName: 'Lumen Playground',
+    google: {
+      packageName: 'com.santi020k.lumen.playground.compose'
+    },
     slug: 'lumen'
   },
   {
@@ -123,6 +132,9 @@ const publishedApps: readonly PublishedApp[] = [
       bundleId: 'com.santi020k.betweencontractions'
     },
     displayName: 'Between Contractions',
+    google: {
+      packageName: 'com.santi020k.betweencontractions'
+    },
     slug: 'betweencontractions'
   }
 ]
@@ -250,13 +262,16 @@ const githubReleaseSources: readonly GithubReleaseSource[] = [
   }
 ]
 
-export const getGithubReleaseSources = (): readonly GithubReleaseSource[] => githubReleaseSources
+export const getGithubReleaseSources = (
+): readonly GithubReleaseSource[] => githubReleaseSources
 
 export const getCatalogOverride = (
   repository: string
 ): CatalogOverride | undefined => catalogOverrides.get(repository)
 
-export const getCanonicalProjectSlug = (slug: string): string => projectAliases.get(slug) ?? slug
+export const getCanonicalProjectSlug = (
+  slug: string
+): string => projectAliases.get(slug) ?? slug
 
 interface VscodeExtensionMapping {
   extensionId: string
@@ -270,8 +285,8 @@ const toVscodeExtensionMappings = ([slug, project]: [
   extensionId => ({ extensionId, slug })
 )
 
-export const getVscodeExtensionMappings = (): VscodeExtensionMapping[] => Array
-  .from(catalogOverrides)
+export const getVscodeExtensionMappings = (
+): VscodeExtensionMapping[] => Array.from(catalogOverrides)
   .flatMap(toVscodeExtensionMappings)
 
 export const titleFromSlug = (slug: string): string => slug

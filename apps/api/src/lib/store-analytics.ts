@@ -5,7 +5,8 @@ import {
   type StoreMetricName,
   storeMetricNameSchema,
   type StoreMetricTotals,
-  type StoreProvider } from '@santi020k/observatory-api-types'
+  type StoreProvider
+} from '@santi020k/observatory-api-types'
 import {
   getPublishedApps,
   type PublishedApp
@@ -137,15 +138,7 @@ const saveProviderMetrics = async (
   } catch (error) {
     const errorCode = safeErrorCode(error)
 
-    await recordSync(
-      env,
-      app.slug,
-      provider,
-      'failed',
-      now,
-      0,
-      errorCode
-    )
+    await recordSync(env, app.slug, provider, 'failed', now, 0, errorCode)
 
     return { points: 0, status: 'failed' }
   }
@@ -232,11 +225,7 @@ const syncGoogleApp = async (
     env,
     app,
     'google',
-    () => collectGooglePlayMetrics(
-      app,
-      configuration,
-      { now, since }
-    ),
+    () => collectGooglePlayMetrics(app, configuration, { now, since }),
     true,
     now
   )
@@ -269,7 +258,9 @@ export const syncStoreAnalytics = async (
     googleConfigurationState.failed = true
   }
 
-  const recordResult = (result: Awaited<ReturnType<typeof saveProviderMetrics>>) => {
+  const recordResult = (
+    result: Awaited<ReturnType<typeof saveProviderMetrics>>
+  ) => {
     points += result.points
 
     if (result.status === 'failed') failed += 1
@@ -311,9 +302,7 @@ const stockMetrics = new Set<StoreMetricName>([
   'totalUserInstalls'
 ])
 
-const aggregateMetrics = (
-  points: readonly StorePoint[]
-): StoreMetricTotals => {
+const aggregateMetrics = (points: readonly StorePoint[]): StoreMetricTotals => {
   const totals: StoreMetricTotals = {}
   const latest = new Map<StoreMetricName, StorePoint>()
 
@@ -366,8 +355,8 @@ const buildBreakdowns = (points: readonly StorePoint[]) => {
   for (const point of points) {
     if (point.dimension === 'overall') continue
 
-    const values = byDimension.get(point.dimension) ??
-      new Map<string, StorePoint[]>()
+    const values =
+      byDimension.get(point.dimension) ?? new Map<string, StorePoint[]>()
 
     const valuePoints = values.get(point.dimensionValue) ?? []
 
@@ -384,32 +373,39 @@ const buildBreakdowns = (points: readonly StorePoint[]) => {
       dimension !== 'country' &&
       dimension !== 'device' &&
       dimension !== 'osVersion'
-    ) return []
+    )
+      return []
 
-    return [{
-      dimension,
-      values: [...values.entries()]
-        .map(([label, valuePoints]) => ({
-          label,
-          metrics: aggregateMetrics(valuePoints)
-        }))
-        .sort((left, right) => {
-          const leftReach = left.metrics.installations ??
-            left.metrics.currentDeviceInstalls ??
-            left.metrics.totalDownloads ??
-            left.metrics.dailyDeviceInstalls ??
-            0
+    return [
+      {
+        dimension,
+        values: [...values.entries()]
+          .map(([label, valuePoints]) => ({
+            label,
+            metrics: aggregateMetrics(valuePoints)
+          }))
+          .sort((left, right) => {
+            const leftReach =
+              left.metrics.installations ??
+              left.metrics.currentDeviceInstalls ??
+              left.metrics.totalDownloads ??
+              left.metrics.dailyDeviceInstalls ??
+              0
 
-          const rightReach = right.metrics.installations ??
-            right.metrics.currentDeviceInstalls ??
-            right.metrics.totalDownloads ??
-            right.metrics.dailyDeviceInstalls ??
-            0
+            const rightReach =
+              right.metrics.installations ??
+              right.metrics.currentDeviceInstalls ??
+              right.metrics.totalDownloads ??
+              right.metrics.dailyDeviceInstalls ??
+              0
 
-          return rightReach - leftReach || left.label.localeCompare(right.label)
-        })
-        .slice(0, 20)
-    }]
+            return (
+              rightReach - leftReach || left.label.localeCompare(right.label)
+            )
+          })
+          .slice(0, 20)
+      }
+    ]
   })
 }
 
@@ -427,27 +423,36 @@ const providerIsConfigured = (
   }
 }
 
+const getListingUrl = (
+  app: PublishedApp,
+  provider: StoreProvider
+): string => provider === 'apple' ?
+  `https://apps.apple.com/app/id${app.apple?.appId ?? ''}` :
+  `https://play.google.com/store/apps/details?id=${encodeURIComponent(app.google?.packageName ?? '')}`
+
 const buildProviderAnalytics = (
   env: Bindings,
-  appSlug: string,
+  app: PublishedApp,
   provider: StoreProvider,
   points: readonly StorePoint[],
   runs: readonly StoreRun[]
 ) => {
-  const providerPoints = points.filter(point => point.appSlug === appSlug &&
-    point.provider === provider)
+  const providerPoints = points.filter(
+    point => point.appSlug === app.slug && point.provider === provider
+  )
 
   const overallPoints = providerPoints.filter(
     point => point.dimension === 'overall'
   )
 
-  const latestRun = runs.find(run => run.appSlug === appSlug &&
-    run.provider === provider)
+  const latestRun = runs.find(
+    run => run.appSlug === app.slug && run.provider === provider
+  )
 
   let status: 'available' | 'awaiting_data' | 'failed' | 'not_configured'
 
   if (latestRun?.status === 'failed') status = 'failed'
-  else if (!providerIsConfigured(env, appSlug, provider))
+  else if (!providerIsConfigured(env, app.slug, provider))
     status = 'not_configured'
   else if (providerPoints.length > 0) status = 'available'
   else status = 'awaiting_data'
@@ -460,12 +465,12 @@ const buildProviderAnalytics = (
   return {
     breakdowns: buildBreakdowns(providerPoints),
     history: buildHistory(overallPoints),
-    lastCollectedAt: latestCollectedAt > 0 ?
-      new Date(latestCollectedAt).toISOString() :
-      null,
+    lastCollectedAt:
+      latestCollectedAt > 0 ? new Date(latestCollectedAt).toISOString() : null,
     lastSyncAt: latestRun ?
       new Date(latestRun.completedAt ?? latestRun.startedAt).toISOString() :
       null,
+    listingUrl: getListingUrl(app, provider),
     metrics: aggregateMetrics(overallPoints),
     provider,
     status
@@ -489,22 +494,10 @@ export const buildStoreAnalytics = async (
       displayName: app.displayName,
       providers: [
         ...(app.apple ?
-          [buildProviderAnalytics(
-            env,
-            app.slug,
-            'apple',
-            points,
-            runs
-          )] :
+          [buildProviderAnalytics(env, app, 'apple', points, runs)] :
           []),
         ...(app.google ?
-          [buildProviderAnalytics(
-            env,
-            app.slug,
-            'google',
-            points,
-            runs
-          )] :
+          [buildProviderAnalytics(env, app, 'google', points, runs)] :
           [])
       ],
       slug: app.slug

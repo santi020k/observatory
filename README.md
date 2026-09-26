@@ -122,6 +122,10 @@ the browser keeps a host-only dashboard cookie and server-rendered pages can for
 with a parent-domain cookie. See [the package-authentication pilot runbook](docs/auth-package-pilot.md) before enabling
 the flag outside local development.
 
+Release-relevant pull requests include a Changeset. On the release branch, run
+`pnpm release:version` to consume the pending files and update every private workspace package as
+one fixed version, then reconcile the generated intent into the root `CHANGELOG.md`.
+
 After a release pull request is merged and its production deployment passes, dispatch the
 `Publish release` workflow from `main` with the workspace's semantic version. GitHub Actions
 verifies the release, creates the matching `v<semver>` tag at the dispatched `main` commit, and
@@ -177,9 +181,9 @@ download Analytics Reports. Observatory deliberately does not create or delete
 Analytics Report requests; create each ongoing request as a separate,
 account-holder-authorized setup action before adding its identifier.
 
-Google Play collection is available for future catalog entries that declare a
-published Play listing; none of the three current apps has a verified public
-Google Play listing. It requires `GOOGLE_PLAY_REPORT_BUCKET` and
+Google Play collection is enabled for the verified Lumen Playground and
+Between Contractions listings. PostLens remains App Store-only. Play reporting
+requires `GOOGLE_PLAY_REPORT_BUCKET` and
 `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. Add the service-account email to Play
 Console with global `View app information` access only. Observatory reads
 install and crash CSV exports from the private reporting bucket; it does not

@@ -28,6 +28,12 @@ production. Native bug reports may attach bounded, person-initiated diagnostic
 text. No route accepts files, images, contraction records, photo identifiers, or
 embedded media metadata.
 
+After a submission is stored, the API asynchronously emails `OWNER_EMAIL` through
+the existing Resend integration. The notification includes the project, type,
+message content, optional contact address and diagnostics, and a link to the
+private project board. Email delivery failures do not reject or remove the stored
+submission.
+
 ## Private contract
 
 Owner-authenticated routes below `/feedback/admin` list, update, and permanently
