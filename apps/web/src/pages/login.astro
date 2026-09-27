@@ -211,6 +211,9 @@ import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
     if (label) label.textContent = submitting ? submittingLabel : idleLabel
   }
 
+  if (!('PublicKeyCredential' in window))
+    passkeyButton?.setAttribute('hidden', '')
+
   loginForm?.addEventListener('submit', async event => {
     event.preventDefault()
 
