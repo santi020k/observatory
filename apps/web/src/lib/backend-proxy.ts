@@ -22,6 +22,25 @@ const normalizeInternalOrigin = (value: string | undefined): string | null => {
   }
 }
 
+const isUnsafeBackendPath = (path: string): boolean => {
+  if (
+    path.startsWith('/') ||
+    path.startsWith('\\') ||
+    /%(?:25|2e|2f|5c)/iu.test(path)
+  ) return true
+
+  const segments = path
+    .replaceAll('\\', '/')
+    .split('/')
+    .filter(Boolean)
+    .map(segment => segment.toLowerCase())
+
+  return segments.length === 0 ||
+    segments.includes('..') ||
+    segments[0] === 'auth' ||
+    (segments[0] === 'api' && segments[1] === 'auth')
+}
+
 export const resolveBackendTarget = (
   request: Request,
   apiInternalUrl: string | undefined
@@ -43,22 +62,11 @@ export const resolveBackendTarget = (
     return null
   }
 
-  if (/%(?:25|2e|2f|5c)/iu.test(path)) return null
-
-  const segments = path
-    .replaceAll('\\', '/')
-    .split('/')
-    .filter(Boolean)
-    .map(segment => segment.toLowerCase())
-
-  if (
-    segments.length === 0 ||
-    segments.includes('..') ||
-    segments[0] === 'auth' ||
-    (segments[0] === 'api' && segments[1] === 'auth')
-  ) return null
+  if (isUnsafeBackendPath(path)) return null
 
   const target = new URL(`/${path}`, apiOrigin)
+
+  if (target.origin !== apiOrigin) return null
 
   target.search = requestUrl.search
 

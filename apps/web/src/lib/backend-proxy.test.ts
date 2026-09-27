@@ -56,7 +56,9 @@ describe('backend proxy', () => {
       'api/auth/update-user',
       'auth/recovery',
       'api%2Fauth/sign-up',
-      'api%252Fauth/sign-out'
+      'api%252Fauth/sign-out',
+      '%2F%2Fattacker.example/collect',
+      '%5C%5Cattacker.example/collect'
     ]
 
     for (const path of blockedPaths) {
