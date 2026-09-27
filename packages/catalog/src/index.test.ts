@@ -100,6 +100,7 @@ describe('project catalog', () => {
   test('registers published native apps and their store identities', () => {
     const lumen = getPublishedApps().find(app => app.slug === 'lumen')
     const postLens = getPublishedApps().find(app => app.slug === 'postlens')
+    const roadScore = getPublishedApps().find(app => app.slug === 'roadscore')
     const between = getPublishedApps().find(
       app => app.slug === 'betweencontractions'
     )
@@ -109,6 +110,11 @@ describe('project catalog', () => {
       bundleId: 'com.santi020k.lumen.playground.apple'
     })
     expect(postLens?.apple?.appId).toBe('6804601300')
+    expect(roadScore).toMatchObject({
+      displayName: 'RoadScore',
+      google: { packageName: 'com.santi020k.roadscore' }
+    })
+    expect(roadScore?.apple).toBeUndefined()
     expect(between?.apple?.appId).toBe('6802499436')
     expect(between?.google).toEqual({
       packageName: 'com.santi020k.betweencontractions'
