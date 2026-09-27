@@ -261,5 +261,6 @@ are ready. Do not retire legacy authentication until all real-origin evidence is
 
 ## License
 
-This is private, proprietary source code. No license is granted to use, copy, modify, or distribute
-it. See [LICENSE](LICENSE).
+Observatory is publicly visible under the **Santi020k Source-Available License**. Viewing and
+contribution preparation are permitted, while reuse, deployment, redistribution, and other use require
+prior written permission. Separately licensed material retains its own terms. See [LICENSE](LICENSE).
