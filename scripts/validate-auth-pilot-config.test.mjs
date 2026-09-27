@@ -6,7 +6,8 @@ import test from 'node:test'
 
 import {
   loadAuthPilotEnvironment,
-  validateAuthPilotEnvironment
+  validateAuthPilotEnvironment,
+  validateAuthPilotPath
 } from './validate-auth-pilot-config.mjs'
 
 const validEnvironment = {
@@ -35,6 +36,64 @@ test('rejects API and browser rollout flag drift', () => {
     invalidKeys: ['AUTH_PILOT_ENABLED', 'PUBLIC_AUTH_PILOT_ENABLED'],
     valid: false
   })
+})
+
+test('validates each disabled deployment path without cross-path fallbacks', () => {
+  assert.deepEqual(validateAuthPilotPath({
+    AUTH_PILOT_ENABLED: 'false'
+  }, 'api'), {
+    enabled: false,
+    invalidKeys: [],
+    valid: true
+  })
+
+  assert.deepEqual(validateAuthPilotPath({
+    PUBLIC_AUTH_PILOT_ENABLED: 'false'
+  }, 'web'), {
+    enabled: false,
+    invalidKeys: [],
+    valid: true
+  })
+})
+
+test('rejects missing or incomplete path-specific pilot configuration', () => {
+  assert.deepEqual(validateAuthPilotPath({
+    PUBLIC_AUTH_PILOT_ENABLED: 'true'
+  }, 'web'), {
+    enabled: true,
+    invalidKeys: ['API_INTERNAL_URL', 'PUBLIC_API_URL'],
+    valid: false
+  })
+
+  assert.deepEqual(validateAuthPilotPath({
+    AUTH_PILOT_ENABLED: 'true',
+    SITE_URL: 'https://observatory.example'
+  }, 'api'), {
+    enabled: true,
+    invalidKeys: ['CORS_ORIGIN'],
+    valid: false
+  })
+
+  assert.deepEqual(validateAuthPilotPath({
+    AUTH_PILOT_ENABLED: 'true'
+  }, 'web'), {
+    enabled: false,
+    invalidKeys: ['PUBLIC_AUTH_PILOT_ENABLED'],
+    valid: false
+  })
+})
+
+test('accepts complete path-specific pilot configuration', () => {
+  assert.equal(validateAuthPilotPath(validEnvironment, 'api').valid, true)
+
+  assert.equal(validateAuthPilotPath(validEnvironment, 'web').valid, true)
+})
+
+test('rejects unknown deployment paths', () => {
+  assert.throws(
+    () => validateAuthPilotPath(validEnvironment, 'other'),
+    /Unknown auth pilot path: other/
+  )
 })
 
 test('loads the setup-local API and web files when process values are absent', context => {

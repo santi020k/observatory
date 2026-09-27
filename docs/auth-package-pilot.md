@@ -27,8 +27,9 @@ exact package versions in a separate reviewed change only after the two-consumer
 ## Configuration preflight
 
 Keep `AUTH_PILOT_ENABLED=false` in Infisical's production `/apps/api` path and `PUBLIC_AUTH_PILOT_ENABLED=false` in
-`/apps/web` until the deployment is approved. The root `pnpm verify` command runs `pnpm check:auth-pilot-config`. The
-check requires the two flags to match; when they are both `true`, it also requires:
+`/apps/web` until the deployment is approved. The deployment preflight first validates each Infisical path independently,
+then validates their combined relationships. The root `pnpm verify` command runs the combined
+`pnpm check:auth-pilot-config` check. The two flags must match; when they are both `true`, validation also requires:
 
 - exact HTTPS `SITE_URL`, `PUBLIC_API_URL`, and `API_INTERNAL_URL` origins;
 - different site and internal API origins, preventing a proxy loop;

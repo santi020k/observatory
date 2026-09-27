@@ -1,8 +1,10 @@
 # Observatory
 
-Private project intelligence and portfolio operations for Santiago Molina. Observatory turns public
+Source-available project intelligence and portfolio operations for Santiago Molina. Observatory turns public
 repository, package, deployment, and product-feedback signals into one decision-focused control room.
 The dashboard is owner-only; narrowly scoped public feedback routes serve each product's branded UI.
+
+[![License: Source-Available](https://img.shields.io/badge/license-source--available-orange.svg)](LICENSE)
 
 [Dashboard](https://observatory.santi020k.com) · [Architecture](docs/architecture.md) ·
 [Feedback platform](docs/feedback-platform.md) ·
@@ -84,6 +86,10 @@ Production deploys run automatically after every push to `main`. GitHub Actions 
 migrations, deploys the API Worker, and then deploys the web Worker. The public entry point is
 `https://observatory.santi020k.com`; the API Worker is available at
 `https://api.observatory.santi020k.com`.
+
+An unprivileged job must complete `pnpm verify` before the protected deployment job can request an
+OIDC token or read production configuration. The web build receives only its `/apps/web` values;
+API and deployment credentials are introduced later, within the protected job.
 
 The workflow authenticates to Infisical with GitHub OIDC through the read-only
 `github-actions-apps` machine identity. No long-lived Infisical credential is stored in GitHub;
@@ -220,6 +226,21 @@ and production builds.
 - Provider secrets stay in Worker bindings and never reach the browser.
 - Private-source routes and storage will remain separate from public collection.
 
+## Source availability and data
+
+This repository contains application source, database schemas, public catalog metadata, and deployment
+configuration. It does not contain production D1 data, provider credentials, authentication secrets, or
+private analytics exports. Making the repository public does not grant access to the hosted dashboard or
+its data.
+
+The project is **source-available, not open source**. You may inspect the code, use GitHub's public
+repository features, and modify it solely to prepare a contribution. Reuse, redistribution, deployment,
+and other modification require prior written permission. Separately licensed vendored packages retain
+their own license terms. See [LICENSE](LICENSE).
+
+Issues and pull requests are welcome under the repository's contribution terms. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Authentication migration
 
 Observatory has begun a staged migration to
@@ -241,5 +262,6 @@ are ready. Do not retire legacy authentication until all real-origin evidence is
 
 ## License
 
-This is private, proprietary source code. No license is granted to use, copy, modify, or distribute
-it. See [LICENSE](LICENSE).
+Observatory is publicly visible under the **Santi020k Source-Available License**. Viewing and
+contribution preparation are permitted, while reuse, deployment, redistribution, and other use require
+prior written permission. Separately licensed material retains its own terms. See [LICENSE](LICENSE).

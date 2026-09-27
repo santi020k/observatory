@@ -1,6 +1,7 @@
 # Observatory — Agent Instructions
 
-Observatory is Santiago Molina's private portfolio operations control room.
+Observatory is Santiago Molina's source-available portfolio operations control room. Its hosted
+dashboard, production data, and credentials remain private.
 
 ## Architecture
 
