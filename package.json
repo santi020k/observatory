@@ -2,8 +2,8 @@
   "name": "@santi020k/observatory-root",
   "version": "0.4.1",
   "private": true,
-  "description": "Private portfolio operations control room for product, package, deployment, and repository signals.",
-  "license": "UNLICENSED",
+  "description": "Source-available portfolio operations control room for product, package, deployment, and repository signals.",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "packageManager": "pnpm@11.6.0",
   "engines": {

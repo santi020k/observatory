@@ -11,13 +11,34 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
+  verify:
+    name: Verify source
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm workspace
+        uses: santi020k/quality/actions/setup-pnpm@eec1701b98bcc0b76d36af288ee78a0369cd84cc # v1.1.1
+        with:
+          node-version-file: .node-version
+
+      - name: Verify repository without production credentials
+        run: pnpm verify
+
   deploy:
-    name: Verify and deploy
+    name: Deploy production
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     environment:
       name: production
       url: https://observatory.santi020k.com
@@ -26,6 +47,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up pnpm workspace
         uses: santi020k/quality/actions/setup-pnpm@eec1701b98bcc0b76d36af288ee78a0369cd84cc # v1.1.1
@@ -53,6 +76,11 @@ jobs:
           echo "::add-mask::$infisical_token"
           printf 'INFISICAL_TOKEN=%s\n' "$infisical_token" >> "$GITHUB_ENV"
 
+      - name: Build web Worker with web-only configuration
+        run: >-
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web --
+          pnpm --filter @santi020k/observatory-web build
+
       - name: Validate deployment credentials
         run: |
           # The nested shell expands Infisical-injected values.
@@ -60,12 +88,6 @@ jobs:
           infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
             sh -c 'test -n "$CLOUDFLARE_DEPLOY_API_TOKEN" \
               || { echo "::error::CLOUDFLARE_DEPLOY_API_TOKEN is missing in Infisical"; exit 1; }'
-
-      - name: Load production secrets and verify
-        run: >-
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api --
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web --
-          pnpm verify
 
       - name: Apply database migrations
         run: |
@@ -163,10 +185,8 @@ jobs:
           # The nested shell expands Infisical-injected values.
           # shellcheck disable=SC2016
           infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web -- \
           sh -c '
             set -eu
-            pnpm --filter @santi020k/observatory-web build
             version_tag="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
             CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
               pnpm --filter @santi020k/observatory-web exec wrangler versions upload \
