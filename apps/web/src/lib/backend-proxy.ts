@@ -26,7 +26,7 @@ const isUnsafeBackendPath = (path: string): boolean => {
   if (
     path.startsWith('/') ||
     path.startsWith('\\') ||
-    /%(?:25|2e|2f|5c)/iu.test(path)
+    /%[\da-f]{2}/iu.test(path)
   ) return true
 
   const segments = path

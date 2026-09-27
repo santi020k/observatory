@@ -57,6 +57,7 @@ describe('backend proxy', () => {
       'auth/recovery',
       'api%2Fauth/sign-up',
       'api%252Fauth/sign-out',
+      'api/%2561uth/update-user',
       '%2F%2Fattacker.example/collect',
       '%5C%5Cattacker.example/collect'
     ]
