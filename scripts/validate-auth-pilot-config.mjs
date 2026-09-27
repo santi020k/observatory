@@ -11,6 +11,17 @@ const localEnvironmentKeys = new Set([
   'SITE_URL'
 ])
 
+const pilotPathRequirements = {
+  api: {
+    flag: 'AUTH_PILOT_ENABLED',
+    requiredWhenEnabled: ['CORS_ORIGIN', 'SITE_URL']
+  },
+  web: {
+    flag: 'PUBLIC_AUTH_PILOT_ENABLED',
+    requiredWhenEnabled: ['API_INTERNAL_URL', 'PUBLIC_API_URL']
+  }
+}
+
 const isLocalHostname = hostname => hostname === '127.0.0.1' || hostname === 'localhost'
 
 const parseOrigin = value => {
@@ -113,10 +124,35 @@ export const validateAuthPilotEnvironment = environment => {
   }
 }
 
+export const validateAuthPilotPath = (environment, path) => {
+  const requirements = pilotPathRequirements[path]
+
+  if (!requirements) throw new TypeError(`Unknown auth pilot path: ${path}`)
+
+  const flag = environment[requirements.flag]
+  const invalidKeys = []
+
+  if (!['false', 'true'].includes(flag)) invalidKeys.push(requirements.flag)
+
+  if (flag === 'true') invalidKeys.push(...requirements.requiredWhenEnabled
+    .filter(key => typeof environment[key] !== 'string' || environment[key].trim() === ''))
+
+  return {
+    enabled: flag === 'true',
+    invalidKeys,
+    valid: invalidKeys.length === 0
+  }
+}
+
 const run = () => {
-  const result = validateAuthPilotEnvironment(
-    loadAuthPilotEnvironment(process.env)
-  )
+  const pathArgument = process.argv.slice(2)
+    .find(argument => argument.startsWith('--path='))
+
+  const path = pathArgument?.slice('--path='.length)
+
+  const result = path ?
+    validateAuthPilotPath(process.env, path) :
+    validateAuthPilotEnvironment(loadAuthPilotEnvironment(process.env))
 
   if (!result.valid) {
     console.error(
@@ -128,11 +164,12 @@ const run = () => {
     return
   }
 
-  process.stdout.write(
-    result.enabled ?
-      'Auth pilot configuration is complete.\n' :
-      'Auth pilot is disabled.\n'
-  )
+  let message = 'Auth pilot is disabled.\n'
+
+  if (path) message = `Auth pilot ${path} path is valid.\n`
+  else if (result.enabled) message = 'Auth pilot configuration is complete.\n'
+
+  process.stdout.write(message)
 }
 
 if (

@@ -77,10 +77,14 @@ jobs:
           printf 'INFISICAL_TOKEN=%s\n' "$infisical_token" >> "$GITHUB_ENV"
 
       - name: Validate production authentication configuration
-        run: >-
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api --
-          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web --
-          pnpm run check:auth-pilot-config
+        run: |
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
+            node scripts/validate-auth-pilot-config.mjs --path=api
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web -- \
+            node scripts/validate-auth-pilot-config.mjs --path=web
+          infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
+            infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web -- \
+              pnpm run check:auth-pilot-config
 
       - name: Build web Worker with web-only configuration
         run: >-
