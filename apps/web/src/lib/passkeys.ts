@@ -90,15 +90,15 @@ const matchesDiagnostic = (
 
 const cancelledMessage = (operation: PasskeyOperation): string => operation === 'registration' ?
   'Your passkey wasn’t added. Try again and finish the confirmation on your device.' :
-  'We couldn’t sign you in. Try again and finish the confirmation on your device, or use the code sent to your email.'
+  'We couldn’t sign you in. Try again and finish the confirmation on your device, or request a code by email.'
 
 const fallbackMessage = (operation: PasskeyOperation): string => operation === 'registration' ?
   'Your passkey wasn’t added. Try again or use a different device.' :
-  'We couldn’t sign you in. Try again or use the code sent to your email.'
+  'We couldn’t sign you in. Try again or request a code by email.'
 
 const siteMismatchMessage = (operation: PasskeyOperation): string => operation === 'registration' ?
   'Passkeys can’t be added right now because this site’s passkey configuration is unavailable. Try again later.' :
-  'Passkeys aren’t available right now. Use the code sent to your email instead.'
+  'Passkeys aren’t available right now. Request a code by email instead.'
 
 export const normalizePasskeyError = (
   error: unknown,

@@ -18,7 +18,7 @@ describe('passkey error presentation', () => {
     expect(normalized).toBeInstanceOf(PasskeyOperationError)
     expect(normalized.code).toBe('passkey_cancelled_or_timed_out')
     expect(normalized.message).toBe(
-      'We couldn’t sign you in. Try again and finish the confirmation on your device, or use the code sent to your email.'
+      'We couldn’t sign you in. Try again and finish the confirmation on your device, or request a code by email.'
     )
     expect(normalized.message).not.toContain('w3.org')
     expect(normalized.diagnostic).toEqual({
@@ -52,7 +52,7 @@ describe('passkey error presentation', () => {
 
     expect(normalized.code).toBe('passkey_operation_failed')
     expect(normalized.message).toBe(
-      'We couldn’t sign you in. Try again or use the code sent to your email.'
+      'We couldn’t sign you in. Try again or request a code by email.'
     )
   })
 
@@ -68,7 +68,7 @@ describe('passkey error presentation', () => {
 
     expect(normalized.code).toBe('passkey_site_mismatch')
     expect(normalized.message).toBe(
-      'Passkeys aren’t available right now. Use the code sent to your email instead.'
+      'Passkeys aren’t available right now. Request a code by email instead.'
     )
     expect(normalized.diagnostic.message).toBe(
       'The RP ID is invalid for this domain'
