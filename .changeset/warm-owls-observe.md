@@ -7,4 +7,5 @@
 ---
 
 Publish Observatory's source under the Santi020k source-available license and isolate production
-deployment credentials from the unprivileged verification job.
+deployment credentials from the unprivileged verification job. Refresh locked development tooling
+to patched transitive dependency versions before making the repository public.
