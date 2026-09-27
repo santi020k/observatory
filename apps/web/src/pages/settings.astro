@@ -1013,6 +1013,11 @@ for (const control of projectControls) {
 
 <script>
 import {
+  normalizePasskeyError,
+  PasskeyOperationError
+} from '@/lib/auth-errors'
+
+import {
   type AuthClientPasskeySummary,
   createSantiAuthHelpers } from '@santi020k/auth-client'
 
@@ -1112,7 +1117,7 @@ const renderPasskeys = () => {
       try {
         const result = await auth.deletePasskey(credential.id)
 
-        if (!result.ok) throw new Error(result.error.message)
+        if (!result.ok) throw new Error('Could not remove the passkey.')
 
         passkeys = passkeys.filter(item => item.id !== credential.id)
 
@@ -1140,7 +1145,7 @@ const loadPasskeys = async () => {
   try {
     const result = await auth.listPasskeys()
 
-    if (!result.ok) throw new Error(result.error.message)
+    if (!result.ok) throw new Error('Could not load passkeys.')
 
     passkeys = [...result.data]
 
@@ -1172,7 +1177,8 @@ passkeyForm?.addEventListener('submit', async event => {
   try {
     const result = await auth.addPasskey({ name })
 
-    if (!result.ok) throw new Error(result.error.message)
+    if (!result.ok)
+      throw normalizePasskeyError(result.error, 'registration')
 
     passkeyForm.reset()
 
@@ -1180,8 +1186,13 @@ passkeyForm?.addEventListener('submit', async event => {
 
     showPasskeyMessage('Passkey created. You can use it on your next sign-in.')
   } catch (error) {
+    const normalized = error instanceof PasskeyOperationError ?
+      error :
+      normalizePasskeyError(error, 'registration')
+
     showPasskeyMessage(
-      error instanceof Error ? error.message : 'Could not create the passkey.', true
+      normalized.message,
+      true
     )
   } finally {
     setPasskeyCreationBusy(false)

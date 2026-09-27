@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.0 - 2026-09-27
+
+### Changed
+
+- Promoted the published Auth 0.5 packages to Observatory's primary email-code, session, passkey,
+  and sign-out flow while preserving the consumer-owned emergency recovery path.
+- Replaced the vendored Auth pilot and feature flags with bounded same-origin authentication and
+  backend proxies backed by exact split-origin configuration validation.
+- Published the repository under the Santi020k source-available license and separated unprivileged
+  source verification from production deployment credentials.
+- Kept passkey failures actionable for users while retaining technical diagnostics outside rendered
+  product copy.
+
+### Security
+
+- Preserved existing authentication tables and recovery sessions for rollback safety while moving
+  primary authentication to the application-local Auth tables already deployed in D1.
+- Removed obsolete vendored package archives and their bundle-validation surface in favor of exact
+  published Auth 0.5 dependencies.
+
 ## 0.4.1 - 2026-09-27
 
 ### Added

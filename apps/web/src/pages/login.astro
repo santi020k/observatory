@@ -122,6 +122,8 @@ import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
   </main>
 
   <script>
+  import { normalizePasskeyError } from '@/lib/auth-errors'
+
   import { createSantiAuthHelpers } from '@santi020k/auth-client'
 
   const auth = createSantiAuthHelpers({
@@ -252,7 +254,8 @@ import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
     try {
       const result = await auth.signInWithPasskey()
 
-      if (!result.ok) throw new Error(result.error.message)
+      if (!result.ok)
+        throw normalizePasskeyError(result.error, 'authentication')
 
       window.location.assign('/dashboard/')
     } catch (error) {
