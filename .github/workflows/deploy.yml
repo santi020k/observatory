@@ -79,12 +79,12 @@ jobs:
       - name: Validate production authentication configuration
         run: |
           infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
-            node scripts/validate-auth-pilot-config.mjs --path=api
+            node scripts/validate-auth-config.mjs --path=api
           infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web -- \
-            node scripts/validate-auth-pilot-config.mjs --path=web
+            node scripts/validate-auth-config.mjs --path=web
           infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- \
             infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/web -- \
-              pnpm run check:auth-pilot-config
+              pnpm run check:auth-config
 
       - name: Build web Worker with web-only configuration
         run: >-
@@ -156,15 +156,10 @@ jobs:
           # shellcheck disable=SC2016
           infisical run --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/apps/api -- sh -c '
             set -eu
-            case "$AUTH_PILOT_ENABLED" in
-              true|false) ;;
-              *) echo "::error::AUTH_PILOT_ENABLED must be true or false"; exit 1 ;;
-            esac
             version_tag="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
             CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
               pnpm --filter @santi020k/observatory-api exec wrangler versions upload \
-                --tag "$version_tag" --message "GitHub $GITHUB_SHA" \
-                --var "AUTH_PILOT_ENABLED:$AUTH_PILOT_ENABLED"
+                --tag "$version_tag" --message "GitHub $GITHUB_SHA"
             CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" \
               pnpm --filter @santi020k/observatory-api exec wrangler versions deploy \
                 --version-tag "$version_tag" --yes --message "GitHub $GITHUB_SHA"

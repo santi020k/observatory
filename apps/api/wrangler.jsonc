@@ -34,7 +34,6 @@
     },
   ],
   "vars": {
-    "AUTH_PILOT_ENABLED": "false",
     "ENVIRONMENT": "production",
   },
   "observability": {

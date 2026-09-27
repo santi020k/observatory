@@ -46,27 +46,25 @@ GitHub App / commercial sources
 
 ## Authentication
 
-1. Email code is the primary sign-in path; passkeys and the server-only recovery code remain
-   available as alternatives.
-2. The browser submits an email to `/auth/request-code`.
-3. The API always returns a generic accepted message to prevent owner-email discovery.
-4. Requests are bounded by authorized email and by an HMAC-hashed client identity. New login and
-   recovery rate-limit records never store raw IP addresses. Legacy recovery-attempt identities
-   created before 0.3.0 age out after 24 hours, and scheduled cleanup runs even when collection
-   fails.
-5. For the configured owner, a random six-digit code is HMAC-hashed and stored for ten minutes.
-6. Resend delivers the code. Local development returns it only when no Resend key is configured.
-7. A verified code is consumed and exchanged for a 30-day opaque session.
-8. Only a hash of the session token is stored. The raw token lives in an HttpOnly cookie.
+1. `@santi020k/auth-client` provides the browser's email-code and passkey operations.
+2. The Astro Worker proxies an allowlist of same-origin `/api/auth/*` requests to the API Worker.
+3. `@santi020k/auth-cloudflare` enforces the configured owner, exact browser origin, rate limits,
+   passkey policy, and session resolution against Observatory's D1 database.
+4. The API returns the same accepted response for authorized and unauthorized email-code requests
+   to prevent owner-email discovery.
+5. Resend delivers the code. Plaintext codes are never returned or logged, including locally.
+6. A verified code or passkey creates a 30-day opaque, HttpOnly session.
+7. The server-only `OWNER_PASSCODE` route remains a separate, consumer-owned recovery boundary;
+   its HMAC-hashed rate-limit identities never store raw IP addresses.
 
-### Package migration pilot
+### Split-origin authentication
 
-The optional package pilot preserves the API as the owner of authentication and D1 while solving the dashboard/API
-hostname boundary without widening cookie scope:
+The production flow preserves the API as the owner of authentication and D1 while solving the dashboard/API hostname
+boundary without widening cookie scope:
 
 ```text
 browser at observatory.santi020k.com
-  -> /api/auth-v2/* on the Astro Worker
+  -> /api/auth/* on the Astro Worker
   -> allowlisted /api/auth/* endpoint on the API Worker
   -> Observatory-owned Better Auth tables in Observatory D1
 ```
@@ -74,9 +72,8 @@ browser at observatory.santi020k.com
 The upstream `Set-Cookie` response is returned through the dashboard origin, which creates a host-only dashboard cookie.
 Astro's existing server-side API client forwards incoming cookies to the API when it renders a protected page. The proxy
 does not expose arbitrary API paths, accept non-auth methods, create a parent-domain cookie, or share identity state with
-another application. `PUBLIC_AUTH_PILOT_ENABLED` gates the UI and proxy, while the matching `AUTH_PILOT_ENABLED` API
-flag gates the package handler and package-session resolution. Legacy authentication remains the primary login and
-recovery path throughout the pilot.
+another application. The package-backed flow owns primary login, sessions, passkeys, and sign-out; recovery remains an
+explicit application policy.
 
 ## Collection cadence
 

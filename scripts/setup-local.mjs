@@ -30,9 +30,8 @@ const ensureEnvironmentFile = (path, lines) => {
 ensureEnvironmentFile(
   webEnvironmentPath,
   [
-      'PUBLIC_API_URL=http://localhost:8787',
-      'API_INTERNAL_URL=http://localhost:8787',
-    'PUBLIC_AUTH_PILOT_ENABLED=true'
+    'PUBLIC_API_URL=http://localhost:8787',
+    'API_INTERNAL_URL=http://localhost:8787'
   ]
 )
 
@@ -46,7 +45,6 @@ ensureEnvironmentFile(
       'APP_STORE_CONNECT_PRIVATE_KEY=',
       'APP_STORE_CONNECT_REPORT_REQUESTS_JSON=',
       `AUTH_SECRET=${secret}`,
-      'AUTH_PILOT_ENABLED=true',
       'CLOUDFLARE_ACCOUNT_ID=',
       'CLOUDFLARE_API_TOKEN=',
       'CORS_ORIGIN=http://localhost:4321,http://localhost:4322',

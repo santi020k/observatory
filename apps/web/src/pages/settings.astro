@@ -529,7 +529,6 @@ const getCategoryIcon = (
 
               <form
                 class="passkey-create"
-                data-api-url={apiUrl}
                 data-passkey-form
                 data-ui-form
               >
@@ -1014,24 +1013,39 @@ for (const control of projectControls) {
 
 <script>
 import {
-  deletePasskey,
-  listPasskeys,
-  registerPasskey,
-  supportsPasskeys
-} from '@/lib/passkeys'
+  type AuthClientPasskeySummary,
+  createSantiAuthHelpers } from '@santi020k/auth-client'
 
-import type { PasskeyCredential } from '@santi020k/observatory-api-types'
+const auth = createSantiAuthHelpers({
+  basePath: '/api/auth',
+  baseURL: window.location.origin
+})
 
 const passkeyForm = document.querySelector<HTMLFormElement>('[data-passkey-form]')
 const passkeyList = document.querySelector<HTMLElement>('[data-passkey-list]')
 const passkeyCount = document.querySelector<HTMLElement>('[data-passkey-count]')
 const passkeyAlert = document.querySelector<HTMLElement>('[data-passkey-alert]')
-const passkeyApiUrl = passkeyForm?.dataset.apiUrl ?? '/api'
-let passkeys: PasskeyCredential[] = []
 
-const formatPasskeyDate = (value: number | null): string => value === null ?
-  'Not used yet' :
-  `Last used ${new Intl.DateTimeFormat(undefined, {
+const passkeyCreateButton = passkeyForm?.querySelector<HTMLButtonElement>(
+  '[data-passkey-create]'
+)
+
+const passkeyCreateLabel = passkeyForm?.querySelector<HTMLElement>(
+  '[data-passkey-create-label]'
+)
+
+let passkeys: AuthClientPasskeySummary[] = []
+
+const setPasskeyCreationBusy = (busy: boolean): void => {
+  if (passkeyCreateButton) passkeyCreateButton.disabled = busy
+
+  if (passkeyCreateLabel)
+    passkeyCreateLabel.textContent = busy ? 'Creating…' : 'Create passkey'
+}
+
+const formatPasskeyDate = (value: string | null): string => value === null ?
+  'Registration date unavailable' :
+  `Added ${new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short'
   }).format(new Date(value))}`
@@ -1078,9 +1092,11 @@ const renderPasskeys = () => {
 
     details.className = 'passkey-row__details'
 
-    name.textContent = credential.name
+    const credentialName = credential.name ?? 'Unnamed passkey'
 
-    metadata.textContent = formatPasskeyDate(credential.lastUsedAt)
+    name.textContent = credentialName
+
+    metadata.textContent = formatPasskeyDate(credential.createdAt)
 
     remove.className = 'passkey-remove'
 
@@ -1088,13 +1104,15 @@ const renderPasskeys = () => {
 
     remove.textContent = 'Remove'
 
-    remove.setAttribute('aria-label', `Remove ${credential.name}`)
+    remove.setAttribute('aria-label', `Remove ${credentialName}`)
 
     remove.addEventListener('click', async () => {
       remove.disabled = true
 
       try {
-        await deletePasskey(passkeyApiUrl, credential.id)
+        const result = await auth.deletePasskey(credential.id)
+
+        if (!result.ok) throw new Error(result.error.message)
 
         passkeys = passkeys.filter(item => item.id !== credential.id)
 
@@ -1120,7 +1138,11 @@ const renderPasskeys = () => {
 
 const loadPasskeys = async () => {
   try {
-    passkeys = await listPasskeys(passkeyApiUrl)
+    const result = await auth.listPasskeys()
+
+    if (!result.ok) throw new Error(result.error.message)
+
+    passkeys = [...result.data]
 
     renderPasskeys()
   } catch (error) {
@@ -1130,12 +1152,8 @@ const loadPasskeys = async () => {
   }
 }
 
-if (!supportsPasskeys()) {
-  const createButton = passkeyForm?.querySelector<HTMLButtonElement>(
-    '[data-passkey-create]'
-  )
-
-  if (createButton) createButton.disabled = true
+if (!('PublicKeyCredential' in window)) {
+  if (passkeyCreateButton) passkeyCreateButton.disabled = true
 
   showPasskeyMessage('This browser does not support passkeys.', true)
 }
@@ -1143,32 +1161,22 @@ if (!supportsPasskeys()) {
 passkeyForm?.addEventListener('submit', async event => {
   event.preventDefault()
 
-  const button = passkeyForm.querySelector<HTMLButtonElement>(
-    '[data-passkey-create]'
-  )
-
-  const label = passkeyForm.querySelector<HTMLElement>(
-    '[data-passkey-create-label]'
-  )
-
   const name = String(new FormData(passkeyForm).get('name') ?? '').trim()
 
   if (!name) return
 
-  if (button) button.disabled = true
-
-  if (label) label.textContent = 'Creating…'
+  setPasskeyCreationBusy(true)
 
   if (passkeyAlert) passkeyAlert.hidden = true
 
   try {
-    const credential = await registerPasskey(passkeyApiUrl, name)
+    const result = await auth.addPasskey({ name })
 
-    passkeys = [...passkeys, credential]
+    if (!result.ok) throw new Error(result.error.message)
 
     passkeyForm.reset()
 
-    renderPasskeys()
+    await loadPasskeys()
 
     showPasskeyMessage('Passkey created. You can use it on your next sign-in.')
   } catch (error) {
@@ -1176,9 +1184,7 @@ passkeyForm?.addEventListener('submit', async event => {
       error instanceof Error ? error.message : 'Could not create the passkey.', true
     )
   } finally {
-    if (button) button.disabled = false
-
-    if (label) label.textContent = 'Create passkey'
+    setPasskeyCreationBusy(false)
   }
 })
 

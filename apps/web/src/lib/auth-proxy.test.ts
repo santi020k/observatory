@@ -1,20 +1,20 @@
 import { describe, expect, test, vi } from 'vitest'
 
 import {
-  proxyAuthPilotRequest,
-  resolveAuthPilotTarget
-} from './auth-pilot-proxy'
+  proxyAuthRequest,
+  resolveAuthProxyTarget
+} from './auth-proxy'
 
 const siteOrigin = 'https://observatory.example'
 const apiOrigin = 'https://api.observatory.example'
 
-describe('auth pilot proxy', () => {
+describe('auth proxy', () => {
   test('maps an allowed same-origin endpoint to the internal auth handler', () => {
     const request = new Request(
-      `${siteOrigin}/api/auth-v2/get-session?disableCookieCache=true`
+      `${siteOrigin}/api/auth/get-session?disableCookieCache=true`
     )
 
-    expect(resolveAuthPilotTarget(request, apiOrigin)).toEqual({
+    expect(resolveAuthProxyTarget(request, apiOrigin)).toEqual({
       allowedMethods: ['GET'],
       target: new URL(
         `${apiOrigin}/api/auth/get-session?disableCookieCache=true`
@@ -23,20 +23,20 @@ describe('auth pilot proxy', () => {
   })
 
   test('rejects unknown endpoints, unsupported methods, and unsafe origins', () => {
-    expect(resolveAuthPilotTarget(
-      new Request(`${siteOrigin}/api/auth-v2/sign-up/email`, {
+    expect(resolveAuthProxyTarget(
+      new Request(`${siteOrigin}/api/auth/sign-up/email`, {
         method: 'POST'
       }), apiOrigin
     )).toEqual({ allowedMethods: [], target: null })
 
-    expect(resolveAuthPilotTarget(
-      new Request(`${siteOrigin}/api/auth-v2/get-session`, {
+    expect(resolveAuthProxyTarget(
+      new Request(`${siteOrigin}/api/auth/get-session`, {
         method: 'DELETE'
       }), apiOrigin
     )).toEqual({ allowedMethods: ['GET'], target: null })
 
-    expect(resolveAuthPilotTarget(
-      new Request(`${siteOrigin}/api/auth-v2/get-session`),
+    expect(resolveAuthProxyTarget(
+      new Request(`${siteOrigin}/api/auth/get-session`),
       'http://api.observatory.example'
     )).toEqual({ allowedMethods: ['GET'], target: null })
   })
@@ -64,8 +64,8 @@ describe('auth pilot proxy', () => {
       }))
     })
 
-    const response = await proxyAuthPilotRequest(new Request(
-      `${siteOrigin}/api/auth-v2/sign-in/email-otp`, {
+    const response = await proxyAuthRequest(new Request(
+      `${siteOrigin}/api/auth/sign-in/email-otp`, {
         body: JSON.stringify({ email: 'owner@example.com', otp: '123456' }),
         headers: {
           'Content-Type': 'application/json',
@@ -85,8 +85,8 @@ describe('auth pilot proxy', () => {
 
   test('rejects oversized auth payloads before contacting the API', async () => {
     const fetcher = vi.fn<typeof fetch>()
-    const response = await proxyAuthPilotRequest(new Request(
-      `${siteOrigin}/api/auth-v2/sign-in/email-otp`, {
+    const response = await proxyAuthRequest(new Request(
+      `${siteOrigin}/api/auth/sign-in/email-otp`, {
         body: 'x',
         headers: { 'Content-Length': String(128 * 1024 + 1) },
         method: 'POST'

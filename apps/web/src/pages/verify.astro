@@ -2,8 +2,6 @@
 import Brand from '@/components/Brand.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
-import { getBrowserApiUrl } from '@/lib/api'
-
 import Alert from '@santi020k/lumen-astro/components/Alert'
 import Button from '@santi020k/lumen-astro/components/Button'
 import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
@@ -14,7 +12,6 @@ import InputOTP from '@santi020k/lumen-astro/components/InputOTP'
 import Label from '@santi020k/lumen-astro/components/Label'
 import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
 
-const apiUrl = getBrowserApiUrl()
 ---
 
 <AppLayout
@@ -37,9 +34,6 @@ const apiUrl = getBrowserApiUrl()
         </p>
       </div>
 
-      <Alert data-development-code-alert hidden variant="default">
-        Local development code: <strong data-development-code></strong>
-      </Alert>
       <Alert
         aria-atomic="true"
         aria-live="assertive"
@@ -50,7 +44,6 @@ const apiUrl = getBrowserApiUrl()
       />
 
       <form
-        data-api-url={apiUrl}
         data-ui-form
         data-verify-form
       >
@@ -71,14 +64,16 @@ const apiUrl = getBrowserApiUrl()
   </main>
 
   <script>
+  import { createSantiAuthHelpers } from '@santi020k/auth-client'
+
+  const auth = createSantiAuthHelpers({
+    basePath: '/api/auth',
+    baseURL: window.location.origin
+  })
+
   const form = document.querySelector<HTMLFormElement>('[data-verify-form]')
   const alert = document.querySelector<HTMLElement>('[data-form-alert]')
-  const apiUrl = form?.dataset.apiUrl ?? '/api'
   const emailStorageKey = 'observatory:pending-login-email'
-
-  const developmentCodeStorageKey =
-    'observatory:pending-login-development-code'
-
   const email = sessionStorage.getItem(emailStorageKey) ?? ''
 
   const maskEmail = (value: string): string => {
@@ -96,36 +91,6 @@ const apiUrl = getBrowserApiUrl()
   )
 
   if (maskedEmail && email) maskedEmail.textContent = maskEmail(email)
-
-  if (import.meta.env.DEV) {
-    const developmentCode = sessionStorage.getItem(
-      developmentCodeStorageKey
-    )
-
-    const developmentCodeAlert = document.querySelector<HTMLElement>(
-      '[data-development-code-alert]'
-    )
-
-    const developmentCodeValue = document.querySelector<HTMLElement>(
-      '[data-development-code]'
-    )
-
-    if (developmentCode && developmentCodeAlert && developmentCodeValue) {
-      developmentCodeValue.textContent = developmentCode
-
-      developmentCodeAlert.hidden = false
-    }
-  }
-
-  const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
-
-  const readErrorMessage = (value: unknown): string | undefined => {
-    if (!isRecord(value) || !isRecord(value.error)) return undefined
-
-    return typeof value.error.message === 'string' ?
-      value.error.message :
-      undefined
-  }
 
   const setSubmitting = (
     button: HTMLButtonElement | null,
@@ -155,23 +120,11 @@ const apiUrl = getBrowserApiUrl()
   }
 
   const verifyCode = async (code: string) => {
-    const response = await fetch(`${apiUrl}/auth/verify-code`, {
-      body: JSON.stringify({ code, email }),
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST'
-    })
+    const result = await auth.signInWithEmailOtp(email, code)
 
-    const result: unknown = await response.json()
-
-    if (!response.ok)
-      throw new Error(
-        readErrorMessage(result) ?? 'The code could not be verified.'
-      )
+    if (!result.ok) throw new Error(result.error.message)
 
     sessionStorage.removeItem(emailStorageKey)
-
-    sessionStorage.removeItem(developmentCodeStorageKey)
 
     window.location.assign('/dashboard/')
   }

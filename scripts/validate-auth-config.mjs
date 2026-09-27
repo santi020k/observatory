@@ -4,22 +4,14 @@ import { pathToFileURL } from 'node:url'
 
 const localEnvironmentKeys = new Set([
   'API_INTERNAL_URL',
-  'AUTH_PILOT_ENABLED',
   'CORS_ORIGIN',
   'PUBLIC_API_URL',
-  'PUBLIC_AUTH_PILOT_ENABLED',
   'SITE_URL'
 ])
 
-const pilotPathRequirements = {
-  api: {
-    flag: 'AUTH_PILOT_ENABLED',
-    requiredWhenEnabled: ['CORS_ORIGIN', 'SITE_URL']
-  },
-  web: {
-    flag: 'PUBLIC_AUTH_PILOT_ENABLED',
-    requiredWhenEnabled: ['API_INTERNAL_URL', 'PUBLIC_API_URL']
-  }
+const pathRequirements = {
+  api: ['CORS_ORIGIN', 'SITE_URL'],
+  web: ['API_INTERNAL_URL', 'PUBLIC_API_URL']
 }
 
 const isLocalHostname = hostname => hostname === '127.0.0.1' || hostname === 'localhost'
@@ -44,26 +36,6 @@ const parseOrigin = value => {
   }
 }
 
-const readPilotFlags = environment => {
-  const publicFlag = environment.PUBLIC_AUTH_PILOT_ENABLED ?? 'false'
-  const apiFlag = environment.AUTH_PILOT_ENABLED ?? 'false'
-  const invalidKeys = []
-
-  if (!['false', 'true'].includes(publicFlag))
-    invalidKeys.push('PUBLIC_AUTH_PILOT_ENABLED')
-
-  if (!['false', 'true'].includes(apiFlag))
-    invalidKeys.push('AUTH_PILOT_ENABLED')
-
-  if (publicFlag !== apiFlag)
-    invalidKeys.push('AUTH_PILOT_ENABLED', 'PUBLIC_AUTH_PILOT_ENABLED')
-
-  return {
-    enabled: publicFlag === 'true' && apiFlag === 'true',
-    invalidKeys
-  }
-}
-
 const readLocalEnvironmentFile = path => {
   if (!existsSync(path)) return {}
 
@@ -78,7 +50,7 @@ const readLocalEnvironmentFile = path => {
     .filter(([key]) => localEnvironmentKeys.has(key)))
 }
 
-export const loadAuthPilotEnvironment = (
+export const loadAuthEnvironment = (
   processEnvironment,
   rootDirectory = resolve(import.meta.dirname, '..')
 ) => ({
@@ -87,15 +59,7 @@ export const loadAuthPilotEnvironment = (
   ...processEnvironment
 })
 
-export const validateAuthPilotEnvironment = environment => {
-  const { enabled, invalidKeys } = readPilotFlags(environment)
-
-  if (!enabled) return {
-    enabled: false,
-    invalidKeys: [...new Set(invalidKeys)].sort(),
-    valid: invalidKeys.length === 0
-  }
-
+export const validateAuthEnvironment = environment => {
   const apiInternalOrigin = parseOrigin(environment.API_INTERNAL_URL)
   const publicApiOrigin = parseOrigin(environment.PUBLIC_API_URL)
   const siteOrigin = parseOrigin(environment.SITE_URL)
@@ -113,35 +77,26 @@ export const validateAuthPilotEnvironment = environment => {
     ['SITE_URL', siteOrigin !== null]
   ]
 
-  invalidKeys.push(...checks
+  const invalidKeys = checks
     .filter(([, valid]) => !valid)
-    .map(([key]) => key))
+    .map(([key]) => key)
 
   return {
-    enabled: true,
     invalidKeys: [...new Set(invalidKeys)].sort(),
     valid: invalidKeys.length === 0
   }
 }
 
-export const validateAuthPilotPath = (environment, path) => {
-  const requirements = pilotPathRequirements[path]
+export const validateAuthPath = (environment, path) => {
+  const required = pathRequirements[path]
 
-  if (!requirements) throw new TypeError(`Unknown auth pilot path: ${path}`)
+  if (!required) throw new TypeError(`Unknown auth path: ${path}`)
 
-  const flag = environment[requirements.flag]
-  const invalidKeys = []
+  const invalidKeys = required.filter(key =>
+    typeof environment[key] !== 'string' || environment[key].trim() === ''
+  )
 
-  if (!['false', 'true'].includes(flag)) invalidKeys.push(requirements.flag)
-
-  if (flag === 'true') invalidKeys.push(...requirements.requiredWhenEnabled
-    .filter(key => typeof environment[key] !== 'string' || environment[key].trim() === ''))
-
-  return {
-    enabled: flag === 'true',
-    invalidKeys,
-    valid: invalidKeys.length === 0
-  }
+  return { invalidKeys, valid: invalidKeys.length === 0 }
 }
 
 const run = () => {
@@ -151,25 +106,20 @@ const run = () => {
   const path = pathArgument?.slice('--path='.length)
 
   const result = path ?
-    validateAuthPilotPath(process.env, path) :
-    validateAuthPilotEnvironment(loadAuthPilotEnvironment(process.env))
+    validateAuthPath(process.env, path) :
+    validateAuthEnvironment(loadAuthEnvironment(process.env))
 
   if (!result.valid) {
-    console.error(
-      `Invalid auth pilot configuration: ${result.invalidKeys.join(', ')}`
-    )
+    console.error(`Invalid auth configuration: ${result.invalidKeys.join(', ')}`)
 
     process.exitCode = 1
 
     return
   }
 
-  let message = 'Auth pilot is disabled.\n'
-
-  if (path) message = `Auth pilot ${path} path is valid.\n`
-  else if (result.enabled) message = 'Auth pilot configuration is complete.\n'
-
-  process.stdout.write(message)
+  process.stdout.write(
+    path ? `Auth ${path} path is valid.\n` : 'Auth configuration is complete.\n'
+  )
 }
 
 if (
