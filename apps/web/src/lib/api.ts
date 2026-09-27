@@ -4,7 +4,6 @@ import type {
   Dashboard,
   ProjectDashboard,
   ProjectSettings,
-  SessionResponse,
   StoreAnalytics
 } from '@santi020k/observatory-api-types'
 
@@ -29,7 +28,7 @@ export interface FeedbackProjectsResponse {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/$/, '')
 
-export const getBrowserApiUrl = (): string => trimTrailingSlash(import.meta.env.PUBLIC_API_URL ?? '/api')
+export const getBrowserApiUrl = (): string => '/api/backend'
 
 export const getServerApiUrl = (requestUrl: URL): string => {
   const configured =
@@ -57,13 +56,6 @@ const requestFromApi = async (
 
   return Object.assign(response, { parsed })
 }
-
-export const getSession = async (
-  request: Request,
-  requestUrl: URL
-): Promise<ApiResponse<SessionResponse>> => (await requestFromApi(
-  '/auth/session', request, requestUrl
-)) as ApiResponse<SessionResponse>
 
 export const getDashboard = async (
   request: Request,

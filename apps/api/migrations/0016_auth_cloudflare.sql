@@ -1,6 +1,5 @@
--- Better Auth owns these application-local tables. The existing Observatory
--- authentication tables remain in place for the compatibility and recovery
--- paths during the staged cutover.
+-- Better Auth owns these application-local tables. Existing Observatory
+-- authentication tables remain untouched for rollback and recovery safety.
 CREATE TABLE IF NOT EXISTS "user" (
   "id" TEXT PRIMARY KEY NOT NULL,
   "name" TEXT NOT NULL,

@@ -10,16 +10,7 @@ import { sendLoginCode } from './email'
 
 const COOKIE_PREFIX = 'observatory-owner'
 
-export const isObservatoryOwnerAuthEnabled = (
-  environment: WorkerEnv['Bindings']
-): boolean => {
-  const enabled = environment.AUTH_PILOT_ENABLED ?? 'false'
-
-  if (enabled !== 'true' && enabled !== 'false')
-    throw new Error('AUTH_PILOT_ENABLED must be either true or false')
-
-  return enabled === 'true'
-}
+type WaitUntil = (task: Promise<void>) => void
 
 const resolveAuthServerURL = (context: Context<WorkerEnv>): string => {
   const requestUrl = new URL(context.req.url)
@@ -35,27 +26,45 @@ const resolveAuthServerURL = (context: Context<WorkerEnv>): string => {
   return `http://${applicationUrl.hostname}:8787`
 }
 
-export const createObservatoryOwnerAuth = (
-  context: Context<WorkerEnv>
+const createObservatoryOwnerAuthRuntime = (
+  env: WorkerEnv['Bindings'],
+  baseURL: string,
+  waitUntil: WaitUntil
 ): OwnerAuthInstance => createOwnerAuth({
   appName: 'Observatory',
-  applicationOrigin: new URL(context.env.SITE_URL).origin,
-  authServerURL: resolveAuthServerURL(context),
+  baseURL,
   basePath: '/api/auth',
+  browserOrigin: new URL(env.SITE_URL).origin,
   cookiePrefix: COOKIE_PREFIX,
-  database: context.env.DB,
-  ownerEmail: context.env.OWNER_EMAIL,
-  secret: context.env.AUTH_SECRET,
+  database: env.DB,
+  ownerEmail: env.OWNER_EMAIL,
+  secret: env.AUTH_SECRET,
   sendVerificationOTP: async ({ email, otp }) => {
-    const result = await sendLoginCode(context.env, email, otp)
+    const result = await sendLoginCode(env, email, otp)
 
     if (result.developmentCode)
       throw new Error('auth_package_local_email_delivery_unavailable')
   },
-  waitUntil: task => {
+  waitUntil
+})
+
+export const createObservatoryOwnerAuth = (
+  context: Context<WorkerEnv>
+): OwnerAuthInstance => createObservatoryOwnerAuthRuntime(
+  context.env,
+  resolveAuthServerURL(context),
+  task => {
     context.executionCtx.waitUntil(task)
   }
-})
+)
+
+export const pruneObservatoryOwnerAuthRateLimits = async (
+  env: WorkerEnv['Bindings']
+): Promise<number> => await createObservatoryOwnerAuthRuntime(
+  env,
+  new URL(env.SITE_URL).origin,
+  () => undefined
+).pruneRateLimits()
 
 const handleObservatoryOwnerAuthRequest = (
   context: Context<WorkerEnv>,
@@ -81,28 +90,9 @@ export const handleObservatoryOwnerAuth = (
   context, context.req.raw
 )
 
-export const logoutObservatoryOwnerAuth = (
-  context: Context<WorkerEnv>
-): Promise<Response> => {
-  if (!isObservatoryOwnerAuthEnabled(context.env))
-    return Promise.resolve(Response.json({ success: true }))
-
-  const requestUrl = new URL('/api/auth/sign-out', context.req.url)
-  const headers = new Headers(context.req.raw.headers)
-
-  headers.set('Origin', new URL(context.env.SITE_URL).origin)
-
-  return handleObservatoryOwnerAuthRequest(context, new Request(requestUrl, {
-    headers,
-    method: 'POST'
-  }))
-}
-
 export const resolveOwnerAuthSession = async (
   context: Context<WorkerEnv>
 ): Promise<string | null> => {
-  if (!isObservatoryOwnerAuthEnabled(context.env)) return null
-
   const session = await createObservatoryOwnerAuth(context).resolveSession(
     context.req.raw.headers
   )

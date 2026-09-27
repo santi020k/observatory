@@ -2,11 +2,8 @@
 import Brand from '@/components/Brand.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
-import { getBrowserApiUrl } from '@/lib/api'
-
 import Alert from '@santi020k/lumen-astro/components/Alert'
 import Button from '@santi020k/lumen-astro/components/Button'
-import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
 import Card from '@santi020k/lumen-astro/components/Card'
 import Field from '@santi020k/lumen-astro/components/Field'
 import Icon from '@santi020k/lumen-astro/components/Icon'
@@ -14,8 +11,6 @@ import Input from '@santi020k/lumen-astro/components/Input'
 import Label from '@santi020k/lumen-astro/components/Label'
 import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
 
-const apiUrl = getBrowserApiUrl()
-const authPilotEnabled = import.meta.env.PUBLIC_AUTH_PILOT_ENABLED === 'true'
 ---
 
 <AppLayout
@@ -62,7 +57,7 @@ const authPilotEnabled = import.meta.env.PUBLIC_AUTH_PILOT_ENABLED === 'true'
           variant="destructive"
         />
 
-        <form data-api-url={apiUrl} data-login-form data-ui-form>
+        <form data-login-form data-ui-form>
           <Field>
             <Label for="email">Email address</Label>
             <Input
@@ -122,23 +117,19 @@ const authPilotEnabled = import.meta.env.PUBLIC_AUTH_PILOT_ENABLED === 'true'
           <Icon aria-hidden="true" name="shield" /> No password stored. This
           device stays signed in for up to 30 days.
         </p>
-        {
-          authPilotEnabled && (
-            <ButtonLink href="/auth-pilot/" variant="inline">
-              Try the isolated package pilot
-              <Icon aria-hidden="true" name="arrow-right" />
-            </ButtonLink>
-          )
-        }
       </Card>
     </section>
   </main>
 
   <script>
-  import {
-    authenticateWithPasskey,
-    supportsPasskeys
-  } from '@/lib/passkeys'
+  import { normalizePasskeyError } from '@/lib/auth-errors'
+
+  import { createSantiAuthHelpers } from '@santi020k/auth-client'
+
+  const auth = createSantiAuthHelpers({
+    basePath: '/api/auth',
+    baseURL: window.location.origin
+  })
 
   const loginForm = document.querySelector<HTMLFormElement>('[data-login-form]')
   const authOptions = document.querySelector<HTMLElement>('[data-auth-options]')
@@ -166,21 +157,17 @@ const authPilotEnabled = import.meta.env.PUBLIC_AUTH_PILOT_ENABLED === 'true'
   )
 
   const alert = document.querySelector<HTMLElement>('[data-form-alert]')
-  const apiUrl = loginForm?.dataset.apiUrl ?? '/api'
-  const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
-
-  const readString = (value: unknown, key: string): string | undefined => {
-    if (!isRecord(value)) return undefined
-
-    const field = value[key]
-
-    return typeof field === 'string' ? field : undefined
-  }
 
   const readErrorMessage = (value: unknown): string | undefined => {
+    const isRecord = (candidate: unknown): candidate is Record<string, unknown> => typeof candidate === 'object' && candidate !== null
+
     if (!isRecord(value)) return undefined
 
-    return readString(value.error, 'message')
+    const error = value.error
+
+    return isRecord(error) && typeof error.message === 'string' ?
+      error.message :
+      undefined
   }
 
   const displayError = (error: unknown, fallback: string) => {
@@ -204,8 +191,6 @@ const authPilotEnabled = import.meta.env.PUBLIC_AUTH_PILOT_ENABLED === 'true'
     else loginForm?.querySelector<HTMLInputElement>('input')?.focus()
   }
 
-  if (!supportsPasskeys()) passkeyButton?.setAttribute('hidden', '')
-
   showRecovery?.addEventListener('click', () => toggleRecovery(true))
 
   hideRecovery?.addEventListener('click', () => toggleRecovery(false))
@@ -226,6 +211,9 @@ const authPilotEnabled = import.meta.env.PUBLIC_AUTH_PILOT_ENABLED === 'true'
     if (label) label.textContent = submitting ? submittingLabel : idleLabel
   }
 
+  if (!('PublicKeyCredential' in window))
+    passkeyButton?.setAttribute('hidden', '')
+
   loginForm?.addEventListener('submit', async event => {
     event.preventDefault()
 
@@ -243,31 +231,11 @@ const authPilotEnabled = import.meta.env.PUBLIC_AUTH_PILOT_ENABLED === 'true'
     if (alert) alert.hidden = true
 
     try {
-      const response = await fetch(`${apiUrl}/auth/request-code`, {
-        body: JSON.stringify({ email }),
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST'
-      })
+      const result = await auth.requestEmailOtp(email)
 
-      const result: unknown = await response.json()
-
-      if (!response.ok) {
-        throw new Error(readErrorMessage(result) ?? 'Could not send the code.')
-      }
-
-      const developmentCode = readString(result, 'developmentCode')
+      if (!result.ok) throw new Error(result.error.message)
 
       sessionStorage.setItem('observatory:pending-login-email', email)
-
-      if (developmentCode)
-        sessionStorage.setItem(
-          'observatory:pending-login-development-code', developmentCode
-        )
-      else
-        sessionStorage.removeItem(
-          'observatory:pending-login-development-code'
-        )
 
       window.location.assign('/verify/')
     } catch (error) {
@@ -287,7 +255,10 @@ const authPilotEnabled = import.meta.env.PUBLIC_AUTH_PILOT_ENABLED === 'true'
     if (alert) alert.hidden = true
 
     try {
-      await authenticateWithPasskey(apiUrl)
+      const result = await auth.signInWithPasskey()
+
+      if (!result.ok)
+        throw normalizePasskeyError(result.error, 'authentication')
 
       window.location.assign('/dashboard/')
     } catch (error) {
@@ -317,7 +288,7 @@ const authPilotEnabled = import.meta.env.PUBLIC_AUTH_PILOT_ENABLED === 'true'
     if (alert) alert.hidden = true
 
     try {
-      const response = await fetch(`${apiUrl}/auth/recovery`, {
+      const response = await fetch('/api/recovery', {
         body: JSON.stringify({ passcode }),
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

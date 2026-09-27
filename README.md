@@ -69,8 +69,9 @@ pnpm db:migrate:local
 pnpm dev
 ```
 
-Open `http://localhost:4321/login/` and use `hi@santi020k.com`. Without a Resend key, the local
-verification code is shown on the verification screen. Run the first sync from the dashboard.
+Open `http://localhost:4321/login/` and use `hi@santi020k.com`. Configure a development Resend key
+to receive the verification code; the shared Auth library never returns or logs plaintext codes.
+Run the first sync from the dashboard.
 
 The web app runs on `4321`; the API runs on `8787`.
 
@@ -120,13 +121,11 @@ Set `CORS_ORIGIN` to the dashboard origin. Configure the web app with
 `PUBLIC_API_URL=https://api.observatory.santi020k.com`; use the same URL for `API_INTERNAL_URL` so
 server-side requests reach the API directly.
 
-The package-authentication pilot is disabled unless the API environment sets `AUTH_PILOT_ENABLED=true` and the web
-environment sets `PUBLIC_AUTH_PILOT_ENABLED=true`. The verification gate rejects drift between the flags. When enabled,
-the dashboard exposes only the reviewed pilot endpoints through
-same-origin `/api/auth-v2/*` requests. The web Worker forwards them to the existing API-owned `/api/auth/*` handler, so
-the browser keeps a host-only dashboard cookie and server-rendered pages can forward it to the API. Do not replace this
-with a parent-domain cookie. See [the package-authentication pilot runbook](docs/auth-package-pilot.md) before enabling
-the flag outside local development.
+Authentication uses the published `@santi020k/auth-cloudflare` and `@santi020k/auth-client` packages. The browser calls
+the narrow same-origin `/api/auth/*` proxy, which forwards approved endpoints to the API-owned handler. This keeps the
+session cookie host-only to the dashboard while allowing server-rendered pages to forward it to the API. Browser-side
+dashboard actions use a separate same-origin backend proxy for the same reason. Do not replace these boundaries with a
+parent-domain cookie.
 
 Release-relevant pull requests include a Changeset. On the release branch, run
 `pnpm release:version` to consume the pending files and update every private workspace package as
@@ -241,24 +240,20 @@ their own license terms. See [LICENSE](LICENSE).
 Issues and pull requests are welcome under the repository's contribution terms. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Authentication migration
+## Authentication
 
-Observatory has begun a staged migration to
-[`@santi020k/auth-cloudflare`](https://www.npmjs.com/package/@santi020k/auth-cloudflare). The API mounts the new,
-application-local Better Auth handler at `/api/auth/*` and accepts its sessions for owner-only API routes. Migration
-`0016_auth_cloudflare.sql` adds the package tables to Observatory's existing D1 database; it does not modify or remove
-the legacy authentication tables.
+Observatory uses the published [`@santi020k/auth-cloudflare`](https://www.npmjs.com/package/@santi020k/auth-cloudflare)
+server policy and `@santi020k/auth-client` browser helpers for email-code authentication, sessions, passkeys, and
+sign-out. The API mounts the application-local Better Auth handler at `/api/auth/*`; the web application exposes only
+the endpoints its authentication UI needs through a bounded same-origin proxy. Migration `0016_auth_cloudflare.sql`
+owns the package tables in Observatory's D1 database.
 
-The existing `/auth/*` email, passkey, session, logout, and `OWNER_PASSCODE` recovery routes remain active during the
-compatibility window. In particular, recovery policy and existing passkeys stay owned by Observatory and are not
-copied into the package tables. Each consumer of the public package must continue to use its own database, secret,
-cookie prefix, origins, passkeys, and recovery behavior.
-
-The primary browser UI has not switched to the new handler. An opt-in `/auth-pilot/` surface uses a narrow same-origin
-proxy so its package cookie remains host-only to `observatory.santi020k.com`; Astro forwards that cookie to the API when
-rendering protected pages. The legacy login, recovery, cookies, routes, and tables remain unchanged. Keep the pilot
-disabled in production until its immutable package candidate, configuration preflight, deployment review, and runbook
-are ready. Do not retire legacy authentication until all real-origin evidence is recorded.
+The `OWNER_PASSCODE` emergency recovery route remains consumer-owned because the reusable library deliberately does not
+choose account-recovery policy. A successful recovery continues to issue a compatibility session. Legacy email-code
+and passkey endpoints are no longer mounted, and their tables remain untouched for rollback and data-safety purposes.
+The compatibility session restores protected dashboard access but does not authorize primary credential changes. Use
+the email-code fallback to establish a package session before adding, renaming, or removing passkeys. Every consumer
+still owns its database, secret, cookie prefix, origins, passkeys, and recovery policy.
 
 ## License
 

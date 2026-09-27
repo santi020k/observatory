@@ -1,6 +1,6 @@
 {
   "name": "@santi020k/observatory-api",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,7 +17,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@santi020k/auth-cloudflare": "file:../../vendor/auth-v0.4.0/santi020k-auth-cloudflare-0.4.0.tgz",
+    "@santi020k/auth-cloudflare": "catalog:",
     "@santi020k/observatory-api-types": "workspace:*",
     "@santi020k/observatory-catalog": "workspace:*",
     "@santi020k/observatory-db": "workspace:*",

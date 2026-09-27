@@ -85,6 +85,13 @@ const {
 </header>
 
 <script>
+import { createSantiAuthHelpers } from '@santi020k/auth-client'
+
+const auth = createSantiAuthHelpers({
+  basePath: '/api/auth',
+  baseURL: window.location.origin
+})
+
 const syncButtons =
   document.querySelectorAll<HTMLButtonElement>('[data-sync-button]')
 
@@ -290,12 +297,15 @@ logoutButton?.addEventListener('click', async () => {
   if (headerStatus) headerStatus.textContent = 'Signing out.'
 
   try {
-    const response = await fetch(`${apiUrl}/auth/logout`, {
-      credentials: 'include',
-      method: 'POST'
+    const result = await auth.signOut()
+
+    if (!result.ok) throw new Error(result.error.message)
+
+    const recoveryResponse = await fetch('/api/recovery', {
+      method: 'DELETE'
     })
 
-    if (!response.ok) throw new Error('Sign out failed')
+    if (!recoveryResponse.ok) throw new Error('Recovery sign out failed')
 
     window.location.assign('/login/')
   } catch {
