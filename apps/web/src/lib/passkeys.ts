@@ -96,6 +96,10 @@ const fallbackMessage = (operation: PasskeyOperation): string => operation === '
   'Your passkey wasn’t added. Try again or use a different device.' :
   'We couldn’t sign you in. Try again or use the code sent to your email.'
 
+const siteMismatchMessage = (operation: PasskeyOperation): string => operation === 'registration' ?
+  'Passkeys can’t be added right now because this site’s passkey configuration is unavailable. Try again later.' :
+  'Passkeys aren’t available right now. Use the code sent to your email instead.'
+
 export const normalizePasskeyError = (
   error: unknown,
   operation: PasskeyOperation
@@ -105,7 +109,7 @@ export const normalizePasskeyError = (
   if (matchesDiagnostic(
     diagnostic,
     ['NotAllowedError'],
-    ['ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY']
+    []
   )) {
     return new PasskeyOperationError(
       'passkey_cancelled_or_timed_out',
@@ -122,7 +126,7 @@ export const normalizePasskeyError = (
   )) {
     return new PasskeyOperationError(
       'passkey_site_mismatch',
-      'Passkeys aren’t available right now. Use the code sent to your email instead.',
+      siteMismatchMessage(operation),
       diagnostic,
       error
     )

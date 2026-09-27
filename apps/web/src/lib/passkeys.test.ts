@@ -38,6 +38,24 @@ describe('passkey error presentation', () => {
     )
   })
 
+  test('does not treat every wrapped browser failure as a cancellation', () => {
+    const cause = new DOMException(
+      'The authenticator could not process the request.',
+      'UnknownError'
+    )
+    const error = Object.assign(new Error(cause.message), {
+      cause,
+      code: 'ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY'
+    })
+
+    const normalized = normalizePasskeyError(error, 'authentication')
+
+    expect(normalized.code).toBe('passkey_operation_failed')
+    expect(normalized.message).toBe(
+      'We couldn’t sign you in. Try again or use the code sent to your email.'
+    )
+  })
+
   test('separates site configuration failures from their technical cause', () => {
     const error = Object.assign(
       new Error('The RP ID is invalid for this domain'),
@@ -55,5 +73,20 @@ describe('passkey error presentation', () => {
     expect(normalized.diagnostic.message).toBe(
       'The RP ID is invalid for this domain'
     )
+  })
+
+  test('uses registration-specific guidance for site configuration failures', () => {
+    const error = new DOMException(
+      'The RP ID is invalid for this domain',
+      'SecurityError'
+    )
+
+    const normalized = normalizePasskeyError(error, 'registration')
+
+    expect(normalized.code).toBe('passkey_site_mismatch')
+    expect(normalized.message).toBe(
+      'Passkeys can’t be added right now because this site’s passkey configuration is unavailable. Try again later.'
+    )
+    expect(normalized.message).not.toContain('email')
   })
 })
