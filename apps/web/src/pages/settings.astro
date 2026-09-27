@@ -542,7 +542,7 @@ const getCategoryIcon = (
                     required
                   />
                 </Field>
-                <Button data-passkey-create type="submit">
+                <Button data-passkey-create disabled type="submit">
                   <Icon aria-hidden="true" name="key-round" />
                   <span data-passkey-create-label>Create passkey</span>
                 </Button>
@@ -1040,9 +1040,11 @@ const passkeyCreateLabel = passkeyForm?.querySelector<HTMLElement>(
 )
 
 let passkeys: AuthClientPasskeySummary[] = []
+let canManagePasskeys = false
 
 const setPasskeyCreationBusy = (busy: boolean): void => {
-  if (passkeyCreateButton) passkeyCreateButton.disabled = busy
+  if (passkeyCreateButton)
+    passkeyCreateButton.disabled = busy || !canManagePasskeys
 
   if (passkeyCreateLabel)
     passkeyCreateLabel.textContent = busy ? 'Creating…' : 'Create passkey'
@@ -1157,14 +1159,10 @@ const loadPasskeys = async () => {
   }
 }
 
-if (!('PublicKeyCredential' in window)) {
-  if (passkeyCreateButton) passkeyCreateButton.disabled = true
-
-  showPasskeyMessage('This browser does not support passkeys.', true)
-}
-
 passkeyForm?.addEventListener('submit', async event => {
   event.preventDefault()
+
+  if (!canManagePasskeys) return
 
   const name = String(new FormData(passkeyForm).get('name') ?? '').trim()
 
@@ -1199,5 +1197,40 @@ passkeyForm?.addEventListener('submit', async event => {
   }
 })
 
-loadPasskeys()
+const initializePasskeys = async (): Promise<void> => {
+  if (!('PublicKeyCredential' in window)) {
+    showPasskeyMessage('This browser does not support passkeys.', true)
+
+    return
+  }
+
+  const session = await auth.getSession()
+
+  if (!session.ok || !session.data) {
+    if (passkeyCount) passkeyCount.textContent = 'Recovery access'
+
+    if (passkeyList) {
+      const guidance = document.createElement('p')
+
+      guidance.textContent = 'Sign in with an email code to manage passkeys.'
+
+      passkeyList.replaceChildren(guidance)
+    }
+
+    showPasskeyMessage(
+      'Recovery access does not authorize credential changes. Sign out, then use an email code to manage passkeys.',
+      true
+    )
+
+    return
+  }
+
+  canManagePasskeys = true
+
+  setPasskeyCreationBusy(false)
+
+  await loadPasskeys()
+}
+
+void initializePasskeys()
 </script>

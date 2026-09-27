@@ -251,7 +251,9 @@ owns the package tables in Observatory's D1 database.
 The `OWNER_PASSCODE` emergency recovery route remains consumer-owned because the reusable library deliberately does not
 choose account-recovery policy. A successful recovery continues to issue a compatibility session. Legacy email-code
 and passkey endpoints are no longer mounted, and their tables remain untouched for rollback and data-safety purposes.
-Every consumer still owns its database, secret, cookie prefix, origins, passkeys, and recovery policy.
+The compatibility session restores protected dashboard access but does not authorize primary credential changes. Use
+the email-code fallback to establish a package session before adding, renaming, or removing passkeys. Every consumer
+still owns its database, secret, cookie prefix, origins, passkeys, and recovery policy.
 
 ## License
 

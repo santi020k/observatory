@@ -17,6 +17,8 @@
 
 - Preserved existing authentication tables and recovery sessions for rollback safety while moving
   primary authentication to the application-local Auth tables already deployed in D1.
+- Kept emergency recovery sessions isolated from package-owned credential changes; owners use the
+  email-code fallback before managing replacement passkeys.
 - Removed obsolete vendored package archives and their bundle-validation surface in favor of exact
   published Auth 0.5 dependencies.
 

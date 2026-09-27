@@ -55,7 +55,9 @@ GitHub App / commercial sources
 5. Resend delivers the code. Plaintext codes are never returned or logged, including locally.
 6. A verified code or passkey creates a 30-day opaque, HttpOnly session.
 7. The server-only `OWNER_PASSCODE` route remains a separate, consumer-owned recovery boundary;
-   its HMAC-hashed rate-limit identities never store raw IP addresses.
+   its HMAC-hashed rate-limit identities never store raw IP addresses. Recovery sessions restore
+   protected application access but cannot mutate package-owned credentials; the email-code fallback
+   creates the package session required for passkey management.
 
 ### Split-origin authentication
 
