@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.1 - 2026-09-27
+
+### Added
+
+- Added Google Play analytics collection for the verified RoadScore Android listing.
+- Recorded verified and pending production evidence for the isolated Auth v0.4 pilot without
+  including sensitive authentication data.
+
+### Changed
+
+- Replaced raw passkey ceremony failures with actionable sign-in and registration guidance while
+  retaining technical diagnostics outside user-facing copy.
+
 ## 0.4.0 - 2026-09-26
 
 ### Added
