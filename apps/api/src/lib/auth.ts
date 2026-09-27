@@ -12,7 +12,10 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 
 import type { WorkerEnv } from '../env'
 
-import { resolveOwnerAuthSession } from './auth-cloudflare'
+import {
+  pruneObservatoryOwnerAuthRateLimits,
+  resolveOwnerAuthSession
+} from './auth-cloudflare'
 import { generateToken, hashValue, safeEqual } from './crypto'
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
@@ -168,4 +171,6 @@ export const cleanupAuth = async (
   env: WorkerEnv['Bindings']
 ): Promise<void> => {
   await cleanupExpiredAuth(createDb(env.DB), Date.now())
+
+  await pruneObservatoryOwnerAuthRateLimits(env)
 }

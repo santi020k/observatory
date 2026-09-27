@@ -35,9 +35,28 @@ export const resolveBackendTarget = (
 
   if (!requestUrl.pathname.startsWith(prefix)) return null
 
-  const path = requestUrl.pathname.slice(prefix.length)
+  let path: string
 
-  if (!path || path.split('/').includes('..')) return null
+  try {
+    path = decodeURIComponent(requestUrl.pathname.slice(prefix.length))
+  } catch {
+    return null
+  }
+
+  if (/%(?:25|2e|2f|5c)/iu.test(path)) return null
+
+  const segments = path
+    .replaceAll('\\', '/')
+    .split('/')
+    .filter(Boolean)
+    .map(segment => segment.toLowerCase())
+
+  if (
+    segments.length === 0 ||
+    segments.includes('..') ||
+    segments[0] === 'auth' ||
+    (segments[0] === 'api' && segments[1] === 'auth')
+  ) return null
 
   const target = new URL(`/${path}`, apiOrigin)
 

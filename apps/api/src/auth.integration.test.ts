@@ -5,8 +5,10 @@ import type { WorkerEnv } from './env'
 
 const mocks = vi.hoisted(() => {
   const packageSession = { active: false }
+  const pruneRateLimits = vi.fn(() => Promise.resolve(0))
 
   return {
+    cleanupExpiredAuth: vi.fn(),
     consumeAuthCode: vi.fn(),
     countRecentFailedAuthAttempts: vi.fn(),
     countRecentAuthCodes: vi.fn(),
@@ -28,6 +30,7 @@ const mocks = vi.hoisted(() => {
         return Response.json({ authenticated: false })
       }),
       policy: { authServerOrigin: 'https://localhost' },
+      pruneRateLimits,
       resolveSession: vi.fn((_headers: Headers) => Promise.resolve(
         packageSession.active ?
           { email: 'owner@example.com', userId: 'owner-user-id' } :
@@ -40,6 +43,7 @@ const mocks = vi.hoisted(() => {
     insertAuthCode: vi.fn(),
     insertSession: vi.fn(),
     packageSession,
+    pruneRateLimits,
     recordAuthAttempt: vi.fn(),
     recordCodeAttempt: vi.fn(),
     reportError: vi.fn(),
@@ -50,6 +54,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('@santi020k/observatory-db', async importOriginal => ({
   ...(await importOriginal()),
+  cleanupExpiredAuth: mocks.cleanupExpiredAuth,
   consumeAuthCode: mocks.consumeAuthCode,
   countRecentFailedAuthAttempts: mocks.countRecentFailedAuthAttempts,
   countRecentAuthCodes: mocks.countRecentAuthCodes,
@@ -72,18 +77,34 @@ vi.mock('./lib/email', () => ({
 }))
 
 const { app } = await import('./index')
-const { requireAuth } = await import('./lib/auth')
+const { cleanupAuth, requireAuth } = await import('./lib/auth')
+
+const unavailableDatabaseMethod = (): never => {
+  throw new Error('The integration test database is mocked at the module boundary.')
+}
+
+const unavailableAsyncDatabaseMethod = (): Promise<never> => Promise.reject(
+  new Error('The integration test database is mocked at the module boundary.')
+)
+
+const database: D1Database = {
+  batch: unavailableAsyncDatabaseMethod,
+  dump: unavailableAsyncDatabaseMethod,
+  exec: unavailableAsyncDatabaseMethod,
+  prepare: unavailableDatabaseMethod,
+  withSession: unavailableDatabaseMethod
+}
 
 const environment = {
   AUTH_SECRET: 'test-auth-secret-that-is-long-enough',
   OWNER_PASSCODE: 'private-test-code',
   CORS_ORIGIN: 'https://observatory.example',
-  DB: {},
+  DB: database,
   ENVIRONMENT: 'production',
   MAIL_FROM: 'Observatory <observatory@example.com>',
   OWNER_EMAIL: 'owner@example.com',
   SITE_URL: 'https://observatory.example'
-}
+} satisfies WorkerEnv['Bindings']
 
 const executionContext = {
   passThroughOnException: vi.fn(),
@@ -115,14 +136,23 @@ beforeEach(() => {
   mocks.packageSession.active = false
 
   mocks.consumeAuthCode.mockResolvedValue(true)
+  mocks.cleanupExpiredAuth.mockResolvedValue(undefined)
   mocks.countRecentAuthCodes.mockResolvedValue(0)
   mocks.countRecentFailedAuthAttempts.mockResolvedValue(0)
 
   mocks.sendLoginCode.mockResolvedValue({})
+  mocks.pruneRateLimits.mockResolvedValue(0)
   mocks.tryInsertAuthCodeRequest.mockResolvedValue(true)
 })
 
 describe('owner authentication flow', () => {
+  test('prunes legacy and package-owned authentication state', async () => {
+    await cleanupAuth(environment)
+
+    expect(mocks.cleanupExpiredAuth).toHaveBeenCalledOnce()
+    expect(mocks.pruneRateLimits).toHaveBeenCalledOnce()
+  })
+
   test('configures the shared auth handler for Observatory split origins', async () => {
     const response = await app.request(
       '/api/auth/get-session', {
@@ -152,6 +182,7 @@ describe('owner authentication flow', () => {
     const auth = {
       handler: vi.fn(() => Response.json({ authenticated: false })),
       policy: { authServerOrigin: 'https://localhost' },
+      pruneRateLimits: mocks.pruneRateLimits,
       resolveSession: vi.fn((_headers: Headers) => Promise.resolve({
         email: environment.OWNER_EMAIL,
         userId: 'owner-user-id'

@@ -50,6 +50,28 @@ describe('backend proxy', () => {
     expect(fetcher).toHaveBeenCalledOnce()
   })
 
+  test('cannot tunnel around the dedicated authentication proxy', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+    const blockedPaths = [
+      'api/auth/update-user',
+      'auth/recovery',
+      'api%2Fauth/sign-up',
+      'api%252Fauth/sign-out'
+    ]
+
+    for (const path of blockedPaths) {
+      const request = new Request(`${siteOrigin}/api/backend/${path}`)
+
+      expect(resolveBackendTarget(request, apiOrigin)).toBeNull()
+
+      const response = await proxyBackendRequest(request, apiOrigin, fetcher)
+
+      expect(response.status).toBe(404)
+    }
+
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
   test('rejects invalid origins and oversized bodies', async () => {
     expect(resolveBackendTarget(
       new Request(`${siteOrigin}/api/backend/dashboard`),
