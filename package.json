@@ -1,6 +1,6 @@
 {
   "name": "@santi020k/observatory-root",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "description": "Source-available portfolio operations control room for product, package, deployment, and repository signals.",
   "license": "SEE LICENSE IN LICENSE",
