@@ -233,9 +233,10 @@ configuration. It does not contain production D1 data, provider credentials, aut
 private analytics exports. Making the repository public does not grant access to the hosted dashboard or
 its data.
 
-The project is **source-available, not open source**. You may inspect the code and use GitHub's public
-repository features, but reuse, modification, redistribution, and deployment require prior written
-permission. Separately licensed vendored packages retain their own license terms. See [LICENSE](LICENSE).
+The project is **source-available, not open source**. You may inspect the code, use GitHub's public
+repository features, and modify it solely to prepare a contribution. Reuse, redistribution, deployment,
+and other modification require prior written permission. Separately licensed vendored packages retain
+their own license terms. See [LICENSE](LICENSE).
 
 Issues and pull requests are welcome under the repository's contribution terms. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
