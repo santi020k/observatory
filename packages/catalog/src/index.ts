@@ -127,6 +127,13 @@ const publishedApps: readonly PublishedApp[] = [
     slug: 'postlens'
   },
   {
+    displayName: 'RoadScore',
+    google: {
+      packageName: 'com.santi020k.roadscore'
+    },
+    slug: 'roadscore'
+  },
+  {
     apple: {
       appId: '6802499436',
       bundleId: 'com.santi020k.betweencontractions'

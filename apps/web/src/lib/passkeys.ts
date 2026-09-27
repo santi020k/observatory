@@ -23,7 +23,122 @@ interface RegistrationOptionsEnvelope {
   options: PublicKeyCredentialCreationOptionsJSON
 }
 
+type PasskeyOperation = 'authentication' | 'registration'
+
+export interface PasskeyErrorDiagnostic {
+  code: string | null
+  message: string
+  name: string | null
+}
+
+/** UI-safe passkey failure with technical details kept in separate developer-only fields. */
+export class PasskeyOperationError extends Error {
+  readonly code: string
+  readonly diagnostic: PasskeyErrorDiagnostic
+  readonly originalError: unknown
+
+  constructor(
+    code: string,
+    message: string,
+    diagnostic: PasskeyErrorDiagnostic,
+    cause: unknown
+  ) {
+    super(message)
+
+    this.code = code
+
+    this.diagnostic = diagnostic
+
+    this.name = 'PasskeyOperationError'
+
+    this.originalError = cause
+  }
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+
+const errorText = (
+  value: unknown,
+  key: 'code' | 'message' | 'name'
+): string | null => {
+  if (!isRecord(value)) return null
+
+  const text = value[key]
+
+  return typeof text === 'string' && text.trim() ? text : null
+}
+
+const passkeyDiagnostic = (error: unknown): PasskeyErrorDiagnostic => {
+  const cause = isRecord(error) ? error.cause : undefined
+
+  return {
+    code: errorText(error, 'code') ?? errorText(cause, 'code'),
+    message:
+      errorText(cause, 'message') ??
+      errorText(error, 'message') ??
+      'Unknown passkey error',
+    name: errorText(cause, 'name') ?? errorText(error, 'name')
+  }
+}
+
+const matchesDiagnostic = (
+  diagnostic: PasskeyErrorDiagnostic,
+  names: readonly string[],
+  codes: readonly string[]
+): boolean => names.includes(diagnostic.name ?? '') ||
+  codes.includes(diagnostic.code ?? '')
+
+const cancelledMessage = (operation: PasskeyOperation): string => operation === 'registration' ?
+  'Your passkey wasn’t added. Try again and finish the confirmation on your device.' :
+  'We couldn’t sign you in. Try again and finish the confirmation on your device, or request a code by email.'
+
+const fallbackMessage = (operation: PasskeyOperation): string => operation === 'registration' ?
+  'Your passkey wasn’t added. Try again or use a different device.' :
+  'We couldn’t sign you in. Try again or request a code by email.'
+
+const siteMismatchMessage = (operation: PasskeyOperation): string => operation === 'registration' ?
+  'Passkeys can’t be added right now because this site’s passkey configuration is unavailable. Try again later.' :
+  'Passkeys aren’t available right now. Request a code by email instead.'
+
+export const normalizePasskeyError = (
+  error: unknown,
+  operation: PasskeyOperation
+): PasskeyOperationError => {
+  const diagnostic = passkeyDiagnostic(error)
+
+  if (matchesDiagnostic(
+    diagnostic,
+    ['NotAllowedError'],
+    []
+  )) {
+    return new PasskeyOperationError(
+      'passkey_cancelled_or_timed_out',
+      cancelledMessage(operation),
+      diagnostic,
+      error
+    )
+  }
+
+  if (matchesDiagnostic(
+    diagnostic,
+    ['SecurityError'],
+    ['ERROR_INVALID_DOMAIN', 'ERROR_INVALID_RP_ID']
+  )) {
+    return new PasskeyOperationError(
+      'passkey_site_mismatch',
+      siteMismatchMessage(operation),
+      diagnostic,
+      error
+    )
+  }
+
+  return new PasskeyOperationError(
+    'passkey_operation_failed',
+    fallbackMessage(operation),
+    diagnostic,
+    error
+  )
+}
 
 const isAuthenticationEnvelope = (
   value: unknown
@@ -55,10 +170,12 @@ const requestJson = async (
   const result: unknown = await response.json().catch(() => null)
 
   if (!response.ok) {
-    const message = isRecord(result) && isRecord(result.error) &&
+    const message =
+      isRecord(result) &&
+      isRecord(result.error) &&
       typeof result.error.message === 'string' ?
-      result.error.message :
-      'The passkey request failed.'
+        result.error.message :
+        'The passkey request failed.'
 
     throw new Error(message)
   }
@@ -72,14 +189,19 @@ export const authenticateWithPasskey = async (
   apiUrl: string
 ): Promise<void> => {
   const envelope = await requestJson(
-    `${apiUrl}/auth/passkeys/authentication/options`, { method: 'POST' }
+    `${apiUrl}/auth/passkeys/authentication/options`,
+    { method: 'POST' }
   )
 
   if (!isAuthenticationEnvelope(envelope)) {
     throw new Error('Invalid passkey authentication options.')
   }
 
-  const response = await startAuthentication({ optionsJSON: envelope.options })
+  const response = await startAuthentication({
+    optionsJSON: envelope.options
+  }).catch((error: unknown): never => {
+    throw normalizePasskeyError(error, 'authentication')
+  })
 
   await requestJson(`${apiUrl}/auth/passkeys/authentication/verify`, {
     body: JSON.stringify({ challengeId: envelope.challengeId, response }),
@@ -93,18 +215,28 @@ export const registerPasskey = async (
   name: string
 ): Promise<PasskeyCredential> => {
   const envelope = await requestJson(
-    `${apiUrl}/auth/passkeys/registration/options`, { method: 'POST' }
+    `${apiUrl}/auth/passkeys/registration/options`,
+    { method: 'POST' }
   )
 
   if (!isRegistrationEnvelope(envelope)) {
     throw new Error('Invalid passkey registration options.')
   }
 
-  const response = await startRegistration({ optionsJSON: envelope.options })
+  const response = await startRegistration({
+    optionsJSON: envelope.options
+  }).catch((error: unknown): never => {
+    throw normalizePasskeyError(error, 'registration')
+  })
 
   const credential = await requestJson(
-    `${apiUrl}/auth/passkeys/registration/verify`, {
-      body: JSON.stringify({ challengeId: envelope.challengeId, name, response }),
+    `${apiUrl}/auth/passkeys/registration/verify`,
+    {
+      body: JSON.stringify({
+        challengeId: envelope.challengeId,
+        name,
+        response
+      }),
       headers: { 'Content-Type': 'application/json' },
       method: 'POST'
     }
@@ -126,6 +258,7 @@ export const deletePasskey = async (
   id: string
 ): Promise<void> => {
   await requestJson(
-    `${apiUrl}/auth/passkeys/credentials/${encodeURIComponent(id)}`, { method: 'DELETE' }
+    `${apiUrl}/auth/passkeys/credentials/${encodeURIComponent(id)}`,
+    { method: 'DELETE' }
   )
 }
