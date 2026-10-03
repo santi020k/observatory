@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up pnpm workspace
-        uses: santi020k/quality/actions/setup-pnpm@eec1701b98bcc0b76d36af288ee78a0369cd84cc # v1.1.1
+        uses: santi020k/quality/actions/setup-pnpm@ffa37774f75b2b8e761fe3d71e7046cdb6694a69 # v1.3.0
         with:
           node-version-file: .node-version
 
@@ -51,7 +51,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up pnpm workspace
-        uses: santi020k/quality/actions/setup-pnpm@eec1701b98bcc0b76d36af288ee78a0369cd84cc # v1.1.1
+        uses: santi020k/quality/actions/setup-pnpm@ffa37774f75b2b8e761fe3d71e7046cdb6694a69 # v1.3.0
         with:
           node-version-file: .node-version
 
