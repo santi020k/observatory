@@ -13,6 +13,7 @@ const renderBoard = (): void => {
     <main data-feedback-api="/api" data-feedback-project="postlens">
       <div data-feedback-alert hidden tabindex="-1"></div>
       <span data-board-total></span>
+      <section data-feedback-filters><p role="status"></p></section>
       <input data-feedback-search>
       <select data-feedback-type-filter><option value=""></option></select>
       <select data-feedback-moderation-filter><option value=""></option></select>
@@ -68,6 +69,31 @@ describe('feedback board', () => {
 
     expect(cardMatchesFeedbackFilters(card, 'exports', 'idea', 'pending')).toBe(true)
     expect(cardMatchesFeedbackFilters(card, 'missing', 'idea', 'pending')).toBe(false)
+  })
+
+  test('announces filtered results and restores the full board when search is cleared', () => {
+    initializeFeedbackBoard()
+
+    const search = document.querySelector<HTMLInputElement>('[data-feedback-search]')
+    const results = document.querySelector('[data-feedback-filters] [role="status"]')
+    const card = document.querySelector<HTMLElement>('[data-feedback-item]')
+
+    expect(results?.textContent).toBe('1 item')
+
+    if (!search) throw new Error('Feedback search fixture is missing')
+
+    search.value = 'unmatched'
+    search.dispatchEvent(new Event('input', { bubbles: true }))
+
+    expect(card?.hidden).toBe(true)
+    expect(results?.textContent).toBe('0 items')
+    expect(document.querySelector('[data-board-total]')?.textContent).toBe('0 items')
+
+    search.value = ''
+    search.dispatchEvent(new Event('input', { bubbles: true }))
+
+    expect(card?.hidden).toBe(false)
+    expect(results?.textContent).toBe('1 item')
   })
 
   test('resolves keyboard movement in LTR and RTL order', () => {

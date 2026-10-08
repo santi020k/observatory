@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.6.0 - 2026-10-07
+
+### Changed
+
+- Adopted Lumen 4 across all dashboard, project, feedback, store, settings, and access pages.
+  Open metric summaries, lighter headings, consistent filters, locally served Montserrat, and
+  a connected workspace header retain Observatory's violet identity and operational focus.
+- Added optional browser-native page transitions and short Lumen reveals, honoring both operating
+  system and saved reduced-motion preferences without changing server-rendered authentication.
+- Improved mobile navigation with modal focus containment, background isolation, an animated exit,
+  focus restoration, rapid-reopen handling, and a usable navigation fallback without JavaScript.
+- Upgraded compatible dependencies and pnpm within major 11; retained TypeScript 6 because the
+  current Astro checking and shared ESLint contracts do not support TypeScript 7.
+- Removed unused direct SimpleWebAuthn and commitlint CLI dependencies and the unused code generator
+  left behind by the shared Auth migration. Existing database tables and migrations remain intact.
+- Removed obsolete email-code and passkey exports from the private API-types workspace; shared Auth
+  packages own the active authentication contracts. The consumer-owned recovery contract remains.
+- Removed the unmounted private-project placeholder and its unused styles; future private-source
+  isolation requirements remain documented.
+- Refreshed the README, design guide, architecture links, and current chart adoption documentation.
+
+### Fixed
+
+- Store chart history now preserves missing observations as gaps, keeps genuine zero values,
+  and uses stable date identities so repeated display labels do not collide.
+- Project and feedback filters announce their current result counts through Lumen's live region.
+- The workspace doctor command explicitly runs its package script under pnpm 11.
+
+### Security
+
+- Resolved production dependency advisories and backported the upstream KaTeX fix used by Markdown
+  lint tooling, with installed-package regression coverage and documented maintenance criteria.
+
 ## 0.5.0 - 2026-09-27
 
 ### Changed

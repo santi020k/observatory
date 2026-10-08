@@ -13,7 +13,13 @@ import {
 } from '@/lib/api'
 import { formatDate, formatRelativeDate } from '@/lib/format'
 
-import { ButtonLink, Card, Icon } from '@santi020k/lumen-astro'
+import {
+  Breadcrumb,
+  ButtonLink,
+  Card,
+  Icon,
+  ScrollReveal
+} from '@santi020k/lumen-astro'
 import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
 
 const range = analyticsRangeSchema
@@ -78,13 +84,20 @@ const syncStatus = hasFailedSync ? 'failed' : 'succeeded'
         syncSubject={`${app.displayName} store analytics data`}
       />
       <main class="dashboard store-dashboard store-detail" id="main-content">
-        <nav class="breadcrumb" aria-label="Breadcrumb">
+        <Breadcrumb class="breadcrumb">
           <a href={`/store/?range=${analytics.range}`}>Published apps</a><Icon
             aria-hidden="true"
             name="chevron-right"
                                                                          /><span aria-current="page">{app.displayName}</span>
-        </nav>
-        <section class="hero-row" aria-labelledby="store-app-title">
+        </Breadcrumb>
+        <ScrollReveal
+          as="section"
+          animation="fade"
+          duration="fast"
+          threshold={0}
+          class="hero-row"
+          aria-labelledby="store-app-title"
+        >
           <div>
             <span class="eyebrow">Store intelligence</span><h1
               id="store-app-title"
@@ -100,7 +113,7 @@ const syncStatus = hasFailedSync ? 'failed' : 'succeeded'
           </div><div class="hero-controls">
             <RangePicker range={analytics.range} />
           </div>
-        </section>
+        </ScrollReveal>
         <div class="store-provider-stack">
           {
             app.providers.map(provider => (

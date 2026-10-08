@@ -172,3 +172,14 @@ const getCategoryIcon = (
   type="button"
 >
 </button>
+
+<noscript>
+  <style is:global>
+    @media (max-width: 52rem) {
+      .app-shell { display: block; height: auto; overflow: visible; }
+      .app-sidebar { position: relative; width: 100%; height: auto; transform: none; }
+      .app-workspace { height: auto; overflow: visible; }
+      .sidebar-trigger, .sidebar-close { display: none; }
+    }
+  </style>
+</noscript>

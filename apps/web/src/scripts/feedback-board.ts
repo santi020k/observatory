@@ -89,8 +89,12 @@ export const initializeFeedbackBoard = (): void => {
 
     const total = itemCards().filter(card => !card.hidden).length
     const totalBadge = dashboard.querySelector<HTMLElement>('[data-board-total]')
+    const filterResult = dashboard.querySelector<HTMLElement>('[data-feedback-filters] [role="status"]')
+    const totalLabel = `${total} item${total === 1 ? '' : 's'}`
 
-    if (totalBadge) totalBadge.textContent = `${total} items`
+    if (totalBadge) totalBadge.textContent = totalLabel
+
+    if (filterResult) filterResult.textContent = totalLabel
   }
 
   const applyFilters = (): void => {

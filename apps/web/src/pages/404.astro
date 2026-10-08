@@ -1,9 +1,12 @@
 ---
 import AppLayout from '@/layouts/AppLayout.astro'
 
-import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
-import Card from '@santi020k/lumen-astro/components/Card'
-import Icon from '@santi020k/lumen-astro/components/Icon'
+import {
+  ButtonLink,
+  Card,
+  Icon,
+  ScrollReveal
+} from '@santi020k/lumen-astro'
 ---
 
 <AppLayout
@@ -15,12 +18,14 @@ import Icon from '@santi020k/lumen-astro/components/Icon'
       <span class="error-card__icon">
         <Icon aria-hidden="true" name="telescope" />
       </span>
-      <span class="eyebrow">Lost signal</span>
-      <h1 id="not-found-title">That page is outside this Observatory.</h1>
-      <p>
-        The project may be excluded from analysis, or the address may no longer
-        exist.
-      </p>
+      <ScrollReveal animation="fade" duration="fast" threshold={0}>
+        <span class="eyebrow">Lost signal</span>
+        <h1 id="not-found-title">That page is outside this Observatory.</h1>
+        <p>
+          The project may be excluded from analysis, or the address may no longer
+          exist.
+        </p>
+      </ScrollReveal>
       <ButtonLink href="/dashboard/">
         <Icon aria-hidden="true" name="arrow-left" />
         Return to overview

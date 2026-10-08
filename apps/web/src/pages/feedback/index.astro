@@ -11,10 +11,15 @@ import {
 } from '@/lib/api'
 import { formatRelativeDate } from '@/lib/format'
 
-import Badge from '@santi020k/lumen-astro/components/Badge'
-import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
-import Card from '@santi020k/lumen-astro/components/Card'
-import Icon from '@santi020k/lumen-astro/components/Icon'
+import {
+  Badge,
+  ButtonLink,
+  Card,
+  Icon,
+  RevealGroup,
+  ScrollReveal,
+  Stat
+} from '@santi020k/lumen-astro'
 
 const [feedbackResponse, projectsResponse, settingsResponse] = await Promise.all([
   getAdminFeedback(Astro.request, Astro.url),
@@ -62,7 +67,14 @@ const summary = {
       />
 
       <main class="dashboard feedback-dashboard" id="main-content">
-        <section class="hero-row" aria-labelledby="feedback-title">
+        <ScrollReveal
+          as="section"
+          animation="fade"
+          duration="fast"
+          threshold={0}
+          class="hero-row"
+          aria-labelledby="feedback-title"
+        >
           <div>
             <span class="eyebrow">Portfolio operations</span>
             <h1 id="feedback-title">Feedback</h1>
@@ -71,13 +83,13 @@ const summary = {
               project-specific delivery pipeline.
             </p>
           </div>
-        </section>
+        </ScrollReveal>
 
         <section class="feedback-summary" aria-label="Feedback summary">
-          <Card><span>All items</span><strong>{summary.total}</strong></Card>
-          <Card><span>New inbox</span><strong>{summary.inbox}</strong></Card>
-          <Card><span>Awaiting moderation</span><strong>{summary.pending}</strong></Card>
-          <Card><span>Private reports</span><strong>{summary.private}</strong></Card>
+          <Stat label="All items" value={String(summary.total)} variant="bare" />
+          <Stat label="New inbox" value={String(summary.inbox)} variant="bare" />
+          <Stat label="Awaiting moderation" value={String(summary.pending)} variant="bare" />
+          <Stat label="Private reports" value={String(summary.private)} variant="bare" />
         </section>
 
         <section aria-labelledby="project-boards-title">
@@ -90,7 +102,7 @@ const summary = {
             <Badge variant="outline">{projects.length} projects</Badge>
           </div>
 
-          <div class="feedback-project-grid">
+          <RevealGroup animation="fade" duration="fast" stagger={35} threshold={0} class="feedback-project-grid">
             {projects.map(project => {
               const projectItems = items.filter(item => item.projectSlug === project.slug)
               const pending = projectItems.filter(item => item.moderationStatus === 'pending').length
@@ -108,13 +120,13 @@ const summary = {
                     <p>{projectItems.length} feedback items across the delivery pipeline.</p>
                   </div>
                   <ButtonLink href={`/projects/${project.slug}/feedback/`}>
-                    Open kanban
+                    Open delivery board
                     <Icon aria-hidden="true" name="arrow-right" />
                   </ButtonLink>
                 </Card>
               )
             })}
-          </div>
+          </RevealGroup>
         </section>
       </main>
     </div>

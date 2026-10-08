@@ -6,10 +6,8 @@ import {
   dashboardSchema,
   projectDashboardSchema,
   recoveryLoginSchema,
-  requestCodeSchema,
   storeAnalyticsSchema,
   updateProjectSettingSchema,
-  verifyCodeSchema,
   websiteAnalyticsSchema
 } from './index'
 
@@ -78,24 +76,6 @@ describe('feedback contracts', () => {
 })
 
 describe('authentication contracts', () => {
-  test('normalizes owner email addresses', () => {
-    expect(requestCodeSchema.parse({ email: ' SANTI@EXAMPLE.COM ' })).toEqual({
-      email: 'santi@example.com'
-    })
-  })
-
-  test('only accepts six digit verification codes', () => {
-    expect(
-      verifyCodeSchema.safeParse({ code: '123456', email: 'santi@example.com' })
-        .success
-    ).toBe(true)
-
-    expect(
-      verifyCodeSchema.safeParse({ code: '12345a', email: 'santi@example.com' })
-        .success
-    ).toBe(false)
-  })
-
   test('keeps recovery codes bounded without restricting symbols', () => {
     expect(
       recoveryLoginSchema.safeParse({ passcode: 'private@@' }).success

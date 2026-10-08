@@ -1,6 +1,6 @@
 {
   "name": "@santi020k/observatory-root",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Source-available portfolio operations control room for product, package, deployment, and repository signals.",
   "license": "SEE LICENSE IN LICENSE",
@@ -22,7 +22,7 @@
     "dev": "turbo run dev",
     "dev:api": "pnpm --filter @santi020k/observatory-api dev",
     "dev:web": "pnpm --filter @santi020k/observatory-web dev",
-    "doctor": "pnpm --filter @santi020k/observatory-web doctor",
+    "doctor": "pnpm --filter @santi020k/observatory-web run doctor",
     "lint": "pnpm run lint:repo && turbo run lint",
     "lint:fix": "pnpm run lint:repo:fix && turbo run lint:fix",
     "lint:repo": "eslint . --cache --no-warn-ignored --max-warnings=0",

@@ -17,14 +17,6 @@ export const hashValue = async (
   return toHex(digest)
 }
 
-export const generateCode = (): string => {
-  const values = new Uint32Array(1)
-
-  crypto.getRandomValues(values)
-
-  return String((values[0] ?? 0) % 1_000_000).padStart(6, '0')
-}
-
 export const generateToken = (): string => {
   const bytes = new Uint8Array(32)
 

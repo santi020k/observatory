@@ -2,15 +2,18 @@
 import Brand from '@/components/Brand.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
-import Alert from '@santi020k/lumen-astro/components/Alert'
-import Button from '@santi020k/lumen-astro/components/Button'
-import ButtonLink from '@santi020k/lumen-astro/components/ButtonLink'
-import Card from '@santi020k/lumen-astro/components/Card'
-import Field from '@santi020k/lumen-astro/components/Field'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import InputOTP from '@santi020k/lumen-astro/components/InputOTP'
-import Label from '@santi020k/lumen-astro/components/Label'
-import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
+import {
+  Alert,
+  Button,
+  ButtonLink,
+  Card,
+  Field,
+  Icon,
+  InputOTP,
+  Label,
+  ScrollReveal,
+  ThemeToggle
+} from '@santi020k/lumen-astro'
 
 ---
 
@@ -25,14 +28,14 @@ import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
       <span class="auth-card__icon"><Icon aria-hidden="true" name="mail-check" />
       </span
       >
-      <div class="verify-card__intro">
+      <ScrollReveal animation="fade" duration="fast" threshold={0} class="verify-card__intro">
         <span class="eyebrow">Check your inbox</span>
         <h1>Enter your code</h1>
         <p>
           Sent to <strong data-masked-email>your authorized email</strong>. The
           code expires in 10 minutes.
         </p>
-      </div>
+      </ScrollReveal>
 
       <Alert
         aria-atomic="true"

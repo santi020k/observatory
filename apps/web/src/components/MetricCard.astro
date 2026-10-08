@@ -31,7 +31,7 @@ const showTrend = trend && trend.values.length >= 2
 const trendTone = trend?.tone ? { tone: trend.tone } : {}
 ---
 
-<Card class="metric-card">
+<Card as="article" class="metric-card" variant="unstyled">
   <div class="metric-card__top">
     <span class="metric-card__icon">
       <Icon aria-hidden="true" name={icon} />
@@ -48,7 +48,7 @@ const trendTone = trend?.tone ? { tone: trend.tone } : {}
       )
     }
   </div>
-  <Stat label={label} value={value}>
+  <Stat label={label} value={value} variant="bare">
     <p>{context}</p>
   </Stat>
 </Card>

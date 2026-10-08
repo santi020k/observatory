@@ -1,5 +1,8 @@
 ---
+import montserratUrl from '@/assets/fonts/montserrat-variable.woff2?url'
+
 import '@santi020k/lumen-astro/styles.css'
+import '@santi020k/theme/typography.css'
 import '@/styles/global.css'
 
 import SkipLink from '@santi020k/lumen-astro/components/SkipLink'
@@ -12,6 +15,11 @@ interface Props {
 }
 
 const { description, title } = Astro.props
+
+const workspacePage =
+  /^\/(dashboard|projects|store|feedback|settings)(\/|$)/.test(
+    Astro.url.pathname
+  )
 
 const typographyVariables = `
   --santi020k-font-sans: ${typography.body};
@@ -36,6 +44,14 @@ const darkContrastVariables = colors
   .join('')
 
 const themeCss = `
+  @font-face {
+    font-family: Montserrat;
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('${montserratUrl}') format('woff2');
+  }
+
   :root,
   :root[data-theme='light'] {
     color-scheme: light;
@@ -69,61 +85,89 @@ const themeCss = `
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="viewport" content="width=device-width" />
     <meta name="theme-color" content="hsl(260 43% 8%)" />
+    {workspacePage && (
+<style is:global>
+      @media (prefers-reduced-motion: no-preference) {
+        @view-transition {
+          navigation: auto;
+        }
+      }
+    </style>
+)}
     <style is:global set:html={themeCss}></style>
     <script is:inline>
-    const readStoredTheme = () => {
-      const storedTheme = localStorage.getItem('lumen-theme')
+      const readStoredTheme = () => {
+        const storedTheme = localStorage.getItem('lumen-theme')
 
-      if (storedTheme === 'light' || storedTheme === 'santi020k-light')
-        return 'light'
+        if (storedTheme === 'light' || storedTheme === 'santi020k-light')
+          return 'light'
 
-      return 'dark'
-    }
-
-    const applyStoredPreferences = root => {
-      const preferences = JSON.parse(
-        localStorage.getItem('observatory.settings.preferences') ?? '{}'
-      )
-
-      root.dataset.observatoryDensity =
-        preferences.density === 'compact' ? 'compact' : 'comfortable'
-
-      root.dataset.observatoryReduceMotion = String(
-        preferences.reduceMotion === true
-      )
-
-      root.dataset.observatoryShowDetails = String(
-        preferences.showDetails !== false
-      )
-    }
-
-    const applyObservatoryPreferences = () => {
-      const root = document.documentElement
-      let theme = 'dark'
-
-      try {
-        theme = readStoredTheme()
-
-        localStorage.setItem('lumen-theme', theme)
-
-        applyStoredPreferences(root)
-      } catch {
-        // Storage may be unavailable; retain Observatory's defaults.
+        return 'dark'
       }
 
-      root.dataset.theme = theme
+      const applyStoredPreferences = root => {
+        const preferences = JSON.parse(
+          localStorage.getItem('observatory.settings.preferences') ?? '{}'
+  )
 
-      root.classList.toggle('dark', theme === 'dark')
+        root.dataset.observatoryDensity =
+          preferences.density === 'compact' ? 'compact' : 'comfortable'
 
-      document
-        .querySelector('meta[name="theme-color"]')
-        ?.setAttribute(
-          'content', theme === 'dark' ? 'hsl(260 43% 8%)' : 'hsl(268 20% 98%)'
+        root.dataset.observatoryReduceMotion = String(
+          preferences.reduceMotion === true
+  )
+
+        root.dataset.uiMotion =
+          preferences.reduceMotion === true ? 'reduce' : 'auto'
+
+        root.dataset.observatoryShowDetails = String(
+          preferences.showDetails !== false
+  )
+      }
+
+      const applyObservatoryPreferences = () => {
+        const root = document.documentElement
+        let theme = 'dark'
+
+        try {
+          theme = readStoredTheme()
+
+          localStorage.setItem('lumen-theme', theme)
+
+          applyStoredPreferences(root)
+        } catch {
+          // Storage may be unavailable; retain Observatory's defaults.
+        }
+
+        root.dataset.theme = theme
+
+        root.classList.toggle('dark', theme === 'dark')
+
+        document
+          .querySelector('meta[name="theme-color"]')
+          ?.setAttribute(
+            'content',
+            theme === 'dark' ? 'hsl(260 43% 8%)' : 'hsl(268 20% 98%)'
     )
-    }
+      }
 
-    applyObservatoryPreferences()
-    </script>
+      applyObservatoryPreferences()
+
+      window.addEventListener('pageshow', applyObservatoryPreferences)
+
+      window.addEventListener('pagereveal', event => {
+        applyObservatoryPreferences()
+
+      const transition = event.viewTransition
+
+      if (document.documentElement.dataset.uiMotion === 'reduce' && transition) {
+        // Skipping intentionally rejects ready; consume that expected rejection.
+        void transition.ready.catch(() => undefined)
+
+        transition.skipTransition()
+      }
+      })
+  </script>
     <title>{title}</title>
   </head>
   <body>
@@ -131,17 +175,18 @@ const themeCss = `
     <slot />
     <UIPrimitives />
     <script>
-    document.addEventListener('ui:theme-change', event => {
-      const theme = (event as CustomEvent<{ theme?: string }>).detail?.theme
+      document.addEventListener('ui:theme-change', event => {
+        const theme = (event as CustomEvent<{ theme?: string }>).detail?.theme
 
-      if (theme !== 'light' && theme !== 'dark') return
+        if (theme !== 'light' && theme !== 'dark') return
 
-      document
-        .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-        ?.setAttribute(
-          'content', theme === 'dark' ? 'hsl(260 43% 8%)' : 'hsl(268 20% 98%)'
+        document
+          .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+          ?.setAttribute(
+            'content',
+            theme === 'dark' ? 'hsl(260 43% 8%)' : 'hsl(268 20% 98%)'
     )
-    })
+      })
     </script>
   </body>
 </html>

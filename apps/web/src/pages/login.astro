@@ -2,14 +2,17 @@
 import Brand from '@/components/Brand.astro'
 import AppLayout from '@/layouts/AppLayout.astro'
 
-import Alert from '@santi020k/lumen-astro/components/Alert'
-import Button from '@santi020k/lumen-astro/components/Button'
-import Card from '@santi020k/lumen-astro/components/Card'
-import Field from '@santi020k/lumen-astro/components/Field'
-import Icon from '@santi020k/lumen-astro/components/Icon'
-import Input from '@santi020k/lumen-astro/components/Input'
-import Label from '@santi020k/lumen-astro/components/Label'
-import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  Icon,
+  Input,
+  Label,
+  ScrollReveal,
+  ThemeToggle
+} from '@santi020k/lumen-astro'
 
 ---
 
@@ -19,7 +22,14 @@ import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
 >
   <ThemeToggle class="auth-theme-toggle" title="Toggle color theme" />
   <main class="auth-shell" id="main-content">
-    <section class="auth-story" aria-labelledby="auth-story-title">
+    <ScrollReveal
+      as="section"
+      animation="fade"
+      duration="fast"
+      threshold={0}
+      class="auth-story"
+      aria-labelledby="auth-story-title"
+    >
       <Brand />
       <div>
         <span class="eyebrow">One view. Every signal.</span>
@@ -34,7 +44,7 @@ import ThemeToggle from '@santi020k/lumen-astro/components/ThemeToggle'
         <li><Icon aria-hidden="true" name="package" /> Package downloads</li>
         <li><Icon aria-hidden="true" name="activity" /> Website health</li>
       </ul>
-    </section>
+    </ScrollReveal>
 
     <section class="auth-panel" aria-labelledby="sign-in-title">
       <Card class="auth-card">
