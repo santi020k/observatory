@@ -18,7 +18,15 @@ import {
   statusMeta
 } from '@/lib/store-presentation'
 
-import { Badge, ButtonLink, Card, Icon } from '@santi020k/lumen-astro'
+import {
+  Badge,
+  ButtonLink,
+  Card,
+  Icon,
+  RevealGroup,
+  ScrollReveal,
+  Stat
+} from '@santi020k/lumen-astro'
 import { analyticsRangeSchema } from '@santi020k/observatory-api-types'
 
 const range = analyticsRangeSchema
@@ -96,7 +104,14 @@ const publishedListings = analytics.apps.reduce(
       />
 
       <main class="dashboard store-dashboard store-overview" id="main-content">
-        <section class="hero-row" aria-labelledby="store-title">
+        <ScrollReveal
+          as="section"
+          animation="fade"
+          duration="fast"
+          threshold={0}
+          class="hero-row"
+          aria-labelledby="store-title"
+        >
           <div>
             <span class="eyebrow">Published apps</span><h1 id="store-title">
               Store intelligence
@@ -108,21 +123,23 @@ const publishedListings = analytics.apps.reduce(
           <div class="hero-controls">
             <RangePicker range={analytics.range} />
           </div>
-        </section>
+        </ScrollReveal>
 
         <section class="store-summary" aria-label="Store coverage summary">
-          <div>
-            <strong>{analytics.apps.length}</strong><span>Published apps</span>
-          </div>
-          <div>
-            <strong>{publishedListings}</strong><span>Live listings</span>
-          </div>
-          <div>
-            <strong>{reportingProviders}</strong><span>Reporting now</span>
-          </div>
+          <Stat label="Published apps" value={String(analytics.apps.length)} variant="bare" />
+          <Stat label="Live listings" value={String(publishedListings)} variant="bare" />
+          <Stat label="Reporting now" value={String(reportingProviders)} variant="bare" />
         </section>
 
-        <section class="store-app-grid" aria-label="Published applications">
+        <RevealGroup
+          as="section"
+          animation="fade"
+          duration="fast"
+          stagger={35}
+          threshold={0}
+          class="store-app-grid"
+          aria-label="Published applications"
+        >
           {
             analytics.apps.map(app => {
               const appPrimary = app.providers
@@ -199,7 +216,7 @@ const publishedListings = analytics.apps.reduce(
               )
             })
           }
-        </section>
+        </RevealGroup>
 
         <Card
 as="section"

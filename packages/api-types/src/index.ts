@@ -112,17 +112,6 @@ export type FeedbackType = z.infer<typeof feedbackTypeSchema>
 export type PublicFeedbackItem = z.infer<typeof publicFeedbackItemSchema>
 export type UpdateFeedbackInput = z.infer<typeof updateFeedbackSchema>
 
-export const requestCodeSchema = z.object({
-  email: z.string().trim().toLowerCase().pipe(z.email())
-})
-
-export const verifyCodeSchema = requestCodeSchema.extend({
-  code: z
-    .string()
-    .trim()
-    .regex(/^\d{6}$/)
-})
-
 export const projectSourceSchema = z.object({
   github: z.string().trim(),
   npm: z.array(z.string().trim()).default([]),
@@ -388,80 +377,8 @@ export const updateProjectSettingSchema = z
     { error: 'At least one project setting is required.' }
   )
 
-const base64UrlSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .regex(/^[A-Za-z0-9_-]+$/)
-
-const authenticatorTransportSchema = z.enum([
-  'ble',
-  'cable',
-  'hybrid',
-  'internal',
-  'nfc',
-  'smart-card',
-  'usb'
-])
-
-const clientExtensionResultsSchema = z.record(z.string(), z.unknown())
-
 export const recoveryLoginSchema = z.object({
   passcode: z.string().trim().min(8).max(128)
-})
-
-export const passkeyRegistrationResponseSchema = z.object({
-  authenticatorAttachment: z.enum(['cross-platform', 'platform']).optional(),
-  clientExtensionResults: clientExtensionResultsSchema,
-  id: base64UrlSchema,
-  rawId: base64UrlSchema,
-  response: z.object({
-    attestationObject: base64UrlSchema,
-    authenticatorData: base64UrlSchema.optional(),
-    clientDataJSON: base64UrlSchema,
-    publicKey: base64UrlSchema.optional(),
-    publicKeyAlgorithm: z.int().optional(),
-    transports: z.array(authenticatorTransportSchema).optional()
-  }),
-  type: z.literal('public-key')
-})
-
-export const passkeyAuthenticationResponseSchema = z.object({
-  authenticatorAttachment: z.enum(['cross-platform', 'platform']).optional(),
-  clientExtensionResults: clientExtensionResultsSchema,
-  id: base64UrlSchema,
-  rawId: base64UrlSchema,
-  response: z.object({
-    authenticatorData: base64UrlSchema,
-    clientDataJSON: base64UrlSchema,
-    signature: base64UrlSchema,
-    userHandle: base64UrlSchema.optional()
-  }),
-  type: z.literal('public-key')
-})
-
-export const verifyPasskeyRegistrationSchema = z.object({
-  challengeId: z.string().trim().min(1),
-  name: z.string().trim().min(1).max(80),
-  response: passkeyRegistrationResponseSchema
-})
-
-export const verifyPasskeyAuthenticationSchema = z.object({
-  challengeId: z.string().trim().min(1),
-  response: passkeyAuthenticationResponseSchema
-})
-
-export const passkeyCredentialSchema = z.object({
-  backedUp: z.boolean(),
-  createdAt: z.int().nonnegative(),
-  deviceType: z.enum(['singleDevice', 'multiDevice']),
-  id: z.string().trim(),
-  lastUsedAt: z.int().nonnegative().nullable(),
-  name: z.string().trim()
-})
-
-export const passkeyCredentialsSchema = z.object({
-  credentials: z.array(passkeyCredentialSchema)
 })
 
 export const websiteAnalyticsPointSchema = z.object({
@@ -595,29 +512,9 @@ export type StoreProviderAnalytics = z.infer<
 export type StoreMetricName = z.infer<typeof storeMetricNameSchema>
 export type StoreMetricTotals = z.infer<typeof storeMetricTotalsSchema>
 export type StoreProvider = z.infer<typeof storeProviderSchema>
-export type RequestCodeInput = z.infer<typeof requestCodeSchema>
-export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>
-export type PasskeyCredential = z.infer<typeof passkeyCredentialSchema>
-export type VerifyPasskeyAuthenticationInput = z.infer<
-  typeof verifyPasskeyAuthenticationSchema
->
-export type VerifyPasskeyRegistrationInput = z.infer<
-  typeof verifyPasskeyRegistrationSchema
->
-
 export interface ApiError {
   error: {
     code: string
     message: string
   }
-}
-
-export interface RequestCodeResponse {
-  developmentCode?: string
-  message: string
-}
-
-export interface SessionResponse {
-  authenticated: boolean
-  email?: string
 }

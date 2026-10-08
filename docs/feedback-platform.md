@@ -1,5 +1,8 @@
 # Shared feedback platform
 
+[Project overview](../README.md) · [Architecture](architecture.md) ·
+[Design guide](design-system.md)
+
 Observatory is the control plane for feedback across Santiago Molina's products.
 Product repositories own their customer-facing presentation; Observatory owns
 the reusable contract, storage, security controls, moderation, and delivery

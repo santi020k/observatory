@@ -1,15 +1,30 @@
-# Observatory
+<p align="center">
+  <a href="README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/hero-dark.svg">
+      <img src="docs/assets/readme/hero-light.svg" alt="Observatory — Project signals. A clearer next move." width="1200" height="360">
+    </picture>
+  </a>
+</p>
+
+<h1 align="center">Observatory</h1>
+
+<p align="center">One control room for project intelligence and portfolio operations.</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-source--available-orange.svg" alt="License: Source-Available"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/workspace-Monorepo-6319be?style=flat-square" alt="Workspace: Monorepo"></a>
+</p>
 
 Source-available project intelligence and portfolio operations for Santiago Molina. Observatory turns public
 repository, package, deployment, and product-feedback signals into one decision-focused control room.
 The dashboard is owner-only; narrowly scoped public feedback routes serve each product's branded UI.
 
-[![License: Source-Available](https://img.shields.io/badge/license-source--available-orange.svg)](LICENSE)
+[Dashboard](https://observatory.santi020k.com) ·
+[Design guide](docs/design-system.md) · [Architecture](docs/architecture.md) ·
+[Contributing](CONTRIBUTING.md)
 
-[Dashboard](https://observatory.santi020k.com) · [Architecture](docs/architecture.md) ·
-[Feedback platform](docs/feedback-platform.md) ·
-[Private-project model](docs/private-projects.md) ·
-[Visualization roadmap](docs/visualization-roadmap.md)
+**Explore:** [What it measures](#what-it-measures) · [Architecture](#architecture) · [Local setup](#local-setup) · [Production configuration](#production-configuration) · [Quality](#quality) · [Authentication](#authentication)
 
 ## What it measures
 
@@ -41,7 +56,7 @@ Mapped GitHub release assets are also stored as cumulative snapshots. Coolstead
 keeps direct website downloads separate while its current versioned asset is
 reported as the combined Homebrew-or-update channel.
 
-The private projects section is specified but not connected. See
+Private-source collection is specified but not connected. See
 [`docs/private-projects.md`](docs/private-projects.md).
 
 ## Architecture
@@ -56,6 +71,16 @@ packages/db/       Drizzle schema and D1 query helpers
 
 This follows the useful boundaries in `aaronmgz`: a pnpm/Turborepo workspace, a unified Hono API,
 D1 behind a shared data package, and backend-owned contracts.
+
+## Interface and design
+
+Observatory keeps its violet identity and practical control-room layout while sharing the
+sculpted typography, quieter surfaces, and precise navigation of Santiago's website and theme
+family. Lumen 4 supplies the accessible primitives, charts, and optional reveal motion.
+
+The [design guide](docs/design-system.md) records the palette, page composition, motion policy,
+and visual review checklist. The [visualization roadmap](docs/visualization-roadmap.md) explains
+which chart responsibilities belong to Lumen and which remain in Observatory.
 
 ## Local setup
 
@@ -102,19 +127,24 @@ Keep `CLOUDFLARE_API_TOKEN` scoped to runtime analytics reads. CI uses the separ
 the Observatory account. Routes are provisioned separately; CI publishes and promotes immutable
 Worker versions so routine deployments do not require zone-level route access.
 
-The production D1 binding is declared in `apps/api/wrangler.jsonc`. Apply migrations manually when
-needed with Infisical providing the Cloudflare credentials:
+The production D1 binding is declared in `apps/api/wrangler.jsonc`. The deployment workflow applies
+migrations. For an explicitly authorized emergency intervention, confirm the affected data and
+recovery plan first, then inject the deployment credential through Infisical:
 
 ```bash
-infisical run --env=prod --path=/apps/api -- pnpm db:migrate:remote
+infisical run --env=prod --path=/apps/api -- \
+  sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" pnpm --filter @santi020k/observatory-api run db:migrate:remote'
 ```
 
-For emergency manual deployment, inject the same production secrets and use the workspace scripts:
+Routine releases and deployments stay in GitHub Actions. If a manual emergency deployment has
+been explicitly authorized, inject the same production configuration and use the workspace scripts:
 
 ```bash
-infisical run --env=prod --path=/apps/api -- pnpm --filter @santi020k/observatory-api run deploy
+infisical run --env=prod --path=/apps/api -- \
+  sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" pnpm --filter @santi020k/observatory-api run deploy'
 infisical run --env=prod --path=/apps/web -- pnpm --filter @santi020k/observatory-web build
-infisical run --env=prod --path=/apps/api -- pnpm --filter @santi020k/observatory-web run deploy
+infisical run --env=prod --path=/apps/api -- \
+  sh -c 'CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" pnpm --filter @santi020k/observatory-web run deploy'
 ```
 
 Set `CORS_ORIGIN` to the dashboard origin. Configure the web app with
@@ -213,8 +243,10 @@ as unavailable or awaiting data rather than displaying a misleading zero.
 pnpm verify
 ```
 
-This runs the Santi ESLint base configuration, Astro check, TypeScript checks, Vitest, Astro Doctor,
-and production builds.
+This runs zero-warning Santi ESLint, Astro and TypeScript checks, Vitest and script regressions,
+Astro Doctor, the production dependency audit, and production builds. The
+[dependency security guide](docs/dependency-security.md) records the maintained security backport
+and upstream peer constraints.
 
 ## Privacy
 
@@ -255,8 +287,21 @@ The compatibility session restores protected dashboard access but does not autho
 the email-code fallback to establish a package session before adding, renaming, or removing passkeys. Every consumer
 still owns its database, secret, cookie prefix, origins, passkeys, and recovery policy.
 
+## Find your next step
+
+| Resource                                               | Use it for                                                           |
+| ------------------------------------------------------ | -------------------------------------------------------------------- |
+| [Design guide](docs/design-system.md)                  | Palette, page hierarchy, navigation, motion, and visual review.      |
+| [Architecture](docs/architecture.md)                   | Package responsibilities, authentication, and collection boundaries. |
+| [Visualization roadmap](docs/visualization-roadmap.md) | Current charts, data semantics, and future visualization work.       |
+| [Feedback platform](docs/feedback-platform.md)         | Public submissions, moderation, and private delivery boards.         |
+| [Private-project model](docs/private-projects.md)      | Planned private-source scope and isolation requirements.             |
+| [Contributing](CONTRIBUTING.md)                        | Contributor setup, privacy rules, and validation workflow.           |
+
 ## License
 
 Observatory is publicly visible under the **Santi020k Source-Available License**. Viewing and
 contribution preparation are permitted, while reuse, deployment, redistribution, and other use require
 prior written permission. Separately licensed material retains its own terms. See [LICENSE](LICENSE).
+
+Created by [Santiago Molina](https://santi020k.com).

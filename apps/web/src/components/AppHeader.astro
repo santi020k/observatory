@@ -16,6 +16,20 @@ const {
   syncStatus,
   syncSubject = 'project and website analytics data'
 } = Astro.props
+
+const getSectionLabel = (path: string): string => {
+  if (path.startsWith('/settings')) return 'Workspace settings'
+
+  if (path.startsWith('/store')) return 'Published apps'
+
+  if (path.includes('/feedback')) return 'Feedback operations'
+
+  if (path.startsWith('/projects')) return 'Project intelligence'
+
+  return 'Portfolio overview'
+}
+
+const section = getSectionLabel(Astro.url.pathname)
 ---
 
 <header
@@ -37,7 +51,7 @@ const {
     <Icon aria-hidden="true" name="menu" />
   </Button>
   <div class="app-header__workspace">
-    <span class="app-header__context">Observatory</span>
+    <span class="app-header__context"><span>Workspace</span><Icon aria-hidden="true" name="chevron-right" /><strong>{section}</strong></span>
     <Badge variant="outline"><span class="status-dot"></span> Private workspace
     </Badge
     >
@@ -87,6 +101,8 @@ const {
 <script>
 import { createSantiAuthHelpers } from '@santi020k/auth-client'
 
+import { initializeAppNavigation } from '@/scripts/app-navigation'
+
 const auth = createSantiAuthHelpers({
   basePath: '/api/auth',
   baseURL: window.location.origin
@@ -106,119 +122,9 @@ const syncPath = header?.dataset.syncPath ?? '/sync'
 const syncSubject =
   header?.dataset.syncSubject ?? 'project and website analytics data'
 
-const sidebar = document.querySelector<HTMLElement>('[data-app-sidebar]')
+const headerStatus = document.querySelector<HTMLElement>('[data-header-status]')
 
-const sidebarTrigger = document.querySelector<HTMLButtonElement>(
-  '[data-sidebar-trigger]'
-)
-
-const sidebarCloseButtons = document.querySelectorAll<HTMLButtonElement>(
-  '[data-sidebar-close]'
-)
-
-const mobileSidebarQuery = window.matchMedia('(max-width: 52rem)')
-
-const headerStatus = document.querySelector<HTMLElement>(
-  '[data-header-status]'
-)
-
-const syncSidebarAccessibility = () => {
-  if (!sidebar) return
-
-  const isOpen = sidebar.classList.contains('is-open')
-  const isHidden = mobileSidebarQuery.matches && !isOpen
-
-  sidebar.toggleAttribute('inert', isHidden)
-
-  if (isHidden) sidebar.setAttribute('aria-hidden', 'true')
-  else sidebar.removeAttribute('aria-hidden')
-}
-
-const closeSidebar = (restoreFocus = false) => {
-  const wasOpen = sidebar?.classList.contains('is-open') ?? false
-
-  sidebar?.classList.remove('is-open')
-
-  document.body.classList.remove('sidebar-open')
-
-  sidebarTrigger?.setAttribute('aria-expanded', 'false')
-
-  syncSidebarAccessibility()
-
-  if (restoreFocus && wasOpen) sidebarTrigger?.focus({ preventScroll: true })
-}
-
-const openSidebar = () => {
-  sidebar?.classList.add('is-open')
-
-  document.body.classList.add('sidebar-open')
-
-  sidebarTrigger?.setAttribute('aria-expanded', 'true')
-
-  syncSidebarAccessibility()
-
-  sidebar
-    ?.querySelector<HTMLElement>(
-      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    )
-    ?.focus({ preventScroll: true })
-}
-
-sidebarTrigger?.addEventListener('click', () => {
-  const isOpen = !sidebar?.classList.contains('is-open')
-
-  if (isOpen) openSidebar()
-  else closeSidebar(true)
-})
-
-for (const closeButton of sidebarCloseButtons)
-  closeButton.addEventListener('click', () => closeSidebar(true))
-
-const shouldTrapSidebarFocus = (event: KeyboardEvent): boolean => event.key === 'Tab' &&
-  mobileSidebarQuery.matches &&
-  sidebar?.classList.contains('is-open') === true
-
-const trapSidebarFocus = (event: KeyboardEvent) => {
-  if (!shouldTrapSidebarFocus(event) || !sidebar) return
-
-  const focusable = [
-    ...sidebar.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    )
-  ].filter(element => !element.hasAttribute('hidden'))
-
-  const first = focusable.at(0)
-  const last = focusable.at(-1)
-
-  if (!first || !last) return
-
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault()
-
-    last.focus()
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault()
-
-    first.focus()
-  }
-}
-
-document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && sidebar?.classList.contains('is-open')) {
-    closeSidebar(true)
-
-    return
-  }
-
-  trapSidebarFocus(event)
-})
-
-mobileSidebarQuery.addEventListener('change', () => {
-  if (mobileSidebarQuery.matches) syncSidebarAccessibility()
-  else closeSidebar()
-})
-
-syncSidebarAccessibility()
+initializeAppNavigation()
 
 const setSyncButtonLabel = (button: HTMLButtonElement, label: string) => {
   const labelElement = button.querySelector<HTMLElement>('[data-sync-label]')

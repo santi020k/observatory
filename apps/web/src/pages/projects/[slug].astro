@@ -32,6 +32,7 @@ import {
   Empty,
   Icon,
   LineChart,
+  ScrollReveal,
   Table,
   Tabs
 } from '@santi020k/lumen-astro'
@@ -375,7 +376,14 @@ const growthGuidance = (() => {
           <span aria-current="page">{project.name}</span>
         </Breadcrumb>
 
-        <section class="hero-row" aria-labelledby="project-title">
+        <ScrollReveal
+          as="section"
+          animation="fade"
+          duration="fast"
+          threshold={0}
+          class="hero-row"
+          aria-labelledby="project-title"
+        >
           <div>
             <span class="eyebrow">{project.category} dashboard</span>
             <h1 id="project-title">{project.name}</h1>
@@ -452,7 +460,7 @@ const growthGuidance = (() => {
               }
             </div>
           </div>
-        </section>
+        </ScrollReveal>
 
         <Tabs class="dashboard-tabs project-tabs" initialValue="pulse">
           <div

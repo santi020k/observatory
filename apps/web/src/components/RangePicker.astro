@@ -1,6 +1,7 @@
 ---
 import { analyticsRangeOptions } from '@/lib/analytics-range'
 
+import { ButtonLink } from '@santi020k/lumen-astro'
 import type { AnalyticsRange } from '@santi020k/observatory-api-types'
 
 interface Props {
@@ -13,12 +14,13 @@ const { range } = Astro.props
 <nav aria-label="Analytics time range" class="range-picker">
   {
     analyticsRangeOptions.map(item => (
-      <a
+      <ButtonLink
+        variant="unstyled"
         aria-current={range === item.value ? 'page' : undefined}
         href={`?range=${item.value}`}
       >
         {item.label}
-      </a>
+      </ButtonLink>
     ))
   }
 </nav>

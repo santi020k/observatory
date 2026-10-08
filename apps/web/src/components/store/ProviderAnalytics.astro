@@ -1,8 +1,9 @@
 ---
 import MetricCard from '@/components/MetricCard.astro'
 
-import { analyticsRangeMeta, formatHistoryLabel } from '@/lib/analytics-range'
+import { analyticsRangeMeta } from '@/lib/analytics-range'
 import { formatNumber, formatRelativeDate } from '@/lib/format'
+import { createStoreMetricHistory } from '@/lib/store-history'
 import {
   dimensionLabels,
   emptyStatusMessage,
@@ -51,18 +52,14 @@ const chartMetrics =
 const chartSeries = chartMetrics
   .filter(metric => provider.history.some(point => point.metrics[metric] !== undefined))
   .map((metric, index) => ({
-    data: provider.history.map(point => ({
-      label: `${formatNumber(point.metrics[metric] ?? 0)} ${metricLabels[metric].toLocaleLowerCase('en')}`,
-      x: formatHistoryLabel(point.periodStart, range),
-      y: point.metrics[metric] ?? 0
-    })),
+    data: createStoreMetricHistory(provider.history, metric, range),
     id: `${provider.provider}-${metric}`,
     label: metricLabels[metric],
     tone: index === 0 ? ('brand' as const) : ('accent' as const)
   }))
 ---
 
-<Card as="article" class="store-provider store-provider--detail">
+<Card as="article" class="store-provider store-provider--detail" variant="unstyled">
   <div class="store-provider__heading">
     <div>
       <span class="store-provider__icon">

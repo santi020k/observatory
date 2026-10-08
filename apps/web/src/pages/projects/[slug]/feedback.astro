@@ -19,10 +19,12 @@ import {
   Card,
   Empty,
   Field,
+  FilterBar,
   Icon,
   Label,
   Link,
   NativeSelect,
+  ScrollReveal,
   SearchField,
   VisuallyHidden
 } from '@santi020k/lumen-astro'
@@ -92,7 +94,14 @@ const moderationOptions = [
         data-feedback-project={project.slug}
         id="main-content"
       >
-        <section class="hero-row feedback-board-hero" aria-labelledby="board-title">
+        <ScrollReveal
+          as="section"
+          animation="fade"
+          duration="fast"
+          threshold={0}
+          class="hero-row feedback-board-hero"
+          aria-labelledby="board-title"
+        >
           <div>
             <ButtonLink href="/feedback/" variant="ghost">
               <Icon aria-hidden="true" name="arrow-left" />
@@ -103,35 +112,42 @@ const moderationOptions = [
             <p>Moderate incoming ideas and private reports, then manage accepted work.</p>
           </div>
           <Badge variant="outline" data-board-total>{items.length} items</Badge>
-        </section>
+        </ScrollReveal>
 
-        <section class="feedback-toolbar" aria-label="Board filters">
-          <SearchField
-            aria-label="Search feedback"
-            data-feedback-search
-            placeholder="Search title, details, or email"
-          />
-          <NativeSelect
-            aria-label="Filter by feedback type"
-            data-feedback-type-filter
-            options={[
-              { label: 'All feedback', value: '' },
-              { label: 'Ideas', value: 'idea' },
-              { label: 'Bugs', value: 'bug' },
-              { label: 'Messages', value: 'message' }
-            ]}
-            value=""
-          />
-          <NativeSelect
-            aria-label="Filter by moderation status"
-            data-feedback-moderation-filter
-            options={[
-              { label: 'All moderation states', value: '' },
-              ...moderationOptions
-            ]}
-            value=""
-          />
-        </section>
+        <FilterBar
+          class="feedback-filter-bar"
+          data-feedback-filters
+          label="Find feedback"
+          resultLabel={`${items.length} items`}
+        >
+          <div class="feedback-toolbar">
+            <SearchField
+              aria-label="Search feedback"
+              data-feedback-search
+              placeholder="Search title, details, or email"
+            />
+            <NativeSelect
+              aria-label="Filter by feedback type"
+              data-feedback-type-filter
+              options={[
+                { label: 'All feedback', value: '' },
+                { label: 'Ideas', value: 'idea' },
+                { label: 'Bugs', value: 'bug' },
+                { label: 'Messages', value: 'message' }
+              ]}
+              value=""
+            />
+            <NativeSelect
+              aria-label="Filter by moderation status"
+              data-feedback-moderation-filter
+              options={[
+                { label: 'All moderation states', value: '' },
+                ...moderationOptions
+              ]}
+              value=""
+            />
+          </div>
+        </FilterBar>
 
         <Alert
           aria-live="polite"

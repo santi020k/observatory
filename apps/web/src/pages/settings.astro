@@ -15,10 +15,12 @@ import {
   Card,
   Empty,
   Field,
+  FilterBar,
   Icon,
   Input,
   Label,
   NativeSelect,
+  ScrollReveal,
   SearchField,
   Switch,
   Tabs
@@ -69,7 +71,14 @@ const getCategoryIcon = (
       />
 
       <main class="dashboard settings-dashboard" id="main-content">
-        <section class="hero-row" aria-labelledby="settings-title">
+        <ScrollReveal
+          as="section"
+          animation="fade"
+          duration="fast"
+          threshold={0}
+          class="hero-row"
+          aria-labelledby="settings-title"
+        >
           <div>
             <span class="eyebrow">Workspace preferences</span>
             <h1 id="settings-title">Settings</h1>
@@ -78,7 +87,7 @@ const getCategoryIcon = (
               browser.
             </p>
           </div>
-        </section>
+        </ScrollReveal>
 
         <Tabs
           class="settings-tabs"
@@ -183,34 +192,30 @@ const getCategoryIcon = (
                         All changes saved
                       </span>
                     </div>
-                    <div
-                      class="project-settings-filters"
-                      aria-label="Filter project settings"
-                      role="search"
+                    <FilterBar
+                      class="settings-filter-bar"
+                      data-project-settings-filters
+                      label="Find project settings"
+                      resultLabel={`${settings.projects.length} projects`}
                     >
-                      <SearchField
-                        aria-label="Search project settings"
-                        data-project-settings-search
-                        placeholder="Search projects"
-                      />
-                      <NativeSelect
-                        aria-label="Filter by inclusion"
-                        data-project-settings-scope
-                        options={[
-                          { label: 'All projects', value: 'all' },
-                          { label: 'Included', value: 'included' },
-                          { label: 'Excluded', value: 'excluded' }
-                        ]}
-                        size="sm"
-                      />
-                      <span
-                        class="project-settings-result"
-                        aria-live="polite"
-                        data-project-settings-result
-                      >
-                        {settings.projects.length} projects
-                      </span>
-                    </div>
+                      <div class="project-settings-filters">
+                        <SearchField
+                          aria-label="Search project settings"
+                          data-project-settings-search
+                          placeholder="Search projects"
+                        />
+                        <NativeSelect
+                          aria-label="Filter by inclusion"
+                          data-project-settings-scope
+                          options={[
+                            { label: 'All projects', value: 'all' },
+                            { label: 'Included', value: 'included' },
+                            { label: 'Excluded', value: 'excluded' }
+                          ]}
+                          size="sm"
+                        />
+                      </div>
+                    </FilterBar>
                     <Accordion class="project-settings-list" variant="flush">
                       {settings.projects.map((project, index) => (
                         <details
@@ -634,11 +639,17 @@ const defaultPreferences: BrowserPreferences = {
 
 const readPreferences = (): BrowserPreferences => {
   try {
-    const stored = JSON.parse(
+    const stored: unknown = JSON.parse(
       localStorage.getItem(preferenceKey) ?? '{}'
-    ) as Partial<BrowserPreferences>
+    )
 
-    return { ...defaultPreferences, ...stored }
+    if (typeof stored !== 'object' || stored === null) return defaultPreferences
+
+    return {
+      density: 'density' in stored && stored.density === 'compact' ? 'compact' : 'comfortable',
+      reduceMotion: 'reduceMotion' in stored && stored.reduceMotion === true,
+      showDetails: !('showDetails' in stored) || stored.showDetails !== false
+    }
   } catch {
     return defaultPreferences
   }
@@ -650,6 +661,9 @@ const applyPreferences = (preferences: BrowserPreferences) => {
   document.documentElement.dataset.observatoryReduceMotion = String(
     preferences.reduceMotion
   )
+
+  if (preferences.reduceMotion) document.documentElement.dataset.uiMotion = 'reduce'
+  else delete document.documentElement.dataset.uiMotion
 
   document.documentElement.dataset.observatoryShowDetails = String(
     preferences.showDetails
@@ -792,7 +806,7 @@ const projectItems = [
 ]
 
 const projectResult = document.querySelector<HTMLElement>(
-  '[data-project-settings-result]'
+  '[data-project-settings-filters] [role="status"]'
 )
 
 const projectFilterEmpty = document.querySelector<HTMLElement>(

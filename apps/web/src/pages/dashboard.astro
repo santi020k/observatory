@@ -30,9 +30,11 @@ import {
   ButtonLink,
   Card,
   Empty,
+  FilterBar,
   Icon,
   LineChart,
   NativeSelect,
+  ScrollReveal,
   SearchField,
   Sparkline,
   Table,
@@ -492,7 +494,14 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
       />
 
       <main class="dashboard" id="main-content">
-        <section class="hero-row" aria-labelledby="overview-title">
+        <ScrollReveal
+          as="section"
+          animation="fade"
+          duration="fast"
+          threshold={0}
+          class="hero-row"
+          aria-labelledby="overview-title"
+        >
           <div>
             <span class="eyebrow">Portfolio overview</span>
             <h1 id="overview-title">{greeting}, Santiago.</h1>
@@ -504,7 +513,7 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
           <div class="hero-controls">
             <RangePicker range={dashboard.range} />
           </div>
-        </section>
+        </ScrollReveal>
 
         <Tabs
           class="dashboard-tabs"
@@ -1965,82 +1974,82 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
                         </div>
                       </div>
 
-                      <div class="portfolio-toolbar" aria-label="Project filters">
-                        <div class="portfolio-search">
-                          <label class="sr-only" for="project-search">
-                            Search projects
-                          </label>
-                          <SearchField
-                            id="project-search"
-                            autocomplete="off"
-                            data-project-search
-                            placeholder="Search projects…"
-                          />
+                      <FilterBar
+                        class="portfolio-filter-bar"
+                        data-project-filters
+                        label="Find a project"
+                        resultLabel={`${dashboard.projects.length} projects`}
+                      >
+                        <div class="portfolio-toolbar">
+                          <div class="portfolio-search">
+                            <label class="sr-only" for="project-search">
+                              Search projects
+                            </label>
+                            <SearchField
+                              id="project-search"
+                              autocomplete="off"
+                              data-project-search
+                              placeholder="Search projects…"
+                            />
+                          </div>
+                          <div class="portfolio-selects">
+                            <label class="sr-only" for="project-category">
+                              Filter by category
+                            </label>
+                            <NativeSelect
+                              id="project-category"
+                              data-project-category
+                              options={[
+                                { label: 'All categories', value: 'all' },
+                                { label: 'Apps', value: 'app' },
+                                { label: 'Content', value: 'content' },
+                                { label: 'Libraries', value: 'library' },
+                                { label: 'Tools', value: 'tool' }
+                              ]}
+                              size="sm"
+                            />
+                            <label class="sr-only" for="project-status">
+                              Filter by status
+                            </label>
+                            <NativeSelect
+                              id="project-status"
+                              data-project-status
+                              options={[
+                                { label: 'All statuses', value: 'all' },
+                                { label: 'Active', value: 'active' },
+                                { label: 'Maintained', value: 'maintained' },
+                                { label: 'Paused', value: 'paused' },
+                                { label: 'Archived', value: 'archived' }
+                              ]}
+                              size="sm"
+                            />
+                            <label class="sr-only" for="project-sort">
+                              Sort projects
+                            </label>
+                            <NativeSelect
+                              id="project-sort"
+                              data-project-sort
+                              options={[
+                                { label: 'Most relevant', value: 'relevance' },
+                                { label: 'Fastest growth', value: 'momentum' },
+                                { label: 'Most downloads', value: 'downloads' },
+                                { label: 'Most stars', value: 'stars' },
+                                { label: 'Recently updated', value: 'updated' },
+                                { label: 'Name', value: 'name' }
+                              ]}
+                              size="sm"
+                            />
+                            <Button
+                              data-project-clear
+                              size="sm"
+                              type="button"
+                              variant="ghost"
+                            >
+                              Clear
+                            </Button>
+                          </div>
                         </div>
-                        <div class="portfolio-selects">
-                          <label class="sr-only" for="project-category">
-                            Filter by category
-                          </label>
-                          <NativeSelect
-                            id="project-category"
-                            data-project-category
-                            options={[
-                              { label: 'All categories', value: 'all' },
-                              { label: 'Apps', value: 'app' },
-                              { label: 'Content', value: 'content' },
-                              { label: 'Libraries', value: 'library' },
-                              { label: 'Tools', value: 'tool' }
-                            ]}
-                            size="sm"
-                          />
-                          <label class="sr-only" for="project-status">
-                            Filter by status
-                          </label>
-                          <NativeSelect
-                            id="project-status"
-                            data-project-status
-                            options={[
-                              { label: 'All statuses', value: 'all' },
-                              { label: 'Active', value: 'active' },
-                              { label: 'Maintained', value: 'maintained' },
-                              { label: 'Paused', value: 'paused' },
-                              { label: 'Archived', value: 'archived' }
-                            ]}
-                            size="sm"
-                          />
-                          <label class="sr-only" for="project-sort">
-                            Sort projects
-                          </label>
-                          <NativeSelect
-                            id="project-sort"
-                            data-project-sort
-                            options={[
-                              { label: 'Most relevant', value: 'relevance' },
-                              { label: 'Fastest growth', value: 'momentum' },
-                              { label: 'Most downloads', value: 'downloads' },
-                              { label: 'Most stars', value: 'stars' },
-                              { label: 'Recently updated', value: 'updated' },
-                              { label: 'Name', value: 'name' }
-                            ]}
-                            size="sm"
-                          />
-                          <Button
-                            data-project-clear
-                            size="sm"
-                            type="button"
-                            variant="ghost"
-                          >
-                            Clear
-                          </Button>
-                        </div>
-                        <span
-                          aria-live="polite"
-                          class="portfolio-result-count"
-                          data-project-result-count
-                        >
-                          {dashboard.projects.length} projects
-                        </span>
-                      </div>
+                      </FilterBar>
 
                       <Table
                         aria-label="Project catalog. Scroll horizontally to see all columns."
@@ -2258,7 +2267,7 @@ else if (hourInBogota < 18) greeting = 'Good afternoon'
 )
 
   const resultCount = document.querySelector<HTMLElement>(
-    '[data-project-result-count]'
+    '[data-project-filters] [role="status"]'
 )
 
   const empty = document.querySelector<HTMLElement>(

@@ -1,5 +1,8 @@
 # Architecture decision: portfolio observatory and operations control plane
 
+[Project overview](../README.md) · [Design guide](design-system.md) ·
+[Feedback platform](feedback-platform.md)
+
 ## Decision
 
 Use a pnpm/Turborepo monorepo with an Astro server-rendered interface, Hono Cloudflare Worker API,
@@ -16,6 +19,14 @@ Cloudflare D1 snapshots, and shared contract/catalog/data packages.
   contract.
 - Product-facing feedback uses a deliberately small public route boundary. Observatory owns the
   shared schema and private workflow; each product continues to own its branded customer UI.
+
+## Interface boundary
+
+The [design guide](design-system.md) governs Observatory's visual composition. Lumen supplies
+accessible primitives and chart rendering; Observatory owns metric meanings, aggregation,
+moderation, and authentication policy. Styles and `UIPrimitives` load once in the Astro root layout.
+Native cross-document transitions progressively enhance full server-rendered navigation, preserving
+the existing authentication checks, redirects, and per-page script lifecycle.
 
 ## Data flow
 

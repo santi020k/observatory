@@ -1,7 +1,11 @@
 # Private projects — phase specification
 
-The dashboard visibly reserves this area, but no private repository name, metric, or credential is
-collected in the first release.
+[Project overview](../README.md) · [Architecture](architecture.md) ·
+[Data visualization](visualization-roadmap.md)
+
+Private-source collection remains planned. The current application does not collect private
+repository names, metrics, or credentials. This specification defines the boundary for a future
+implementation; it does not imply that a private-project dashboard or collector is connected.
 
 ## Phase 2 sources
 
