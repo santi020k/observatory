@@ -15,26 +15,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: amannn/action-semantic-pull-request@v6
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
-          types: |
-            feat
-            fix
-            docs
-            style
-            chore
-            refactor
-            perf
-            test
-            ci
-            build
-            revert
-          requireScope: false
-          subjectPattern: ^(?![A-Z]).+$
-          subjectPatternError: >
-            The subject must start with a lowercase letter.
-            Example: "feat: add repository-aware prompts"
-          ignoreLabels: |
-            autorelease: pending
+          script: |
+            // Validate metadata only; never check out or execute PR code.
+            const pullRequest = context.payload.pull_request
+            const ignored = pullRequest.labels.some(label => label.name === 'autorelease: pending')
+            const pattern = /^(feat|fix|docs|style|chore|refactor|perf|test|ci|build|revert)(\([^)\r\n]+\))?!?: (?![A-Z])[^\r\n]+$/
+            const valid = ignored || pattern.test(pullRequest.title)
+            const description = ignored
+              ? 'Release automation title is exempt.'
+              : valid
+                ? 'Pull request title follows the repository standard.'
+                : 'Use a conventional title with a lowercase subject, e.g. feat: add repository-aware prompts'
+
+            await github.rest.repos.createCommitStatus({
+              ...context.repo,
+              sha: pullRequest.head.sha,
+              state: valid ? 'success' : 'failure',
+              context: 'PR title',
+              description,
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            })
+
+            if (!valid) core.setFailed(description)
