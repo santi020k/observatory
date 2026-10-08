@@ -1,14 +1,24 @@
+<p align="center">
+  <a href="README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/hero-dark.svg">
+      <img src="docs/assets/readme/hero-light.svg" alt="Observatory — Project signals. A clearer next move." width="1200" height="360">
+    </picture>
+  </a>
+</p>
+
 <h1 align="center">Observatory</h1>
 
 <p align="center">One control room for project intelligence and portfolio operations.</p>
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-source--available-orange.svg" alt="License: Source-Available"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/workspace-Monorepo-6319be?style=flat-square" alt="Workspace: Monorepo"></a>
+</p>
+
 Source-available project intelligence and portfolio operations for Santiago Molina. Observatory turns public
 repository, package, deployment, and product-feedback signals into one decision-focused control room.
 The dashboard is owner-only; narrowly scoped public feedback routes serve each product's branded UI.
-
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-source--available-orange.svg" alt="License: Source-Available"></a>
-</p>
 
 [Dashboard](https://observatory.santi020k.com) ·
 [Design guide](docs/design-system.md) · [Architecture](docs/architecture.md) ·
