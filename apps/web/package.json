@@ -22,7 +22,6 @@
     "@santi020k/lumen-astro": "catalog:",
     "@santi020k/observatory-api-types": "workspace:*",
     "@santi020k/theme": "catalog:",
-    "@simplewebauthn/browser": "catalog:",
     "astro": "catalog:",
     "zod": "catalog:"
   },
